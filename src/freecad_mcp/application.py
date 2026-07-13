@@ -65,6 +65,10 @@ class Application:
             object_name=object_name,
         )
 
+    def recompute_document(self, document_name: object) -> CommandResult:
+        """Recompute one open document through the shared application handler."""
+        return self.documents.recompute.execute(document_name=document_name)
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

@@ -199,6 +199,7 @@ get_document
 save_document
 list_objects
 get_object
+recompute_document
 ```
 
 These document and object-inspection tools are MCP-only; the workbench has no
@@ -270,6 +271,21 @@ sequence through the MCP client:
    placement position and rotation reflect the change.
 8. Call `get_object` on an object without placement (if one exists in the test
    document) and confirm `placement` is `null`.
+
+### Recompute Verification
+
+1. Open a document in FreeCAD that contains computed features (such as a Part
+   Design Body).
+2. Call `recompute_document` with the document's internal name.
+3. Confirm the result returns `ok: true` with code `document_recomputed`.
+4. Confirm the returned `document` summary includes `name`, `label`,
+   `file_path`, `saved`, `modified`, `active`, and `object_count`.
+5. Modify a parameter in FreeCAD that requires recomputation, then call
+   `recompute_document` and confirm the document's state updates accordingly.
+6. Call `recompute_document` with an unknown document name and confirm the
+   existing `document_not_found` error is returned.
+7. Confirm the document was not saved by the recompute call (check FreeCAD's
+   modified/saved state).
 
 The original create-only smoke prompt remains useful:
 

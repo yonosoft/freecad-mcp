@@ -12,6 +12,7 @@ from freecad_mcp.commands import (
     GetObjectHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
+    RecomputeDocumentHandler,
     SaveDocumentHandler,
 )
 from freecad_mcp.commands.document import (
@@ -77,6 +78,9 @@ class AdapterStub:
             ),
         )
 
+    def recompute_document(self, document_name: str) -> DocumentSummary:
+        return self.document
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -102,6 +106,7 @@ def make_application() -> Application:
         save=SaveDocumentHandler(adapter, dispatcher),
         object_query=ListObjectsHandler(adapter, dispatcher),
         get_object=GetObjectHandler(adapter, dispatcher),
+        recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
 

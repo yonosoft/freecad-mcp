@@ -3,7 +3,11 @@
 from dataclasses import dataclass
 
 from freecad_mcp.commands.document import CreateDocumentHandler
-from freecad_mcp.commands.document_query import GetDocumentHandler, ListDocumentsHandler
+from freecad_mcp.commands.document_query import (
+    GetDocumentHandler,
+    ListDocumentsHandler,
+    RecomputeDocumentHandler,
+)
 from freecad_mcp.commands.document_save import SaveDocumentHandler
 from freecad_mcp.commands.object_query import GetObjectHandler, ListObjectsHandler
 from freecad_mcp.commands.status import report_status
@@ -19,6 +23,7 @@ class DocumentHandlers:
     save: SaveDocumentHandler
     object_query: ListObjectsHandler
     get_object: GetObjectHandler
+    recompute: RecomputeDocumentHandler
 
 
 __all__ = [
@@ -28,6 +33,7 @@ __all__ = [
     "GetObjectHandler",
     "ListDocumentsHandler",
     "ListObjectsHandler",
+    "RecomputeDocumentHandler",
     "SaveDocumentHandler",
     "report_status",
 ]

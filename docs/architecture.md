@@ -317,6 +317,25 @@ The flat response contract places summary fields directly alongside
 }
 ```
 
+### recompute_document
+
+`recompute_document` recomputes one open document through the full dispatch
+chain and returns its updated controlled `DocumentSummary`:
+
+```text
+MCP tool → Application → RecomputeDocumentHandler → FreeCADDocumentAdapter → Qt dispatcher → FreeCAD API
+```
+
+The tool looks up the document by exact internal name, invokes
+`Document.recompute()` on the main thread, and returns the document's
+post-recompute summary with the same fields used by `get_document`. The
+document label is preserved, the file path is unchanged, and the document is
+not saved automatically.
+
+A dedicated `document_recompute_failed` error is returned when the FreeCAD
+recompute itself fails. Missing documents use the existing `document_not_found`
+convention. The tool is MCP-only and has no matching toolbar or menu command.
+
 ## Tool Levels
 
 - **High-level workflows:** common modeling sequences with strong validation and

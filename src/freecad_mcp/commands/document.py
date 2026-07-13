@@ -187,6 +187,10 @@ class DocumentSaveError(RuntimeError):
     """Raised when FreeCAD cannot persist a document."""
 
 
+class DocumentRecomputeError(RuntimeError):
+    """Raised when FreeCAD cannot complete document recomputation."""
+
+
 class ObjectNotFoundError(RuntimeError):
     """Raised when an internal object name is not found in an open document."""
 
@@ -211,6 +215,9 @@ class DocumentAdapter(Protocol):
 
     def get_object(self, document_name: str, object_name: str) -> ObjectDetail:
         """Return one object by exact internal document and object name."""
+
+    def recompute_document(self, document_name: str) -> DocumentSummary:
+        """Recompute one open document and return its updated summary."""
 
 
 class Dispatcher(Protocol):

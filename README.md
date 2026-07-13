@@ -97,6 +97,9 @@ Available document tools:
   internal object name, returning its summary fields plus controlled placement
   data.
 
+- `recompute_document` recomputes one open document and returns its updated
+  controlled summary.
+
 Tool names the MCP client can see:
 
 ```text
@@ -106,6 +109,7 @@ get_document
 save_document
 list_objects
 get_object
+recompute_document
 ```
 
 These document and object-inspection tools are MCP-only capabilities. They do not

@@ -17,6 +17,7 @@ from freecad_mcp.commands import (
     GetObjectHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
+    RecomputeDocumentHandler,
     SaveDocumentHandler,
 )
 from freecad_mcp.commands.document import DocumentCollection, DocumentSummary
@@ -30,6 +31,7 @@ from freecad_mcp.tool_registry import (
     GET_OBJECT_TOOL,
     LIST_DOCUMENTS_TOOL,
     LIST_OBJECTS_TOOL,
+    RECOMPUTE_DOCUMENT_TOOL,
     REGISTERED_TOOL_NAMES,
     SAVE_DOCUMENT_TOOL,
 )
@@ -55,6 +57,7 @@ class AdapterStub:
         self.save_calls: list[tuple[str, str | None]] = []
         self.list_objects_calls: list[str] = []
         self.get_object_calls: list[tuple[str, str]] = []
+        self.recompute_calls: list[str] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -108,6 +111,10 @@ class AdapterStub:
         )
 
 
+    def recompute_document(self, document_name: str) -> DocumentSummary:
+        self.recompute_calls.append(document_name)
+        return self.document
+
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
         return operation()
@@ -124,6 +131,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             save=SaveDocumentHandler(actual_adapter, dispatcher),
             object_query=ListObjectsHandler(actual_adapter, dispatcher),
             get_object=GetObjectHandler(actual_adapter, dispatcher),
+            recompute=RecomputeDocumentHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,
     )
@@ -153,6 +161,8 @@ def test_mcp_server_registers_typed_document_tools() -> None:
     assert set(schemas[LIST_OBJECTS_TOOL]["properties"]) == {"document_name"}
     assert schemas[GET_OBJECT_TOOL]["required"] == ["document_name", "object_name"]
     assert set(schemas[GET_OBJECT_TOOL]["properties"]) == {"document_name", "object_name"}
+    assert schemas[RECOMPUTE_DOCUMENT_TOOL]["required"] == ["document_name"]
+    assert set(schemas[RECOMPUTE_DOCUMENT_TOOL]["properties"]) == {"document_name"}
     assert all(tool.outputSchema is not None for tool in tools)
 
 
@@ -169,6 +179,7 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
     assert "MCP_CreateDocument" not in actual_tools
     assert "list_objects" in actual_tools
     assert "get_object" in actual_tools
+    assert "recompute_document" in actual_tools
 
 
 def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:

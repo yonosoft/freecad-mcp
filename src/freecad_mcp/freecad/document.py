@@ -10,6 +10,7 @@ from freecad_mcp.commands.document import (
     DocumentCollection,
     DocumentCreationError,
     DocumentNotFoundError,
+    DocumentRecomputeError,
     DocumentSaveError,
     DocumentSummary,
     FreeCADDocumentError,
@@ -169,6 +170,23 @@ class FreeCADDocumentAdapter:
             raise
         except Exception as exc:
             raise FreeCADDocumentError(str(exc)) from exc
+
+    def recompute_document(self, document_name: str) -> DocumentSummary:
+        """Recompute one open document and return its updated summary."""
+        import FreeCAD as App
+        import FreeCADGui as Gui
+
+        try:
+            document = App.listDocuments().get(document_name)
+            if document is None:
+                raise DocumentNotFoundError(document_name)
+
+            document.recompute()
+            return _summarize_document(document, _active_document_name(App), Gui)
+        except (DocumentNotFoundError, DocumentRecomputeError):
+            raise
+        except Exception as exc:
+            raise DocumentRecomputeError(str(exc)) from exc
 
 
 def _active_document_name(App: Any) -> str | None:

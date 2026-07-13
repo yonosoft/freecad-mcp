@@ -14,6 +14,7 @@ from freecad_mcp.tool_registry import (
     GET_OBJECT_TOOL,
     LIST_DOCUMENTS_TOOL,
     LIST_OBJECTS_TOOL,
+    RECOMPUTE_DOCUMENT_TOOL,
     SAVE_DOCUMENT_TOOL,
 )
 
@@ -92,5 +93,13 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             document_name=document_name,
             object_name=object_name,
         ).to_dict()
+
+    @server.tool(
+        name=RECOMPUTE_DOCUMENT_TOOL,
+        description="Recompute an open FreeCAD document and return its updated controlled summary.",
+        structured_output=True,
+    )
+    def recompute_document(document_name: str) -> dict[str, object]:
+        return handlers.recompute.execute(document_name=document_name).to_dict()
 
     return server
