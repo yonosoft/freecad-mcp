@@ -8,11 +8,12 @@ from mcp.server.fastmcp import FastMCP
 
 from freecad_mcp.commands import DocumentHandlers
 from freecad_mcp.server.config import ServerConfig
-
-CREATE_DOCUMENT_TOOL = "create_document"
-LIST_DOCUMENTS_TOOL = "list_documents"
-GET_DOCUMENT_TOOL = "get_document"
-SAVE_DOCUMENT_TOOL = "save_document"
+from freecad_mcp.tool_registry import (
+    CREATE_DOCUMENT_TOOL,
+    GET_DOCUMENT_TOOL,
+    LIST_DOCUMENTS_TOOL,
+    SAVE_DOCUMENT_TOOL,
+)
 
 
 def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMCP[Any]:

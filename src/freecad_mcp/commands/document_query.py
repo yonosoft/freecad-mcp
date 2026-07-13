@@ -26,7 +26,13 @@ class ListDocumentsHandler:
         """List documents through the FreeCAD main-thread boundary."""
         try:
             collection = self.dispatcher.call(self.adapter.list_documents)
-        except (DispatchError, FreeCADDocumentError) as exc:
+        except DispatchError as exc:
+            return CommandResult.failure(
+                code="freecad_error",
+                message="FreeCAD could not list open documents.",
+                data=exc.details(),
+            )
+        except FreeCADDocumentError as exc:
             return CommandResult.failure(
                 code="freecad_error",
                 message="FreeCAD could not list open documents.",
@@ -54,7 +60,7 @@ class ListDocumentsHandler:
 
 @dataclass(frozen=True, slots=True)
 class GetDocumentHandler:
-    """Inspect one open document by immutable FreeCAD name."""
+    """Inspect one open document by its internal FreeCAD name."""
 
     adapter: DocumentAdapter
     dispatcher: Dispatcher
@@ -74,7 +80,13 @@ class GetDocumentHandler:
                 message="The requested FreeCAD document is not open.",
                 data={"name": name},
             )
-        except (DispatchError, FreeCADDocumentError) as exc:
+        except DispatchError as exc:
+            return CommandResult.failure(
+                code="freecad_error",
+                message="FreeCAD could not inspect the document.",
+                data={"name": name, **exc.details()},
+            )
+        except FreeCADDocumentError as exc:
             return CommandResult.failure(
                 code="freecad_error",
                 message="FreeCAD could not inspect the document.",

@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService, LifecycleState
+from freecad_mcp.tool_registry import REGISTERED_TOOL_NAMES
 
 
 class FakeRunner:
@@ -17,15 +18,23 @@ class FakeRunner:
         self.start_calls = 0
         self.stop_calls = 0
         self._on_exit: Callable[[BaseException | None], None] | None = None
+        self.on_start: Callable[[], None] | None = None
+        self.on_stop: Callable[[], None] | None = None
 
     def start(self, on_exit: Callable[[BaseException | None], None]) -> None:
         self.start_calls += 1
         if self.start_error is not None:
             raise self.start_error
         self._on_exit = on_exit
+        if self.on_start is not None:
+            self.on_start()
 
     def stop(self) -> None:
         self.stop_calls += 1
+        if self.on_stop is not None:
+            callback = self.on_stop
+            self.on_stop = None
+            callback()
         if self.stop_error is not None:
             raise self.stop_error
         if self._on_exit is not None:
@@ -56,12 +65,7 @@ def test_lifecycle_initial_status_is_stopped_and_structured() -> None:
     assert result.data["state"] == "stopped"
     assert result.data["url"] == "http://127.0.0.1:8765/mcp"
     assert result.data["transport"] == "streamable_http"
-    assert result.data["tools"] == [
-        "create_document",
-        "list_documents",
-        "get_document",
-        "save_document",
-    ]
+    assert result.data["tools"] == list(REGISTERED_TOOL_NAMES)
     assert lifecycle.can_start() is True
     assert lifecycle.can_stop() is False
 
@@ -123,6 +127,7 @@ def test_startup_failure_is_structured_and_recoverable() -> None:
     }
     assert success.ok is True
     assert success.data["state"] == "running"
+    assert failed.stop_calls == 1
 
 
 def test_shutdown_failure_retains_non_recoverable_runner() -> None:
@@ -154,3 +159,86 @@ def test_unexpected_runner_exit_moves_lifecycle_to_recoverable_error() -> None:
         "type": "RuntimeError",
         "message": "event loop failed",
     }
+
+
+def test_shutdown_while_stopped_is_harmless() -> None:
+    factory = FakeRunnerFactory()
+    lifecycle = LifecycleService(ServerConfig(), factory)
+
+    result = lifecycle.shutdown()
+
+    assert result.ok is True
+    assert result.data["state"] == "stopped"
+    assert factory.created == []
+
+
+def test_shutdown_while_running_releases_runner_once() -> None:
+    runner = FakeRunner()
+    lifecycle = LifecycleService(ServerConfig(), FakeRunnerFactory([runner]))
+    lifecycle.start()
+
+    first = lifecycle.shutdown()
+    second = lifecycle.shutdown()
+
+    assert first.ok is True
+    assert second.ok is True
+    assert lifecycle.state is LifecycleState.STOPPED
+    assert runner.stop_calls == 1
+    assert lifecycle.can_start() is True
+
+
+def test_shutdown_during_starting_stops_owned_runner() -> None:
+    runner = FakeRunner()
+    lifecycle = LifecycleService(ServerConfig(), FakeRunnerFactory([runner]))
+    shutdown_results = []
+    runner.on_start = lambda: shutdown_results.append(lifecycle.shutdown())
+
+    start_result = lifecycle.start()
+
+    assert start_result.ok is False
+    assert shutdown_results[0].ok is True
+    assert lifecycle.state is LifecycleState.STOPPED
+    assert runner.stop_calls == 1
+
+
+def test_shutdown_retries_cleanup_after_partial_start_failure() -> None:
+    runner = FakeRunner(
+        start_error=RuntimeError("startup failed"),
+        stop_error=RuntimeError("cleanup failed"),
+    )
+    lifecycle = LifecycleService(ServerConfig(), FakeRunnerFactory([runner]))
+
+    failure = lifecycle.start()
+    runner.stop_error = None
+    shutdown = lifecycle.shutdown()
+
+    assert failure.ok is False
+    assert failure.data["state"] == "error"
+    assert failure.data["recoverable"] is False
+    assert failure.data["last_error"] == {
+        "stage": "startup",
+        "type": "RuntimeError",
+        "message": "startup failed",
+        "cleanup_error": {
+            "type": "RuntimeError",
+            "message": "cleanup failed",
+        },
+    }
+    assert shutdown.ok is True
+    assert shutdown.data["state"] == "stopped"
+    assert runner.stop_calls == 2
+    assert lifecycle.can_start() is True
+
+
+def test_shutdown_does_not_duplicate_an_explicit_stop_in_progress() -> None:
+    runner = FakeRunner()
+    lifecycle = LifecycleService(ServerConfig(), FakeRunnerFactory([runner]))
+    nested_shutdowns = []
+    lifecycle.start()
+    runner.on_stop = lambda: nested_shutdowns.append(lifecycle.shutdown())
+
+    stopped = lifecycle.stop()
+
+    assert stopped.ok is True
+    assert nested_shutdowns[0].code == "server_stopping"
+    assert runner.stop_calls == 1

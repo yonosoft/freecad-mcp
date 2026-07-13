@@ -12,7 +12,7 @@ from freecad_mcp.commands.document import (
     DocumentCreationError,
     DocumentSummary,
 )
-from freecad_mcp.core.dispatch import DispatchError
+from freecad_mcp.core.dispatch import DispatchError, DispatchTimeoutError
 
 T = TypeVar("T")
 
@@ -154,6 +154,18 @@ def test_create_document_reports_main_thread_dispatch_failure() -> None:
 
     assert result.ok is False
     assert result.code == "main_thread_dispatch_failed"
+
+
+def test_create_document_reports_structured_dispatch_timeout() -> None:
+    dispatcher = ImmediateDispatcher(error=DispatchTimeoutError(cancelled_before_start=False))
+
+    result = make_handler(dispatcher=dispatcher).execute("BracketDesign")
+
+    assert result.ok is False
+    assert result.code == "main_thread_dispatch_failed"
+    assert result.data["timed_out"] is True
+    assert result.data["cancelled_before_start"] is False
+    assert result.data["operation_may_complete"] is True
 
 
 def test_create_document_reports_actual_adapter_name() -> None:

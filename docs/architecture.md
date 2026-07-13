@@ -56,7 +56,7 @@ FreeCAD toolbar/menu       MCP transport
 - `package.xml` supplies FreeCAD addon metadata.
 
 Startup code must remain small and robust. Substantial work belongs behind
-workbench activation, command activation, or the future MCP server lifecycle.
+workbench activation, command activation, or the MCP server lifecycle.
 
 ## Shared Command Layer
 
@@ -66,17 +66,18 @@ messages, and structured data. This layer is the common entry point for GUI
 commands and MCP transport adapters.
 
 Document handlers validate requests and dispatch adapter operations to the main
-Qt thread. Internal names use an ASCII letter or underscore followed by letters,
-digits, or underscores. This avoids FreeCAD's automatic sanitization. An
-already-open internal name is rejected instead of allowing FreeCAD to silently
-append a numeric suffix.
+Qt thread. The MCP server accepts internal names consisting of an ASCII letter
+or underscore followed by letters, digits, or underscores. This is an MCP input
+policy, not a claim about every name FreeCAD can represent. It avoids automatic
+sanitization, and an already-open name is rejected instead of allowing FreeCAD
+to append a numeric suffix.
 
 ### Shared Document Summary
 
 `create_document`, `list_documents`, `get_document`, and `save_document` use one
 document summary contract:
 
-- `name`: FreeCAD's immutable, unique internal document name;
+- `name`: FreeCAD's stable internal document identifier;
 - `label`: the user-visible document label;
 - `file_path`: FreeCAD's actual `Document.FileName`, or `null` when empty;
 - `saved`: whether `file_path` is non-null;
@@ -124,11 +125,24 @@ a queued signal. Calls already on the Qt application thread execute directly;
 calls from the MCP server thread wait on a `Future`, preserving return values and
 exceptions without polling or starting another Qt event loop.
 
+If the wait times out, the dispatcher cancels the `Future`. The queued Qt slot
+uses `set_running_or_notify_cancel()` and skips an operation cancelled before it
+starts. Once the slot has marked an operation running, it cannot safely terminate
+FreeCAD work. The client receives a typed dispatch timeout indicating whether
+pre-start cancellation succeeded; when it did not, the operation may already
+have completed or may complete later, so the client should inspect document
+state before retrying a mutation.
+
 ## Embedded MCP Server
 
 One process-owned lifecycle service manages the `stopped`, `starting`,
 `running`, `stopping`, and `error` states. It creates at most one runner and
 handles duplicate start/stop requests without spawning another thread.
+
+FreeCAD process shutdown asks the lifecycle service to clean up any runner it
+still owns, including ownership retained after a partial startup failure. The
+cleanup path is idempotent and does not issue a duplicate stop while an explicit
+stop is already in progress.
 
 The runner uses the official MCP Python SDK 1.27.x with FastMCP's stateless JSON
 Streamable HTTP app and uvicorn. One daemon thread owns the HTTP event loop, and
@@ -143,6 +157,10 @@ SDK-specific registration is isolated under `freecad_mcp.mcp`; it parses typed
 requests, calls the shared handler, and serializes structured results without
 containing CAD implementation logic.
 
+A dependency-free tool registry is the authoritative source for tool names and
+ordering. FastMCP registration and lifecycle status both consume that registry,
+so reported capabilities cannot drift from the registered set.
+
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
 document, object, constraint, geometry, and error data.
@@ -152,7 +170,8 @@ document, object, constraint, geometry, and error data.
 The `create_document` tool creates a FreeCAD document through the shared
 application path. It validates document-name rules, detects collisions, marshals
 execution to the main thread, creates and labels the document, recomputes it,
-and returns its full unsaved document summary.
+and returns its full unsaved document summary. It is MCP-only and has no matching
+toolbar or menu command.
 
 `list_documents` returns documents ordered by internal name and reports the
 actual active document. `get_document` performs an exact internal-name lookup;
@@ -163,6 +182,13 @@ mutating operations because FreeCAD document and GUI state are thread-affine.
 already-saved document, or when the requested path resolves to its existing
 path. It uses `Document.saveAs()` for an unsaved document or a different
 destination. The actual post-save `FileName` and `Modified` values are returned.
+
+FreeCAD's App-level `Document.saveAs()` replaces `Document.Label` with the new
+filename stem, while FreeCAD's GUI Save As path separately clears the GUI
+document's modified flag. The adapter preserves the pre-save user-visible label,
+persists it with a follow-up `save()` when `saveAs()` changed it, and clears the
+GUI modified flag only after every required write succeeds. This matches normal
+FreeCAD GUI save semantics while keeping MCP labels stable across save-as.
 
 Save-as paths are handled with `pathlib`: user-home markers are expanded,
 relative paths resolve against the FreeCAD process working directory, and the

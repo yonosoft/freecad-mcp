@@ -19,23 +19,20 @@ from freecad_mcp.commands import (
 )
 from freecad_mcp.commands.document import DocumentCollection, DocumentSummary
 from freecad_mcp.mcp.runner import UvicornMCPRunner
-from freecad_mcp.mcp.server import (
+from freecad_mcp.mcp.server import build_mcp_server
+from freecad_mcp.server.config import ServerConfig
+from freecad_mcp.server.lifecycle import LifecycleService
+from freecad_mcp.tool_registry import (
     CREATE_DOCUMENT_TOOL,
     GET_DOCUMENT_TOOL,
     LIST_DOCUMENTS_TOOL,
+    REGISTERED_TOOL_NAMES,
     SAVE_DOCUMENT_TOOL,
-    build_mcp_server,
 )
-from freecad_mcp.server.config import ServerConfig
 
 T = TypeVar("T")
 
-TOOL_NAMES = [
-    CREATE_DOCUMENT_TOOL,
-    LIST_DOCUMENTS_TOOL,
-    GET_DOCUMENT_TOOL,
-    SAVE_DOCUMENT_TOOL,
-]
+TOOL_NAMES = list(REGISTERED_TOOL_NAMES)
 
 
 class AdapterStub:
@@ -116,6 +113,19 @@ def test_mcp_server_registers_typed_document_tools() -> None:
     }
     assert schemas[SAVE_DOCUMENT_TOOL]["properties"]["overwrite"]["default"] is False
     assert all(tool.outputSchema is not None for tool in tools)
+
+
+def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> None:
+    handlers, _ = make_handlers()
+    config = ServerConfig()
+    server = build_mcp_server(handlers, config)
+    lifecycle = LifecycleService(config, lambda: UvicornMCPRunner(config, handlers))
+
+    actual_tools = [tool.name for tool in asyncio.run(server.list_tools())]
+
+    assert actual_tools == list(REGISTERED_TOOL_NAMES)
+    assert lifecycle.status().data["tools"] == actual_tools
+    assert "MCP_CreateDocument" not in actual_tools
 
 
 def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:

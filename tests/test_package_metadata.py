@@ -52,10 +52,11 @@ def test_command_icons_are_valid_svg_files() -> None:
         "mcp-start-server.svg",
         "mcp-stop-server.svg",
         "report-status.svg",
-        "mcp-create-document.svg",
     ):
         icon = ADDON_ROOT / "Resources" / "icons" / filename
         root = ET.parse(icon).getroot()
 
         assert root.tag == "{http://www.w3.org/2000/svg}svg"
         assert root.attrib["viewBox"] == "0 0 64 64"
+
+    assert not (ADDON_ROOT / "Resources" / "icons" / "mcp-create-document.svg").exists()

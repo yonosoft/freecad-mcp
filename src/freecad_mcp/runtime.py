@@ -17,7 +17,7 @@ from freecad_mcp.freecad.document import FreeCADDocumentAdapter
 from freecad_mcp.freecad.qt_dispatcher import create_qt_main_thread_dispatcher
 from freecad_mcp.mcp.runner import UvicornMCPRunner
 from freecad_mcp.server.config import ServerConfig
-from freecad_mcp.server.lifecycle import LifecycleService, LifecycleState
+from freecad_mcp.server.lifecycle import LifecycleService
 
 _LOGGER = get_logger("runtime")
 
@@ -30,9 +30,7 @@ class Runtime:
 
     def shutdown(self) -> None:
         """Stop the in-process server during FreeCAD shutdown."""
-        if self.application.lifecycle.state is not LifecycleState.RUNNING:
-            return
-        result = self.application.stop_server()
+        result = self.application.lifecycle.shutdown()
         if not result.ok:
             _LOGGER.error("MCP shutdown failed: %s", result.to_dict())
 

@@ -114,7 +114,13 @@ class SaveDocumentHandler:
                 message="FreeCAD could not save the document.",
                 data={"name": name, "reason": str(exc)},
             )
-        except (DispatchError, FreeCADDocumentError) as exc:
+        except DispatchError as exc:
+            return CommandResult.failure(
+                code="freecad_error",
+                message="FreeCAD could not access the document for saving.",
+                data={"name": name, **exc.details()},
+            )
+        except FreeCADDocumentError as exc:
             return CommandResult.failure(
                 code="freecad_error",
                 message="FreeCAD could not access the document for saving.",

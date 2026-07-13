@@ -166,7 +166,9 @@ Manual runtime check:
 3. Start FreeCAD.
 4. Open Report View.
 5. Select the **MCP** workbench.
-6. Confirm the four toolbar commands are visible.
+6. Confirm only **Start Server**, **Stop Server**, and **Report Status** are
+   present in the toolbar and MCP menu. Confirm there is no **Create Document**
+   command or icon.
 7. Click **Report Status** and confirm the state is `stopped`.
 8. Click **Start Server** and confirm FreeCAD remains responsive.
 9. Click **Report Status** and confirm the state is `running` and URL is:
@@ -197,8 +199,10 @@ get_document
 save_document
 ```
 
-The last three are MCP-only; the workbench still has no matching toolbar or menu
-commands. Run this disposable acceptance sequence through the MCP client:
+All four are MCP-only; the workbench has no matching document toolbar or menu
+commands. Connect the dedicated Aider MCP test project and confirm
+`create_document` remains discoverable, then run this disposable acceptance
+sequence through the MCP client:
 
 1. Request `list_documents` before creating anything and note the open and
    active documents already present in FreeCAD.
@@ -212,7 +216,8 @@ commands. Run this disposable acceptance sequence through the MCP client:
 5. Request `save_document` for `TestDocument` with a disposable absolute path
    whose parent already exists, omit the extension, and leave `overwrite` false.
    Confirm `.FCStd` is appended, the file exists, and the result reports
-   `saved: true` and `modified: false`.
+   `saved: true` and `modified: false`. Confirm the label remains `MCP Test`
+   rather than changing to the filename stem.
 6. Change the document label in FreeCAD, then request `get_document`; confirm
    `modified: true`. Request `save_document` again with only the internal name,
    then confirm it uses the current path and returns `modified: false`.
@@ -234,8 +239,14 @@ Use the MCP create_document tool to create a document named TestDocument with th
 For a fresh run, choose another internal name if `TestDocument` is already open.
 Also verify an invalid internal name, an unknown `get_document` name, and a
 duplicate create return structured errors. Stop and restart the server in the
-same FreeCAD session, reconnect the client, and close FreeCAD with the server
-running to confirm there is no separate or orphaned server process.
+same FreeCAD session and reconnect the client. Finally, close FreeCAD while the
+server is running and confirm shutdown completes without an orphaned server
+thread or process.
+
+Dispatcher timeouts distinguish queued work cancelled before execution from work
+that already started. Cancelled queued work is skipped when Qt later delivers
+it. FreeCAD work already running cannot be terminated safely; after that timeout,
+inspect document state before retrying a mutation because it may still complete.
 
 Report View writes one JSON object per explicit command, prefixed with `[MCP]`.
 Startup remains quiet unless bootstrap initialization fails.

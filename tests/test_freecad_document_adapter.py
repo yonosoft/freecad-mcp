@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from types import ModuleType
 
 import pytest
@@ -44,15 +45,13 @@ class AppDocumentStub:
 
     def save(self) -> bool:
         self.save_calls += 1
-        if self.save_result:
-            self.gui_document.Modified = False
         return self.save_result
 
     def saveAs(self, file_path: str) -> bool:
         self.save_as_calls.append(file_path)
         if self.save_result:
             self.FileName = file_path
-            self.gui_document.Modified = False
+            self.Label = Path(file_path).stem
         return self.save_result
 
 
@@ -197,6 +196,7 @@ def test_adapter_uses_save_and_save_as_and_returns_post_save_state(
     bracket, bracket_gui = make_document(
         "BracketDesign",
         modified=True,
+        label="Small Bracket",
         file_path="/models/BracketDesign.FCStd",
     )
     install_freecad_stubs(
@@ -210,12 +210,15 @@ def test_adapter_uses_save_and_save_as_and_returns_post_save_state(
     saved = adapter.save_document("BracketDesign", None)
     saved_as = adapter.save_document("BracketDesign", "/models/Renamed.FCStd")
 
-    assert bracket.save_calls == 1
+    assert bracket.save_calls == 2
     assert bracket.save_as_calls == ["/models/Renamed.FCStd"]
     assert saved.modified is False
+    assert saved.label == "Small Bracket"
     assert saved_as.file_path == "/models/Renamed.FCStd"
+    assert saved_as.label == "Small Bracket"
     assert saved_as.saved is True
     assert saved_as.modified is False
+    assert bracket_gui.Modified is False
 
 
 def test_adapter_converts_false_save_result(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -234,6 +237,8 @@ def test_adapter_converts_false_save_result(monkeypatch: pytest.MonkeyPatch) -> 
 
     with pytest.raises(DocumentSaveError, match="returned false"):
         FreeCADDocumentAdapter().save_document("BracketDesign", None)
+
+    assert bracket_gui.Modified is True
 
 
 def test_adapter_converts_missing_gui_document(monkeypatch: pytest.MonkeyPatch) -> None:

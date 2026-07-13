@@ -49,7 +49,7 @@ class FreeCADDocumentAdapter:
             raise DocumentCreationError(str(exc)) from exc
 
     def list_documents(self) -> DocumentCollection:
-        """Return all open documents ordered by immutable internal name."""
+        """Return all open documents ordered by stable internal name."""
         import FreeCAD as App
         import FreeCADGui as Gui
 
@@ -88,10 +88,18 @@ class FreeCADDocumentAdapter:
             if document is None:
                 raise DocumentNotFoundError(name)
 
-            saved = document.save() if file_path is None else document.saveAs(file_path)
-            if saved is False:
-                operation = "save" if file_path is None else "saveAs"
-                raise DocumentSaveError(f"FreeCAD Document.{operation}() returned false.")
+            gui_document = _get_gui_document(Gui, name)
+            original_label = str(document.Label)
+            if file_path is None:
+                _require_successful_save(document.save(), "save")
+            else:
+                _require_successful_save(document.saveAs(file_path), "saveAs")
+                if str(document.Label) != original_label:
+                    document.Label = original_label
+                    _require_successful_save(document.save(), "save")
+
+            # App-level saves do not clear the GUI dirty flag as GUI Save does.
+            gui_document.Modified = False
             return _summarize_document(document, _active_document_name(App), Gui)
         except (DocumentNotFoundError, DocumentSaveError):
             raise
@@ -107,9 +115,7 @@ def _active_document_name(App: Any) -> str | None:
 def _summarize_document(document: Any, active_name: str | None, Gui: Any) -> DocumentSummary:
     name = str(document.Name)
     file_name = str(document.FileName)
-    gui_document = Gui.getDocument(name)
-    if gui_document is None:
-        raise RuntimeError(f"FreeCAD GUI document '{name}' is not available.")
+    gui_document = _get_gui_document(Gui, name)
     return DocumentSummary(
         name=name,
         label=str(document.Label),
@@ -118,3 +124,15 @@ def _summarize_document(document: Any, active_name: str | None, Gui: Any) -> Doc
         active=name == active_name,
         object_count=len(document.Objects),
     )
+
+
+def _get_gui_document(Gui: Any, name: str) -> Any:
+    gui_document = Gui.getDocument(name)
+    if gui_document is None:
+        raise RuntimeError(f"FreeCAD GUI document '{name}' is not available.")
+    return gui_document
+
+
+def _require_successful_save(result: object, operation: str) -> None:
+    if result is False:
+        raise DocumentSaveError(f"FreeCAD Document.{operation}() returned false.")

@@ -9,13 +9,7 @@ from typing import Protocol
 
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.server.config import ServerConfig
-
-TOOL_NAMES = (
-    "create_document",
-    "list_documents",
-    "get_document",
-    "save_document",
-)
+from freecad_mcp.tool_registry import REGISTERED_TOOL_NAMES
 
 
 class LifecycleState(StrEnum):
@@ -95,6 +89,8 @@ class LifecycleService:
             return self._record_start_failure(exc)
 
         with self._lock:
+            if self._state is not LifecycleState.STARTING:
+                return self._failure("server_start_failed", "Server shutdown interrupted startup.")
             self._runner = runner
 
         try:
@@ -124,6 +120,23 @@ class LifecycleService:
             runner = self._runner
             self._state = LifecycleState.STOPPING
 
+        return self._stop_owned_runner(runner)
+
+    def shutdown(self) -> CommandResult:
+        """Best-effort cleanup of any runner still owned during process exit."""
+        with self._lock:
+            runner = self._runner
+            if runner is None:
+                self._state = LifecycleState.STOPPED
+                self._last_error = None
+                return self._success("server_already_stopped", "The MCP server is stopped.")
+            if self._state is LifecycleState.STOPPING:
+                return self._success("server_stopping", "The MCP server is already stopping.")
+            self._state = LifecycleState.STOPPING
+
+        return self._stop_owned_runner(runner)
+
+    def _stop_owned_runner(self, runner: ServerRunner) -> CommandResult:
         try:
             runner.stop()
         except Exception as exc:
@@ -140,6 +153,7 @@ class LifecycleService:
             if self._runner is runner:
                 self._runner = None
             self._state = LifecycleState.STOPPED
+            self._last_error = None
             return self._success("server_stopped", "The MCP server stopped.")
 
     def status(self) -> CommandResult:
@@ -150,8 +164,18 @@ class LifecycleService:
     def _record_start_failure(
         self, exc: Exception, runner: ServerRunner | None = None
     ) -> CommandResult:
+        cleanup_error: Exception | None = None
+        if runner is not None:
+            with self._lock:
+                owns_runner = self._runner is runner
+            if owns_runner:
+                try:
+                    runner.stop()
+                except Exception as stop_exc:
+                    cleanup_error = stop_exc
+
         with self._lock:
-            if runner is None or self._runner is runner:
+            if runner is None or (self._runner is runner and cleanup_error is None):
                 self._runner = None
             self._state = LifecycleState.ERROR
             self._last_error = {
@@ -159,6 +183,11 @@ class LifecycleService:
                 "type": type(exc).__name__,
                 "message": str(exc),
             }
+            if cleanup_error is not None:
+                self._last_error["cleanup_error"] = {
+                    "type": type(cleanup_error).__name__,
+                    "message": str(cleanup_error),
+                }
             return self._failure("server_start_failed", "The MCP server could not start.")
 
     def _on_runner_exit(self, runner: ServerRunner, error: BaseException | None) -> None:
@@ -183,7 +212,7 @@ class LifecycleService:
         data = {
             "state": self._state.value,
             **self._config.as_dict(),
-            "tools": list(TOOL_NAMES),
+            "tools": list(REGISTERED_TOOL_NAMES),
             "recoverable": self._state is not LifecycleState.ERROR or self._runner is None,
         }
         if self._last_error is not None:

@@ -20,8 +20,8 @@ T = TypeVar("T")
 class DocumentSummary:
     """Stable public state for one open FreeCAD document.
 
-    ``name`` is FreeCAD's immutable internal name and ``label`` is its visible
-    label. ``file_path`` is the actual backing file or ``None`` when unsaved;
+    ``name`` is FreeCAD's stable internal identifier and ``label`` is its
+    user-visible label. ``file_path`` is the actual backing file or ``None`` when unsaved;
     ``saved`` is therefore derived from whether that path exists. ``modified``
     is FreeCAD GUI's dirty flag, ``active`` identifies the active document, and
     ``object_count`` is the current number of document objects.
@@ -131,7 +131,7 @@ class CreateDocumentHandler:
             return CommandResult.failure(
                 code="main_thread_dispatch_failed",
                 message="FreeCAD could not execute document creation on its main thread.",
-                data={"reason": str(exc)},
+                data=exc.details(),
             )
         except DocumentCreationError as exc:
             return CommandResult.failure(
@@ -175,7 +175,7 @@ def validate_document_reference(name: object) -> CommandResult | None:
     if _DOCUMENT_NAME_PATTERN.fullmatch(name) is None:
         return CommandResult.failure(
             code="validation_error",
-            message="Document name is not a valid FreeCAD internal name.",
+            message="Document name does not satisfy the MCP document-name policy.",
             data={"field": "name", "name": name, "rule": _DOCUMENT_NAME_RULE},
         )
     return None
@@ -203,7 +203,7 @@ def _validate_create_request(name: object, label: object | None) -> CommandResul
     if _DOCUMENT_NAME_PATTERN.fullmatch(name) is None:
         return CommandResult.failure(
             code="invalid_document_name",
-            message="Document name is not a valid FreeCAD internal name.",
+            message="Document name does not satisfy the MCP document-name policy.",
             data={"field": "name", "name": name, "rule": _DOCUMENT_NAME_RULE},
         )
     if label is not None and not isinstance(label, str):

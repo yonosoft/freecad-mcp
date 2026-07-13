@@ -74,11 +74,11 @@ def test_initgui_registers_workbench_and_status_command_once(monkeypatch: Any) -
         "MCP_StartServer",
         "MCP_StopServer",
         "MCP_ReportStatus",
-        "MCP_CreateDocument",
     ]
     assert workbench.toolbars == [("MCP", expected_commands)]
     assert workbench.menus == [("MCP", expected_commands)]
     assert list(commands) == expected_commands
+    assert "MCP_CreateDocument" not in commands
 
     from freecad_mcp.core.result import CommandResult
     from freecad_mcp.gui import commands as gui_commands

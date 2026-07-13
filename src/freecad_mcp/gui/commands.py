@@ -8,14 +8,12 @@ from freecad_mcp.gui.report import write_result
 from freecad_mcp.runtime import get_application
 
 COMMAND_REPORT_STATUS = "MCP_ReportStatus"
-COMMAND_CREATE_DOCUMENT = "MCP_CreateDocument"
 COMMAND_START_SERVER = "MCP_StartServer"
 COMMAND_STOP_SERVER = "MCP_StopServer"
 COMMAND_IDS = [
     COMMAND_START_SERVER,
     COMMAND_STOP_SERVER,
     COMMAND_REPORT_STATUS,
-    COMMAND_CREATE_DOCUMENT,
 ]
 _REGISTERED = False
 
@@ -76,51 +74,15 @@ class ReportStatusCommand:
         return True
 
 
-class CreateDocumentCommand:
-    """FreeCAD command that manually exercises the shared document handler."""
-
-    def GetResources(self) -> dict[str, str]:
-        return {
-            "Pixmap": _icon_path("mcp-create-document.svg"),
-            "MenuText": "Create Document",
-            "ToolTip": "Create a FreeCAD document through the shared MCP handler",
-        }
-
-    def Activated(self) -> None:
-        import FreeCADGui as Gui  # type: ignore[import-not-found]
-        from PySide import QtWidgets  # type: ignore[import-not-found]
-
-        parent = Gui.getMainWindow()
-        name, accepted = QtWidgets.QInputDialog.getText(
-            parent,
-            "Create Document",
-            "Internal name:",
-        )
-        if not accepted:
-            return
-        label, accepted = QtWidgets.QInputDialog.getText(
-            parent,
-            "Create Document",
-            "Label (optional):",
-        )
-        if not accepted:
-            return
-        write_result(get_application().create_document(name=name, label=label or None))
-
-    def IsActive(self) -> bool:
-        return True
-
-
 def register_commands() -> None:
     """Register FreeCAD GUI commands once per FreeCAD process."""
     global _REGISTERED
     if _REGISTERED:
         return
 
-    import FreeCADGui as Gui
+    import FreeCADGui as Gui  # type: ignore[import-not-found]
 
     Gui.addCommand(COMMAND_START_SERVER, StartServerCommand())
     Gui.addCommand(COMMAND_STOP_SERVER, StopServerCommand())
     Gui.addCommand(COMMAND_REPORT_STATUS, ReportStatusCommand())
-    Gui.addCommand(COMMAND_CREATE_DOCUMENT, CreateDocumentCommand())
     _REGISTERED = True

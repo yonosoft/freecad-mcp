@@ -11,7 +11,7 @@ local MCP server inside FreeCAD.
 - Visible workbench name: `MCP`.
 - Workbench class: `MCPWorkbench`.
 - FreeCAD command IDs use the uppercase `MCP_` prefix, such as
-  `MCP_ReportStatus`, `MCP_CreateDocument`, and `MCP_StartServer`.
+  `MCP_ReportStatus`, `MCP_StopServer`, and `MCP_StartServer`.
 - Python package: `freecad_mcp`.
 - Do not rename the Python package to `mcp`; the MCP SDK may use the `mcp`
   namespace.
@@ -24,8 +24,8 @@ local MCP server inside FreeCAD.
 
 - Keep FreeCAD startup modules small. Perform substantial initialization lazily
   when the workbench or a command is activated.
-- MCP tools and FreeCAD toolbar/menu commands must call the same underlying
-  command handlers. Do not duplicate CAD behavior in transport or GUI adapters.
+- Where an operation has both MCP and GUI adapters, they must call the same
+  underlying command handlers. Do not duplicate CAD behavior in adapters.
 - Keep pure-Python validation, schemas, dispatch, and result construction
   separate from FreeCAD imports so they can be tested with ordinary CPython.
 - Treat `FreeCAD`, `FreeCADGui`, `Part`, `Sketcher`, and PySide as runtime
@@ -55,8 +55,8 @@ local MCP server inside FreeCAD.
   geometric selection criteria are possible.
 - Keep tool contracts versioned and documented. Do not silently change request
   or response fields.
-- The first explicit MCP tool is `create_document`; keep its GUI and transport
-  adapters on the same shared application handler.
+- The first explicit MCP tool is `create_document`. It is MCP-only and must use
+  the shared application handler rather than a visible workbench command.
 
 ## Python Standards
 

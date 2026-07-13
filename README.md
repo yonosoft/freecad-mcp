@@ -9,7 +9,7 @@ shared command handlers rather than arbitrary Python execution.
 This repository is at its first functional MCP server milestone. It provides:
 
 - a discoverable external FreeCAD workbench named **MCP**;
-- start, stop, status, and create-document toolbar/menu commands;
+- start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
 - typed MCP document tools for creating, listing, inspecting, and saving documents;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
@@ -91,7 +91,7 @@ Available document tools:
 - `get_document` inspects one document by its internal name;
 - `save_document` persists a document using protected save or save-as behavior.
 
-The list, get, and save tools are MCP-only and do not add workbench commands or
+All four document tools are MCP-only and do not add workbench commands or
 toolbar icons.
 
 ## Documentation
