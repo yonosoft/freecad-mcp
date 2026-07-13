@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# Eclipse / PyDev workspace metadata
+.project
+.pydevproject
+.settings/
+.metadata/
+
+# FreeCAD runtime and generated files
+*.FCStd1
+*.FCBak
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

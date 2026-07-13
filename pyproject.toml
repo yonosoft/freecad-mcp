@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "freecad-mcp-workbench"
+version = "0.1.0"
+description = "Python FreeCAD workbench for an embedded local MCP server"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "LGPL-2.1-or-later" }
+authors = [{ name = "Göran Öberg" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.13,<2",
+  "pytest>=8.3,<9",
+  "ruff>=0.9,<1",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src/FreeCADMCP"}
+
+[tool.setuptools.packages.find]
+where = ["src/FreeCADMCP"]
+include = ["freecad_mcp*"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src/FreeCADMCP", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = "src/FreeCADMCP"
+files = ["src/FreeCADMCP/freecad_mcp", "tests"]
+exclude = ["src/FreeCADMCP/Init.py", "src/FreeCADMCP/InitGui.py"]
