@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +21,7 @@ class CommandResult:
         code: str,
         message: str,
         data: Mapping[str, object] | None = None,
-    ) -> "CommandResult":
+    ) -> CommandResult:
         """Build a successful command result."""
         return cls(ok=True, code=code, message=message, data=data or {})
 
@@ -31,6 +31,6 @@ class CommandResult:
         code: str,
         message: str,
         data: Mapping[str, object] | None = None,
-    ) -> "CommandResult":
+    ) -> CommandResult:
         """Build a failed command result."""
         return cls(ok=False, code=code, message=message, data=data or {})

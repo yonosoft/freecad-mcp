@@ -3,7 +3,6 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 ADDON_ROOT = REPOSITORY_ROOT / "src" / "FreeCADMCP"
 
