@@ -9,7 +9,9 @@ from freecad_mcp.commands.document import (
     DocumentAdapter,
     DocumentNotFoundError,
     FreeCADDocumentError,
+    ObjectNotFoundError,
     validate_document_reference,
+    validate_object_reference,
 )
 from freecad_mcp.core.dispatch import DispatchError
 from freecad_mcp.core.result import CommandResult
@@ -65,5 +67,83 @@ class ListObjectsHandler:
             data={
                 "document_name": document_name,
                 "objects": [obj.to_dict() for obj in objects],
+            },
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GetObjectHandler:
+    """Return one object by exact internal document and object name."""
+
+    adapter: DocumentAdapter
+    dispatcher: Dispatcher
+
+    def execute(self, document_name: object, object_name: object) -> CommandResult:
+        """Retrieve one object through the FreeCAD main-thread boundary."""
+        validation_error = validate_object_reference(document_name, object_name)
+        if validation_error is not None:
+            return validation_error
+        assert isinstance(document_name, str)
+        assert isinstance(object_name, str)
+
+        try:
+            detail = self.dispatcher.call(
+                lambda: self.adapter.get_object(document_name, object_name)
+            )
+        except DocumentNotFoundError:
+            return CommandResult.failure(
+                code="document_not_found",
+                message=f"FreeCAD document '{document_name}' was not found.",
+                data={"document_name": document_name},
+            )
+        except ObjectNotFoundError:
+            return CommandResult.failure(
+                code="object_not_found",
+                message=(
+                    f"FreeCAD object '{object_name}' was not found in document '{document_name}'."
+                ),
+                data={
+                    "document_name": document_name,
+                    "object_name": object_name,
+                },
+            )
+        except DispatchError as exc:
+            return CommandResult.failure(
+                code="freecad_error",
+                message="FreeCAD could not inspect the object.",
+                data={
+                    "document_name": document_name,
+                    "object_name": object_name,
+                    **exc.details(),
+                },
+            )
+        except FreeCADDocumentError as exc:
+            return CommandResult.failure(
+                code="freecad_error",
+                message="FreeCAD could not inspect the object.",
+                data={
+                    "document_name": document_name,
+                    "object_name": object_name,
+                    "reason": str(exc),
+                },
+            )
+        except Exception as exc:
+            return CommandResult.failure(
+                code="internal_error",
+                message="An unexpected error occurred while inspecting the object.",
+                data={
+                    "document_name": document_name,
+                    "object_name": object_name,
+                    "reason": str(exc),
+                },
+            )
+
+        return CommandResult.success(
+            code="object_retrieved",
+            message="FreeCAD object retrieved.",
+            data={
+                "code": "object_retrieved",
+                "document_name": document_name,
+                "object": detail.to_dict(),
             },
         )

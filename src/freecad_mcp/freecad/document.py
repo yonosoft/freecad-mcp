@@ -13,7 +13,12 @@ from freecad_mcp.commands.document import (
     DocumentSaveError,
     DocumentSummary,
     FreeCADDocumentError,
+    ObjectDetail,
+    ObjectNotFoundError,
     ObjectSummary,
+    PlacementData,
+    PlacementPosition,
+    PlacementRotation,
 )
 
 
@@ -134,6 +139,37 @@ class FreeCADDocumentAdapter:
         except Exception as exc:
             raise FreeCADDocumentError(str(exc)) from exc
 
+    def get_object(self, document_name: str, object_name: str) -> ObjectDetail:
+        """Return one object by exact internal document and object name."""
+        import FreeCAD as App
+
+        try:
+            document = App.listDocuments().get(document_name)
+            if document is None:
+                raise DocumentNotFoundError(document_name)
+
+            obj = document.getObject(object_name)
+            if obj is None:
+                raise ObjectNotFoundError(
+                    f"Object '{object_name}' not found in document '{document_name}'."
+                )
+
+            placement = _extract_placement(obj)
+
+            return ObjectDetail(
+                name=str(obj.Name),
+                label=str(obj.Label),
+                type_id=str(obj.TypeId),
+                visibility=_object_visibility(obj),
+                parent=_object_parent(obj),
+                children=_object_children(obj),
+                placement=placement,
+            )
+        except (DocumentNotFoundError, ObjectNotFoundError):
+            raise
+        except Exception as exc:
+            raise FreeCADDocumentError(str(exc)) from exc
+
 
 def _active_document_name(App: Any) -> str | None:
     active_document = App.activeDocument()
@@ -215,3 +251,55 @@ def _object_parent(obj: Any) -> str | None:
             except Exception:
                 pass
     return None
+
+
+def _extract_placement(obj: Any) -> PlacementData | None:
+    """Extract controlled placement data from a FreeCAD object.
+
+    Returns ``None`` when placement is unavailable, unsupported, or cannot
+    be represented safely. Values are converted to plain ``float``.
+    Angle is converted from FreeCAD's internal radians to degrees.
+
+    Assumptions about the FreeCAD 1.1.1 API (requires live verification):
+    - ``obj.Placement`` is the placement attribute (may be absent).
+    - ``placement.Base`` is a ``FreeCAD.Vector`` with ``.x``, ``.y``, ``.z``.
+    - ``placement.Rotation.Axis`` is a ``FreeCAD.Vector``.
+    - ``placement.Rotation.Angle`` is a float in radians.
+    """
+    try:
+        placement = getattr(obj, "Placement", None)
+        if placement is None:
+            return None
+        base = getattr(placement, "Base", None)
+        rotation = getattr(placement, "Rotation", None)
+        if base is None or rotation is None:
+            return None
+
+        position = PlacementPosition(
+            x=float(base.x),
+            y=float(base.y),
+            z=float(base.z),
+        )
+
+        import math
+
+        axis = getattr(rotation, "Axis", None)
+        raw_angle = getattr(rotation, "Angle", None)
+        if axis is None or raw_angle is None:
+            return None
+
+        angle_degrees = float(math.degrees(float(raw_angle)))
+
+        return PlacementData(
+            position=position,
+            rotation=PlacementRotation(
+                axis=PlacementPosition(
+                    x=float(axis.x),
+                    y=float(axis.y),
+                    z=float(axis.z),
+                ),
+                angle_degrees=angle_degrees,
+            ),
+        )
+    except Exception:
+        return None

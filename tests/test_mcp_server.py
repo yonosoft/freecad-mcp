@@ -14,6 +14,7 @@ from freecad_mcp.commands import (
     CreateDocumentHandler,
     DocumentHandlers,
     GetDocumentHandler,
+    GetObjectHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
     SaveDocumentHandler,
@@ -26,6 +27,7 @@ from freecad_mcp.server.lifecycle import LifecycleService
 from freecad_mcp.tool_registry import (
     CREATE_DOCUMENT_TOOL,
     GET_DOCUMENT_TOOL,
+    GET_OBJECT_TOOL,
     LIST_DOCUMENTS_TOOL,
     LIST_OBJECTS_TOOL,
     REGISTERED_TOOL_NAMES,
@@ -52,6 +54,7 @@ class AdapterStub:
         self.get_calls: list[str] = []
         self.save_calls: list[tuple[str, str | None]] = []
         self.list_objects_calls: list[str] = []
+        self.get_object_calls: list[tuple[str, str]] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -79,6 +82,31 @@ class AdapterStub:
         self.list_objects_calls.append(document_name)
         return ()
 
+    def get_object(self, document_name: str, object_name: str) -> Any:
+        self.get_object_calls.append((document_name, object_name))
+        from freecad_mcp.commands.document import (
+            ObjectDetail,
+            PlacementData,
+            PlacementPosition,
+            PlacementRotation,
+        )
+
+        return ObjectDetail(
+            name="Body",
+            label="Body",
+            type_id="PartDesign::Body",
+            visibility=True,
+            parent=None,
+            children=(),
+            placement=PlacementData(
+                position=PlacementPosition(x=0.0, y=0.0, z=0.0),
+                rotation=PlacementRotation(
+                    axis=PlacementPosition(x=0.0, y=0.0, z=1.0),
+                    angle_degrees=0.0,
+                ),
+            ),
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -95,6 +123,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             get=GetDocumentHandler(actual_adapter, dispatcher),
             save=SaveDocumentHandler(actual_adapter, dispatcher),
             object_query=ListObjectsHandler(actual_adapter, dispatcher),
+            get_object=GetObjectHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,
     )
@@ -120,6 +149,10 @@ def test_mcp_server_registers_typed_document_tools() -> None:
         "overwrite",
     }
     assert schemas[SAVE_DOCUMENT_TOOL]["properties"]["overwrite"]["default"] is False
+    assert schemas[LIST_OBJECTS_TOOL]["required"] == ["document_name"]
+    assert set(schemas[LIST_OBJECTS_TOOL]["properties"]) == {"document_name"}
+    assert schemas[GET_OBJECT_TOOL]["required"] == ["document_name", "object_name"]
+    assert set(schemas[GET_OBJECT_TOOL]["properties"]) == {"document_name", "object_name"}
     assert all(tool.outputSchema is not None for tool in tools)
 
 
@@ -135,6 +168,7 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
     assert lifecycle.status().data["tools"] == actual_tools
     assert "MCP_CreateDocument" not in actual_tools
     assert "list_objects" in actual_tools
+    assert "get_object" in actual_tools
 
 
 def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
@@ -156,6 +190,10 @@ def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
             LIST_OBJECTS_TOOL,
             {"document_name": "TestDocument"},
         )
+        await server.call_tool(
+            GET_OBJECT_TOOL,
+            {"document_name": "TestDocument", "object_name": "Body"},
+        )
 
     asyncio.run(call_tools())
 
@@ -166,6 +204,7 @@ def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
         ("TestDocument", str((tmp_path / "TestDocument.FCStd").resolve()))
     ]
     assert adapter.list_objects_calls == ["TestDocument"]
+    assert adapter.get_object_calls == [("TestDocument", "Body")]
 
 
 def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:

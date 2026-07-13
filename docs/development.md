@@ -198,6 +198,7 @@ list_documents
 get_document
 save_document
 list_objects
+get_object
 ```
 
 These document and object-inspection tools are MCP-only; the workbench has no
@@ -250,6 +251,25 @@ sequence through the MCP client:
    `validation_error` is returned.
 9. Confirm the document was not modified by any `list_objects` call (check
    FreeCAD's modified/saved state).
+
+### Object Inspection Verification
+
+1. Create or open a document containing at least one object with a known placement
+   (such as a Part Design Body) in FreeCAD.
+2. Call `get_object` with the document's internal name and the object's internal
+   name.
+3. Confirm the result returns `ok: true` with code `object_retrieved` and the
+   correct `document_name`.
+4. Confirm the flat `object` result includes `name`, `label`, `type_id`,
+   `visibility`, `parent`, `children`, and `placement`.
+5. Call `get_object` with an unknown object name and confirm the structured
+   `object_not_found` error includes both `document_name` and `object_name`.
+6. Call `get_object` with an unknown document name and confirm the existing
+   `document_not_found` error is returned.
+7. Move or rotate an object in FreeCAD, call `get_object` again, and confirm the
+   placement position and rotation reflect the change.
+8. Call `get_object` on an object without placement (if one exists in the test
+   document) and confirm `placement` is `null`.
 
 The original create-only smoke prompt remains useful:
 

@@ -58,6 +58,13 @@ class Application:
         """List objects in an open document through the shared application handler."""
         return self.documents.object_query.execute(document_name=document_name)
 
+    def get_object(self, document_name: object, object_name: object) -> CommandResult:
+        """Retrieve one object through the shared application handler."""
+        return self.documents.get_object.execute(
+            document_name=document_name,
+            object_name=object_name,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

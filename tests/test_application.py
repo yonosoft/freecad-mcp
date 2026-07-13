@@ -9,11 +9,19 @@ from freecad_mcp.commands import (
     CreateDocumentHandler,
     DocumentHandlers,
     GetDocumentHandler,
+    GetObjectHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
     SaveDocumentHandler,
 )
-from freecad_mcp.commands.document import DocumentCollection, DocumentSummary
+from freecad_mcp.commands.document import (
+    DocumentCollection,
+    DocumentSummary,
+    ObjectDetail,
+    PlacementData,
+    PlacementPosition,
+    PlacementRotation,
+)
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService
 
@@ -52,6 +60,23 @@ class AdapterStub:
     def list_objects(self, document_name: str) -> tuple[Any, ...]:
         return ()
 
+    def get_object(self, document_name: str, object_name: str) -> ObjectDetail:
+        return ObjectDetail(
+            name=object_name,
+            label=object_name,
+            type_id="PartDesign::Body",
+            visibility=True,
+            parent=None,
+            children=(),
+            placement=PlacementData(
+                position=PlacementPosition(x=0.0, y=0.0, z=0.0),
+                rotation=PlacementRotation(
+                    axis=PlacementPosition(x=0.0, y=0.0, z=1.0),
+                    angle_degrees=0.0,
+                ),
+            ),
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -76,6 +101,7 @@ def make_application() -> Application:
         get=GetDocumentHandler(adapter, dispatcher),
         save=SaveDocumentHandler(adapter, dispatcher),
         object_query=ListObjectsHandler(adapter, dispatcher),
+        get_object=GetObjectHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
 

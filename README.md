@@ -93,6 +93,9 @@ Available document tools:
 - `list_objects` returns controlled summaries of all objects in an open FreeCAD
   document: internal name, visible label, type ID, visibility, parent container,
   and children.
+- `get_object` retrieves one object by exact internal document name and exact
+  internal object name, returning its summary fields plus controlled placement
+  data.
 
 Tool names the MCP client can see:
 
@@ -102,10 +105,13 @@ list_documents
 get_document
 save_document
 list_objects
+get_object
 ```
 
 These document and object-inspection tools are MCP-only capabilities. They do not
-add workbench commands or toolbar icons.
+add workbench commands or toolbar icons. `get_object` performs exact internal-name
+lookup only; labels are not used as lookup keys. If placement is unavailable the
+``placement`` field returns ``null`` rather than failing the entire tool.
 
 ## Documentation
 

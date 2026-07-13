@@ -13,6 +13,9 @@ from freecad_mcp.core.result import CommandResult
 _DOCUMENT_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 _DOCUMENT_NAME_RULE = "ASCII letter or underscore, followed by letters, digits, or underscores"
 
+_OBJECT_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+_OBJECT_NAME_RULE = "ASCII letter or underscore, followed by letters, digits, or underscores"
+
 T = TypeVar("T")
 
 
@@ -91,6 +94,79 @@ class ObjectSummary:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class PlacementPosition:
+    """Serializable 3-D vector for a placement base position."""
+
+    x: float
+    y: float
+    z: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {"x": self.x, "y": self.y, "z": self.z}
+
+
+@dataclass(frozen=True, slots=True)
+class PlacementRotation:
+    """Serializable axis-angle rotation in degrees."""
+
+    axis: PlacementPosition
+    angle_degrees: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "axis": self.axis.to_dict(),
+            "angle_degrees": self.angle_degrees,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PlacementData:
+    """Controlled placement representation suitable for JSON serialization."""
+
+    position: PlacementPosition
+    rotation: PlacementRotation
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "position": self.position.to_dict(),
+            "rotation": self.rotation.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectDetail:
+    """Public state for one FreeCAD document object with controlled placement.
+
+    Extends the ObjectSummary contract with placement data. All fields are
+    flat so the serialized result exposes summary fields directly alongside
+    ``placement`` without a nested ``summary`` wrapper.
+    """
+
+    name: str
+    label: str
+    type_id: str
+    visibility: bool
+    parent: str | None
+    children: tuple[str, ...]
+    placement: PlacementData | None
+
+    def to_dict(self) -> dict[str, object]:
+        result: dict[str, object] = {
+            "name": self.name,
+            "label": self.label,
+            "type_id": self.type_id,
+            "visibility": self.visibility,
+            "parent": self.parent,
+            "children": list(self.children),
+        }
+        if self.placement is not None:
+            result["placement"] = self.placement.to_dict()
+        else:
+            result["placement"] = None
+        return result
+
+
 class DocumentAlreadyExistsError(RuntimeError):
     """Raised when the requested internal document name is already open."""
 
@@ -111,6 +187,10 @@ class DocumentSaveError(RuntimeError):
     """Raised when FreeCAD cannot persist a document."""
 
 
+class ObjectNotFoundError(RuntimeError):
+    """Raised when an internal object name is not found in an open document."""
+
+
 class DocumentAdapter(Protocol):
     """FreeCAD document operations used by the shared handlers."""
 
@@ -128,6 +208,9 @@ class DocumentAdapter(Protocol):
 
     def list_objects(self, document_name: str) -> tuple[ObjectSummary, ...]:
         """Return all objects in one open document by exact internal name."""
+
+    def get_object(self, document_name: str, object_name: str) -> ObjectDetail:
+        """Return one object by exact internal document and object name."""
 
 
 class Dispatcher(Protocol):
@@ -211,6 +294,32 @@ def validate_document_reference(name: object) -> CommandResult | None:
             code="validation_error",
             message="Document name does not satisfy the MCP document-name policy.",
             data={"field": "name", "name": name, "rule": _DOCUMENT_NAME_RULE},
+        )
+    return None
+
+
+def validate_object_reference(document_name: object, object_name: object) -> CommandResult | None:
+    """Validate document- and object-name arguments used for object lookup."""
+    doc_error = validate_document_reference(document_name)
+    if doc_error is not None:
+        return doc_error
+    if not isinstance(object_name, str):
+        return CommandResult.failure(
+            code="validation_error",
+            message="Object name must be a non-empty string.",
+            data={"field": "object_name", "actual_type": type(object_name).__name__},
+        )
+    if not object_name.strip():
+        return CommandResult.failure(
+            code="validation_error",
+            message="Object name must not be empty or whitespace.",
+            data={"field": "object_name"},
+        )
+    if _OBJECT_NAME_PATTERN.fullmatch(object_name) is None:
+        return CommandResult.failure(
+            code="validation_error",
+            message="Object name does not satisfy the MCP object-name policy.",
+            data={"field": "object_name", "name": object_name, "rule": _OBJECT_NAME_RULE},
         )
     return None
 

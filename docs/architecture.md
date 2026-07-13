@@ -266,6 +266,57 @@ view-provider internals. Exposing all of them would:
 The `ObjectSummary` model is deliberately narrow. Future tools such as
 `get_object` can add detail incrementally without changing this contract.
 
+### get_object
+
+`get_object` retrieves one object by exact internal document name and exact
+internal object name. It follows the same dispatch chain as `list_objects`:
+
+```text
+MCP tool → Application → GetObjectHandler → FreeCADDocumentAdapter → Qt dispatcher → FreeCAD API
+```
+
+The handler reuses the existing container-only parent and child semantics,
+visibility extraction, and document-not-found behaviour from `list_objects`.
+An additional `object_not_found` error is returned when the object name cannot
+be resolved; labels are never used as fallback lookup keys.
+
+#### Placement
+
+The result includes a controlled `placement` field alongside the standard
+`ObjectSummary` fields. Placement is extracted from the FreeCAD object's
+`Placement` attribute using ``Base`` position, ``Rotation.Axis``, and
+``Rotation.Angle``. The angle is converted from FreeCAD's internal radians to
+degrees, and all values are converted to plain `float`.
+
+When placement is unavailable, the ``Placement`` attribute is absent, or any
+extracted value cannot be represented safely, the field is `null` rather than
+failing the entire tool. No matrices, arbitrary properties, or expressions are
+exposed.
+
+The flat response contract places summary fields directly alongside
+`placement` without a nested `summary` wrapper:
+
+```json
+{
+  "document_name": "BracketDesign",
+  "object": {
+    "name": "Body",
+    "label": "Bracket Body",
+    "type_id": "PartDesign::Body",
+    "visibility": true,
+    "parent": null,
+    "children": ["Pad001", "Sketch001"],
+    "placement": {
+      "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+      "rotation": {
+        "axis": {"x": 0.0, "y": 0.0, "z": 1.0},
+        "angle_degrees": 0.0
+      }
+    }
+  }
+}
+```
+
 ## Tool Levels
 
 - **High-level workflows:** common modeling sequences with strong validation and

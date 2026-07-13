@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from freecad_mcp.commands.document import CreateDocumentHandler
 from freecad_mcp.commands.document_query import GetDocumentHandler, ListDocumentsHandler
 from freecad_mcp.commands.document_save import SaveDocumentHandler
-from freecad_mcp.commands.object_query import ListObjectsHandler
+from freecad_mcp.commands.object_query import GetObjectHandler, ListObjectsHandler
 from freecad_mcp.commands.status import report_status
 
 
@@ -18,12 +18,14 @@ class DocumentHandlers:
     get: GetDocumentHandler
     save: SaveDocumentHandler
     object_query: ListObjectsHandler
+    get_object: GetObjectHandler
 
 
 __all__ = [
     "CreateDocumentHandler",
     "DocumentHandlers",
     "GetDocumentHandler",
+    "GetObjectHandler",
     "ListDocumentsHandler",
     "ListObjectsHandler",
     "SaveDocumentHandler",

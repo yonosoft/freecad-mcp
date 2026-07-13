@@ -11,6 +11,7 @@ from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import (
     CREATE_DOCUMENT_TOOL,
     GET_DOCUMENT_TOOL,
+    GET_OBJECT_TOOL,
     LIST_DOCUMENTS_TOOL,
     LIST_OBJECTS_TOOL,
     SAVE_DOCUMENT_TOOL,
@@ -77,5 +78,19 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     )
     def list_objects(document_name: str) -> dict[str, object]:
         return handlers.object_query.execute(document_name=document_name).to_dict()
+
+    @server.tool(
+        name=GET_OBJECT_TOOL,
+        description=(
+            "Retrieve one FreeCAD object by exact internal document and object name "
+            "with controlled placement."
+        ),
+        structured_output=True,
+    )
+    def get_object(document_name: str, object_name: str) -> dict[str, object]:
+        return handlers.get_object.execute(
+            document_name=document_name,
+            object_name=object_name,
+        ).to_dict()
 
     return server
