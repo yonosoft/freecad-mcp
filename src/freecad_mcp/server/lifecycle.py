@@ -10,7 +10,12 @@ from typing import Protocol
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.server.config import ServerConfig
 
-TOOL_NAMES = ("create_document",)
+TOOL_NAMES = (
+    "create_document",
+    "list_documents",
+    "get_document",
+    "save_document",
+)
 
 
 class LifecycleState(StrEnum):

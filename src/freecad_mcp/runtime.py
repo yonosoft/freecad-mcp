@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from freecad_mcp.application import Application, create_application
-from freecad_mcp.commands.document import CreateDocumentHandler
+from freecad_mcp.commands import (
+    CreateDocumentHandler,
+    DocumentHandlers,
+    GetDocumentHandler,
+    ListDocumentsHandler,
+    SaveDocumentHandler,
+)
 from freecad_mcp.core.logging import get_logger
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter
 from freecad_mcp.freecad.qt_dispatcher import create_qt_main_thread_dispatcher
@@ -44,15 +50,19 @@ def get_application() -> Application:
 
 def _build_runtime() -> Runtime:
     config = ServerConfig()
-    handler = CreateDocumentHandler(
-        adapter=FreeCADDocumentAdapter(),
-        dispatcher=create_qt_main_thread_dispatcher(),
+    adapter = FreeCADDocumentAdapter()
+    dispatcher = create_qt_main_thread_dispatcher()
+    handlers = DocumentHandlers(
+        create=CreateDocumentHandler(adapter=adapter, dispatcher=dispatcher),
+        list=ListDocumentsHandler(adapter=adapter, dispatcher=dispatcher),
+        get=GetDocumentHandler(adapter=adapter, dispatcher=dispatcher),
+        save=SaveDocumentHandler(adapter=adapter, dispatcher=dispatcher),
     )
     lifecycle = LifecycleService(
         config=config,
-        runner_factory=lambda: UvicornMCPRunner(config=config, handler=handler),
+        runner_factory=lambda: UvicornMCPRunner(config=config, handlers=handlers),
     )
-    runtime = Runtime(create_application(lifecycle, handler))
+    runtime = Runtime(create_application(lifecycle, handlers))
     _connect_shutdown(runtime)
     return runtime
 

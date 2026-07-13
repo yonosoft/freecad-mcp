@@ -188,17 +188,54 @@ Use a dedicated MCP client test profile containing only:
 }
 ```
 
-Confirm the client lists `create_document`, then request:
+Confirm the client lists exactly these document tools:
+
+```text
+create_document
+list_documents
+get_document
+save_document
+```
+
+The last three are MCP-only; the workbench still has no matching toolbar or menu
+commands. Run this disposable acceptance sequence through the MCP client:
+
+1. Request `list_documents` before creating anything and note the open and
+   active documents already present in FreeCAD.
+2. Request `create_document` with `name` `TestDocument` and label `MCP Test`.
+   Confirm the result has `file_path: null`, `saved: false`, `modified: true`,
+   `active: true`, and `object_count: 0`.
+3. Request `list_documents`; confirm `TestDocument` is present in internal-name
+   order and is identified as active.
+4. Request `get_document` with `name` `TestDocument`; confirm the same summary
+   fields and values are returned.
+5. Request `save_document` for `TestDocument` with a disposable absolute path
+   whose parent already exists, omit the extension, and leave `overwrite` false.
+   Confirm `.FCStd` is appended, the file exists, and the result reports
+   `saved: true` and `modified: false`.
+6. Change the document label in FreeCAD, then request `get_document`; confirm
+   `modified: true`. Request `save_document` again with only the internal name,
+   then confirm it uses the current path and returns `modified: false`.
+7. In the FreeCAD GUI, create and save a disposable target document to a second
+   `.FCStd` path, then close that target document. Request `save_document` for
+   `TestDocument` using that existing path with `overwrite: false`; confirm the
+   structured error code is `file_already_exists` and the target is unchanged.
+8. Repeat the same save-as with `overwrite: true`; confirm success, the returned
+   path is the requested target, and `modified` is false.
+9. Request `save_document` to a path under a missing parent directory and confirm
+   `parent_directory_not_found`; no directory should be created.
+
+The original create-only smoke prompt remains useful:
 
 ```text
 Use the MCP create_document tool to create a document named TestDocument with the label "MCP Test".
 ```
 
-The document should appear immediately. Repeat without a label, then verify an
-invalid internal name and duplicate name return structured errors. Stop and
-restart the server in the same FreeCAD session, reconnect the client, and close
-FreeCAD with the server running to confirm there is no separate or orphaned
-server process.
+For a fresh run, choose another internal name if `TestDocument` is already open.
+Also verify an invalid internal name, an unknown `get_document` name, and a
+duplicate create return structured errors. Stop and restart the server in the
+same FreeCAD session, reconnect the client, and close FreeCAD with the server
+running to confirm there is no separate or orphaned server process.
 
 Report View writes one JSON object per explicit command, prefixed with `[MCP]`.
 Startup remains quiet unless bootstrap initialization fails.

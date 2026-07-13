@@ -56,7 +56,12 @@ def test_lifecycle_initial_status_is_stopped_and_structured() -> None:
     assert result.data["state"] == "stopped"
     assert result.data["url"] == "http://127.0.0.1:8765/mcp"
     assert result.data["transport"] == "streamable_http"
-    assert result.data["tools"] == ["create_document"]
+    assert result.data["tools"] == [
+        "create_document",
+        "list_documents",
+        "get_document",
+        "save_document",
+    ]
     assert lifecycle.can_start() is True
     assert lifecycle.can_stop() is False
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from freecad_mcp.commands.document import CreateDocumentHandler
+from freecad_mcp.commands import DocumentHandlers
 from freecad_mcp.commands.status import report_status
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.server.lifecycle import LifecycleService
@@ -15,7 +15,7 @@ class Application:
     """Dispatches user-facing operations to typed command handlers."""
 
     lifecycle: LifecycleService
-    create_document_handler: CreateDocumentHandler
+    documents: DocumentHandlers
 
     def start_server(self) -> CommandResult:
         """Start the local MCP server."""
@@ -31,7 +31,28 @@ class Application:
 
     def create_document(self, name: object, label: object | None = None) -> CommandResult:
         """Create a document through the shared application handler."""
-        return self.create_document_handler.execute(name=name, label=label)
+        return self.documents.create.execute(name=name, label=label)
+
+    def list_documents(self) -> CommandResult:
+        """List all open documents through the shared application handler."""
+        return self.documents.list.execute()
+
+    def get_document(self, name: object) -> CommandResult:
+        """Inspect one open document through the shared application handler."""
+        return self.documents.get.execute(name=name)
+
+    def save_document(
+        self,
+        name: object,
+        file_path: object | None = None,
+        overwrite: object = False,
+    ) -> CommandResult:
+        """Persist one open document through the shared application handler."""
+        return self.documents.save.execute(
+            name=name,
+            file_path=file_path,
+            overwrite=overwrite,
+        )
 
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
@@ -42,11 +63,9 @@ class Application:
         return self.lifecycle.can_stop()
 
 
-def create_application(
-    lifecycle: LifecycleService, create_document_handler: CreateDocumentHandler
-) -> Application:
+def create_application(lifecycle: LifecycleService, documents: DocumentHandlers) -> Application:
     """Create an application service from explicitly owned dependencies."""
     return Application(
         lifecycle=lifecycle,
-        create_document_handler=create_document_handler,
+        documents=documents,
     )

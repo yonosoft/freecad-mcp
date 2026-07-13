@@ -6,13 +6,16 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from freecad_mcp.commands.document import CreateDocumentHandler
+from freecad_mcp.commands import DocumentHandlers
 from freecad_mcp.server.config import ServerConfig
 
 CREATE_DOCUMENT_TOOL = "create_document"
+LIST_DOCUMENTS_TOOL = "list_documents"
+GET_DOCUMENT_TOOL = "get_document"
+SAVE_DOCUMENT_TOOL = "save_document"
 
 
-def build_mcp_server(handler: CreateDocumentHandler, config: ServerConfig) -> FastMCP[Any]:
+def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMCP[Any]:
     """Build a local Streamable HTTP server with explicit typed tools."""
     server: FastMCP[Any] = FastMCP(
         name="MCP",
@@ -27,10 +30,42 @@ def build_mcp_server(handler: CreateDocumentHandler, config: ServerConfig) -> Fa
 
     @server.tool(
         name=CREATE_DOCUMENT_TOOL,
-        description="Create a new FreeCAD document in the running FreeCAD application.",
+        description="Create a new unsaved document in the running FreeCAD application.",
         structured_output=True,
     )
     def create_document(name: str, label: str | None = None) -> dict[str, object]:
-        return handler.execute(name=name, label=label).to_dict()
+        return handlers.create.execute(name=name, label=label).to_dict()
+
+    @server.tool(
+        name=LIST_DOCUMENTS_TOOL,
+        description="List open FreeCAD documents and identify the active document.",
+        structured_output=True,
+    )
+    def list_documents() -> dict[str, object]:
+        return handlers.list.execute().to_dict()
+
+    @server.tool(
+        name=GET_DOCUMENT_TOOL,
+        description="Inspect an open FreeCAD document by its internal name.",
+        structured_output=True,
+    )
+    def get_document(name: str) -> dict[str, object]:
+        return handlers.get.execute(name=name).to_dict()
+
+    @server.tool(
+        name=SAVE_DOCUMENT_TOOL,
+        description="Save or save as an open FreeCAD document with overwrite protection.",
+        structured_output=True,
+    )
+    def save_document(
+        name: str,
+        file_path: str | None = None,
+        overwrite: bool = False,
+    ) -> dict[str, object]:
+        return handlers.save.execute(
+            name=name,
+            file_path=file_path,
+            overwrite=overwrite,
+        ).to_dict()
 
     return server

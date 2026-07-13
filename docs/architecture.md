@@ -65,11 +65,30 @@ imports. Handlers return `CommandResult` objects with stable codes, user-facing
 messages, and structured data. This layer is the common entry point for GUI
 commands and MCP transport adapters.
 
-`create_document` validates a strict FreeCAD internal name, then dispatches the
-adapter operation to the main Qt thread. Names use an ASCII letter or underscore
-followed by letters, digits, or underscores. This avoids FreeCAD's automatic
-sanitization. An already-open internal name is rejected instead of allowing
-FreeCAD to silently append a numeric suffix.
+Document handlers validate requests and dispatch adapter operations to the main
+Qt thread. Internal names use an ASCII letter or underscore followed by letters,
+digits, or underscores. This avoids FreeCAD's automatic sanitization. An
+already-open internal name is rejected instead of allowing FreeCAD to silently
+append a numeric suffix.
+
+### Shared Document Summary
+
+`create_document`, `list_documents`, `get_document`, and `save_document` use one
+document summary contract:
+
+- `name`: FreeCAD's immutable, unique internal document name;
+- `label`: the user-visible document label;
+- `file_path`: FreeCAD's actual `Document.FileName`, or `null` when empty;
+- `saved`: whether `file_path` is non-null;
+- `modified`: the actual `FreeCADGui.Document.Modified` dirty flag;
+- `active`: whether the document is FreeCAD's current active document;
+- `object_count`: the current length of `Document.Objects`.
+
+`Document.isSaved()` is not used for `modified`: FreeCAD documents that have a
+backing filename remain "saved" while containing later unsaved changes. The GUI
+document's `Modified` property is the authoritative state used for close/save
+prompts. Reading it requires normal FreeCAD GUI mode; the embedded MCP runtime is
+therefore not a headless `FreeCADCmd` service.
 
 ## FreeCAD and GUI Adapters
 
@@ -91,8 +110,11 @@ FreeCAD document changes must:
 Transport threads must never modify FreeCAD documents directly.
 
 Creating a document cannot open a transaction before the document exists. The
-adapter instead rejects duplicates before creation, applies the label, recomputes,
-and closes the newly created document if initialization fails.
+adapter instead rejects duplicates before creation, applies the label,
+recomputes, and closes the newly created document if initialization fails.
+Listing and inspection are read-only. Saving changes persistence state rather
+than model data, so it uses FreeCAD's save API without opening a model
+transaction or forcing a recompute.
 
 ## Main-Thread Dispatch
 
@@ -125,12 +147,35 @@ The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
 document, object, constraint, geometry, and error data.
 
-## First Tool: `create_document`
+## Document Tools
 
 The `create_document` tool creates a FreeCAD document through the shared
 application path. It validates document-name rules, detects collisions, marshals
 execution to the main thread, creates and labels the document, recomputes it,
-and returns the actual name and label.
+and returns its full unsaved document summary.
+
+`list_documents` returns documents ordered by internal name and reports the
+actual active document. `get_document` performs an exact internal-name lookup;
+labels are not lookup keys. Both reads cross the same main-thread dispatcher as
+mutating operations because FreeCAD document and GUI state are thread-affine.
+
+`save_document` uses `Document.save()` when no new path is supplied for an
+already-saved document, or when the requested path resolves to its existing
+path. It uses `Document.saveAs()` for an unsaved document or a different
+destination. The actual post-save `FileName` and `Modified` values are returned.
+
+Save-as paths are handled with `pathlib`: user-home markers are expanded,
+relative paths resolve against the FreeCAD process working directory, and the
+result is absolute. A missing extension is appended as `.FCStd`; case variants
+of that extension are normalized to `.FCStd`; other extensions are rejected.
+The parent directory must already exist. The handler does not create directories,
+browse the filesystem, or delete files.
+
+Before save-as, the handler checks whether the destination exists. Existing
+destinations return `file_already_exists` unless `overwrite` is explicitly true.
+This guard does not block a normal `save()` to a document's own backing file.
+Filesystem checks and the FreeCAD save execute inside the single dispatched
+operation, while transport threads never access a document directly.
 
 ## Tool Levels
 

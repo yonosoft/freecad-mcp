@@ -3,73 +3,155 @@ from __future__ import annotations
 import asyncio
 import socket
 from collections.abc import Callable
+from dataclasses import replace
+from pathlib import Path
+from typing import TypeVar
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-from freecad_mcp.commands.document import CreateDocumentHandler, DocumentInfo
+from freecad_mcp.commands import (
+    CreateDocumentHandler,
+    DocumentHandlers,
+    GetDocumentHandler,
+    ListDocumentsHandler,
+    SaveDocumentHandler,
+)
+from freecad_mcp.commands.document import DocumentCollection, DocumentSummary
 from freecad_mcp.mcp.runner import UvicornMCPRunner
-from freecad_mcp.mcp.server import CREATE_DOCUMENT_TOOL, build_mcp_server
+from freecad_mcp.mcp.server import (
+    CREATE_DOCUMENT_TOOL,
+    GET_DOCUMENT_TOOL,
+    LIST_DOCUMENTS_TOOL,
+    SAVE_DOCUMENT_TOOL,
+    build_mcp_server,
+)
 from freecad_mcp.server.config import ServerConfig
+
+T = TypeVar("T")
+
+TOOL_NAMES = [
+    CREATE_DOCUMENT_TOOL,
+    LIST_DOCUMENTS_TOOL,
+    GET_DOCUMENT_TOOL,
+    SAVE_DOCUMENT_TOOL,
+]
 
 
 class AdapterStub:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, str | None]] = []
+        self.document = DocumentSummary(
+            name="TestDocument",
+            label="TestDocument",
+            file_path=None,
+            modified=True,
+            active=True,
+            object_count=0,
+        )
+        self.create_calls: list[tuple[str, str | None]] = []
+        self.list_calls = 0
+        self.get_calls: list[str] = []
+        self.save_calls: list[tuple[str, str | None]] = []
 
-    def create_document(self, name: str, label: str | None) -> DocumentInfo:
-        self.calls.append((name, label))
-        return DocumentInfo(name=name, label=label or name)
+    def create_document(self, name: str, label: str | None) -> DocumentSummary:
+        self.create_calls.append((name, label))
+        self.document = replace(self.document, name=name, label=label or name)
+        return self.document
+
+    def list_documents(self) -> DocumentCollection:
+        self.list_calls += 1
+        return DocumentCollection(self.document.name, (self.document,))
+
+    def get_document(self, name: str) -> DocumentSummary:
+        self.get_calls.append(name)
+        return self.document
+
+    def save_document(self, name: str, file_path: str | None) -> DocumentSummary:
+        self.save_calls.append((name, file_path))
+        self.document = replace(
+            self.document,
+            file_path=file_path or self.document.file_path,
+            modified=False,
+        )
+        return self.document
 
 
 class DispatcherStub:
-    def call(self, operation: Callable[[], DocumentInfo]) -> DocumentInfo:
+    def call(self, operation: Callable[[], T]) -> T:
         return operation()
 
 
-def test_mcp_server_registers_typed_create_document_tool() -> None:
-    handler = CreateDocumentHandler(AdapterStub(), DispatcherStub())
-    server = build_mcp_server(handler, ServerConfig())
+def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers, AdapterStub]:
+    actual_adapter = adapter or AdapterStub()
+    dispatcher = DispatcherStub()
+    return (
+        DocumentHandlers(
+            create=CreateDocumentHandler(actual_adapter, dispatcher),
+            list=ListDocumentsHandler(actual_adapter, dispatcher),
+            get=GetDocumentHandler(actual_adapter, dispatcher),
+            save=SaveDocumentHandler(actual_adapter, dispatcher),
+        ),
+        actual_adapter,
+    )
+
+
+def test_mcp_server_registers_typed_document_tools() -> None:
+    handlers, _ = make_handlers()
+    server = build_mcp_server(handlers, ServerConfig())
 
     tools = asyncio.run(server.list_tools())
 
-    assert [tool.name for tool in tools] == [CREATE_DOCUMENT_TOOL]
-    assert tools[0].description == (
-        "Create a new FreeCAD document in the running FreeCAD application."
-    )
-    assert tools[0].inputSchema["required"] == ["name"]
-    assert set(tools[0].inputSchema["properties"]) == {"name", "label"}
-    assert tools[0].outputSchema is not None
+    assert [tool.name for tool in tools] == TOOL_NAMES
+    schemas = {tool.name: tool.inputSchema for tool in tools}
+    assert schemas[CREATE_DOCUMENT_TOOL]["required"] == ["name"]
+    assert set(schemas[CREATE_DOCUMENT_TOOL]["properties"]) == {"name", "label"}
+    assert schemas[LIST_DOCUMENTS_TOOL]["properties"] == {}
+    assert schemas[GET_DOCUMENT_TOOL]["required"] == ["name"]
+    assert set(schemas[GET_DOCUMENT_TOOL]["properties"]) == {"name"}
+    assert schemas[SAVE_DOCUMENT_TOOL]["required"] == ["name"]
+    assert set(schemas[SAVE_DOCUMENT_TOOL]["properties"]) == {
+        "name",
+        "file_path",
+        "overwrite",
+    }
+    assert schemas[SAVE_DOCUMENT_TOOL]["properties"]["overwrite"]["default"] is False
+    assert all(tool.outputSchema is not None for tool in tools)
 
 
-def test_mcp_tool_calls_the_shared_handler() -> None:
-    adapter = AdapterStub()
-    server = build_mcp_server(
-        CreateDocumentHandler(adapter, DispatcherStub()),
-        ServerConfig(),
-    )
+def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
+    handlers, adapter = make_handlers()
+    server = build_mcp_server(handlers, ServerConfig())
 
-    asyncio.run(
-        server.call_tool(
+    async def call_tools() -> None:
+        await server.call_tool(
             CREATE_DOCUMENT_TOOL,
             {"name": "TestDocument", "label": "MCP Test"},
         )
-    )
+        await server.call_tool(LIST_DOCUMENTS_TOOL, {})
+        await server.call_tool(GET_DOCUMENT_TOOL, {"name": "TestDocument"})
+        await server.call_tool(
+            SAVE_DOCUMENT_TOOL,
+            {"name": "TestDocument", "file_path": str(tmp_path / "TestDocument")},
+        )
 
-    assert adapter.calls == [("TestDocument", "MCP Test")]
+    asyncio.run(call_tools())
+
+    assert adapter.create_calls == [("TestDocument", "MCP Test")]
+    assert adapter.list_calls == 1
+    assert adapter.get_calls == ["TestDocument", "TestDocument"]
+    assert adapter.save_calls == [
+        ("TestDocument", str((tmp_path / "TestDocument.FCStd").resolve()))
+    ]
 
 
-def test_streamable_http_runner_serves_tool_and_stops_cleanly() -> None:
+def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
 
     config = ServerConfig(port=port)
-    adapter = AdapterStub()
-    runner = UvicornMCPRunner(
-        config,
-        CreateDocumentHandler(adapter, DispatcherStub()),
-    )
+    handlers, adapter = make_handlers()
+    runner = UvicornMCPRunner(config, handlers)
     exits: list[BaseException | None] = []
     runner.start(exits.append)
 
@@ -91,11 +173,19 @@ def test_streamable_http_runner_serves_tool_and_stops_cleanly() -> None:
     finally:
         runner.stop()
 
-    assert tool_names == [CREATE_DOCUMENT_TOOL]
+    assert tool_names == TOOL_NAMES
     assert structured_result == {
         "ok": True,
-        "document": {"name": "HttpDocument", "label": "HTTP Test"},
-        "message": "FreeCAD document created.",
+        "document": {
+            "name": "HttpDocument",
+            "label": "HTTP Test",
+            "file_path": None,
+            "saved": False,
+            "modified": True,
+            "active": True,
+            "object_count": 0,
+        },
+        "message": "FreeCAD document created but not saved.",
     }
-    assert adapter.calls == [("HttpDocument", "HTTP Test")]
+    assert adapter.create_calls == [("HttpDocument", "HTTP Test")]
     assert exits == [None]

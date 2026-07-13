@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TypeVar, cast
 
 import pytest
 
 from freecad_mcp.commands.document import (
     CreateDocumentHandler,
+    DocumentAdapter,
     DocumentAlreadyExistsError,
     DocumentCreationError,
-    DocumentInfo,
+    DocumentSummary,
 )
 from freecad_mcp.core.dispatch import DispatchError
+
+T = TypeVar("T")
 
 
 class ImmediateDispatcher:
@@ -18,7 +22,7 @@ class ImmediateDispatcher:
         self.error = error
         self.calls = 0
 
-    def call(self, operation: Callable[[], DocumentInfo]) -> DocumentInfo:
+    def call(self, operation: Callable[[], T]) -> T:
         self.calls += 1
         if self.error is not None:
             raise self.error
@@ -28,18 +32,25 @@ class ImmediateDispatcher:
 class FakeDocumentAdapter:
     def __init__(
         self,
-        document: DocumentInfo | None = None,
+        document: DocumentSummary | None = None,
         error: Exception | None = None,
     ) -> None:
         self.document = document
         self.error = error
         self.calls: list[tuple[str, str | None]] = []
 
-    def create_document(self, name: str, label: str | None) -> DocumentInfo:
+    def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.calls.append((name, label))
         if self.error is not None:
             raise self.error
-        return self.document or DocumentInfo(name=name, label=label if label is not None else name)
+        return self.document or DocumentSummary(
+            name=name,
+            label=label if label is not None else name,
+            file_path=None,
+            modified=True,
+            active=True,
+            object_count=0,
+        )
 
 
 def make_handler(
@@ -47,7 +58,7 @@ def make_handler(
     dispatcher: ImmediateDispatcher | None = None,
 ) -> CreateDocumentHandler:
     return CreateDocumentHandler(
-        adapter=adapter or FakeDocumentAdapter(),
+        adapter=cast(DocumentAdapter, adapter or FakeDocumentAdapter()),
         dispatcher=dispatcher or ImmediateDispatcher(),
     )
 
@@ -92,7 +103,13 @@ def test_create_document_applies_label_through_injected_adapter() -> None:
     assert result.data["document"] == {
         "name": "BracketDesign",
         "label": "Bracket Design",
+        "file_path": None,
+        "saved": False,
+        "modified": True,
+        "active": True,
+        "object_count": 0,
     }
+    assert result.message == "FreeCAD document created but not saved."
 
 
 def test_create_document_uses_freecad_default_label_when_omitted() -> None:
@@ -102,6 +119,11 @@ def test_create_document_uses_freecad_default_label_when_omitted() -> None:
     assert result.data["document"] == {
         "name": "BracketDesign",
         "label": "BracketDesign",
+        "file_path": None,
+        "saved": False,
+        "modified": True,
+        "active": True,
+        "object_count": 0,
     }
 
 
@@ -135,8 +157,25 @@ def test_create_document_reports_main_thread_dispatch_failure() -> None:
 
 
 def test_create_document_reports_actual_adapter_name() -> None:
-    adapter = FakeDocumentAdapter(document=DocumentInfo("ActualName", "Visible Label"))
+    adapter = FakeDocumentAdapter(
+        document=DocumentSummary(
+            "ActualName",
+            "Visible Label",
+            None,
+            True,
+            True,
+            0,
+        )
+    )
 
     result = make_handler(adapter).execute("RequestedName")
 
-    assert result.data["document"] == {"name": "ActualName", "label": "Visible Label"}
+    assert result.data["document"] == {
+        "name": "ActualName",
+        "label": "Visible Label",
+        "file_path": None,
+        "saved": False,
+        "modified": True,
+        "active": True,
+        "object_count": 0,
+    }
