@@ -104,8 +104,8 @@ save_document
 list_objects
 ```
 
-All four document tools are MCP-only and do not add workbench commands or
-toolbar icons.
+These document and object-inspection tools are MCP-only capabilities. They do not
+add workbench commands or toolbar icons.
 
 ## Documentation
 

@@ -228,13 +228,19 @@ object without exposing arbitrary properties:
 
 ### Parent and Child Semantics
 
-The parent is the first entry in the FreeCAD object's `InList`. When `InList` is
-non-empty, another object depends on or contains this one. Top-level objects
-with no incoming reference receive `null`.
+The parent is the first supported container found for the object. The adapter
+queries `getParentGeoFeatureGroup()` (PartDesign Body, GeoFeatureGroup) followed
+by `getParentGroup()` (App::Part, regular groups). Both return `None` when no
+supported container exists. Top-level objects with no container parent receive
+`null`.
 
-Children are the object's `OutList` entries sorted by internal name. This
-captures dependency and containment relationships; a future refinement may
-distinguish strict container membership from general dependency links.
+Children are derived only from a supported container's direct `Group` property.
+Non-container objects have no `Group` and report an empty children list. Each
+child list is sorted by internal name.
+
+`InList` and `OutList` are generic dependency relationships and must not be used
+to derive containment. Dependencies such as Sketch-to-Pad appear in those lists
+but are not parent/child containment and are excluded from the summary.
 
 ### Deterministic Ordering
 

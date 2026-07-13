@@ -200,8 +200,9 @@ save_document
 list_objects
 ```
 
-All four are MCP-only; the workbench has no matching document toolbar or menu
-commands. Connect the dedicated Aider MCP test project and confirm
+These document and object-inspection tools are MCP-only; the workbench has no
+matching document toolbar or menu commands. Connect the dedicated Aider MCP test
+project and confirm
 `create_document` remains discoverable, then run this disposable acceptance
 sequence through the MCP client:
 
