@@ -1,30 +1,39 @@
-# Development setup
+# Development Setup
 
-## Prerequisites
+## Workspaces and Repositories
 
-- Windows 10 or 11.
-- FreeCAD 1.1 or later.
-- Git.
-- Eclipse with PyDev.
-- External CPython 3.11 for development tools.
-- AiderDesk when agent-assisted development is required.
+Use a generic Eclipse Python workspace:
 
-FreeCAD 1.1.x release packages use Python 3.11, so external Python 3.11 is the closest development-tooling match. Always confirm the exact embedded version in the installed build from FreeCAD's Python console:
-
-```python
-import sys
-print(sys.version)
+```text
+C:\Users\Goran\python-workspace
 ```
 
-Do not assume packages installed into system Python or `.venv` are available inside FreeCAD.
+Keep Git repositories under:
 
-## Repository and virtual environment
+```text
+C:\Users\Goran\git
+```
 
-From PowerShell:
+The Eclipse workspace must not contain copied repositories. Import or create the
+PyDev project from the existing repository path:
+
+```text
+C:\Users\Goran\git\freecad-mcp
+```
+
+Keep FreeCAD/Python work separate from any ESP32 workspace or toolchain setup.
+
+## Python Tooling
+
+Use standalone CPython 3.11 for PyDev, linting, type checking, and tests.
+FreeCAD 1.1.x release builds also use Python 3.11, but FreeCAD runtime modules
+are supplied by FreeCAD itself.
+
+The `freecad-mcp` project uses its own `.venv` for local tooling where
+practical:
 
 ```powershell
-git clone <repository-url> FreeCAD-MCP
-cd FreeCAD-MCP
+cd C:\Users\Goran\git\freecad-mcp
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 .\scripts\test.ps1
@@ -32,76 +41,23 @@ py -3.11 -m venv .venv
 
 The repository scripts never install packages automatically.
 
-## Development junction
+## Eclipse/PyDev
 
-Run:
-
-```powershell
-.\scripts\install-dev.ps1
-```
-
-Detected link location (for FreeCAD 1.1, typically):
+Configure PyDev with standalone Python 3.11, preferably the project venv:
 
 ```text
-%APPDATA%\FreeCAD\v1-1\Mod\FreeCADMCP
+C:\Users\Goran\git\freecad-mcp\.venv\Scripts\python.exe
 ```
 
-The installer searches `%APPDATA%\FreeCAD` for a versioned user directory. If multiple candidates exist and it cannot select one safely, use:
+Create the PyDev project from existing sources:
 
-```powershell
-.\scripts\install-dev.ps1 -FreeCADModRoot "$env:APPDATA\FreeCAD\v1-1\Mod"
-```
-
-Default target:
-
-```text
-<repository>\src\FreeCADMCP
-```
-
-A directory junction is used because it works on normal Windows installations without enabling Developer Mode or granting symbolic-link privileges. The source remains in the repository; there is no copy step.
-
-To remove it:
-
-```powershell
-.\scripts\uninstall-dev.ps1
-```
-
-Both scripts refuse to delete an ordinary directory at the link location.
-
-## Eclipse/PyDev without affecting ESP32
-
-### Separate workspace
-
-Start Eclipse and select a separate workspace such as:
-
-```text
-C:\Users\Goran\eclipse-workspace-freecad
-```
-
-Do not open or convert the existing ESP32 workspace. Eclipse workspaces keep project metadata, perspectives, launch configurations, and toolchain settings separate.
-
-### Install PyDev
-
-Use **Help → Eclipse Marketplace**, search for **PyDev**, install it, and restart Eclipse. This adds Python tooling; it does not change the ESP32 C++ compiler or project settings.
-
-### Configure the interpreter
-
-1. Create `.venv` with external CPython 3.11 as shown above.
-2. Open **Window → Preferences → PyDev → Interpreters → Python Interpreter**.
-3. Add `<repository>\.venv\Scripts\python.exe` and name it `FreeCAD-MCP Python 3.11`.
-4. Keep the detected standard-library and site-packages paths.
-
-Use the external virtual environment for code analysis and tests. Do not select `FreeCAD.exe` as the initial PyDev interpreter. FreeCAD runtime testing is performed by launching FreeCAD itself.
-
-### Create the PyDev project from existing sources
-
-1. Choose **File → New → Project → PyDev → PyDev Project**.
-2. Project name: `FreeCAD-MCP`.
-3. Clear **Use default** and point **Project contents** to the existing Git repository.
-4. Choose Python grammar 3.11 and interpreter `FreeCAD-MCP Python 3.11`.
-5. Finish without creating another repository or copying sources.
-6. In project properties, set `src/FreeCADMCP` as a PyDev source folder.
-7. Optionally set `tests` as an additional source folder for test navigation.
+1. Choose **File -> New -> Project -> PyDev -> PyDev Project**.
+2. Project name: `freecad-mcp`.
+3. Clear **Use default** and point **Project contents** to
+   `C:\Users\Goran\git\freecad-mcp`.
+4. Choose Python grammar 3.11 and the configured interpreter.
+5. Set the PyDev source root to `/freecad-mcp/src`.
+6. Optionally add `/freecad-mcp/tests` for test navigation.
 
 Recommended excluded/generated folders:
 
@@ -117,93 +73,95 @@ dist
 *.egg-info
 ```
 
-Eclipse `.project`, `.pydevproject`, `.settings`, and workspace `.metadata` are intentionally ignored so local IDE configuration does not become repository policy.
+Eclipse `.project`, `.pydevproject`, `.settings`, and workspace `.metadata` are
+local IDE configuration and should not become repository policy.
 
-### FreeCAD-specific imports
+## FreeCAD Runtime Imports
 
-Modules such as `FreeCAD`, `FreeCADGui`, `Part`, and `Sketcher` are supplied by FreeCAD's embedded runtime. They generally cannot be imported safely by an unrelated system Python because compiled modules and DLL search paths are tied to the FreeCAD installation.
+Modules such as `FreeCAD`, `FreeCADGui`, `Part`, and `Sketcher` execute inside
+FreeCAD. They generally cannot be imported safely by unrelated standalone
+Python because compiled modules and DLL/search paths are tied to the FreeCAD
+installation.
 
 Use these practices:
 
 - keep FreeCAD imports inside adapter modules or function bodies;
 - keep schemas, validation, dispatch, and result objects in pure-Python modules;
-- use narrow `# type: ignore[import-not-found]` comments where an adapter must import a FreeCAD module;
+- use narrow `# type: ignore[import-not-found]` comments where an adapter must
+  import a FreeCAD module;
 - do not add FreeCAD as a pip dependency;
-- do not add the entire FreeCAD installation to the external interpreter unless a tested local setup proves compatible.
+- do not add the whole FreeCAD installation to the standalone interpreter unless
+  a tested local setup proves compatible.
 
-For PyDev editor warnings, **Forced Builtins** can be tried for `FreeCAD`, `FreeCADGui`, `Part`, and `Sketcher`, but PyDev may be unable to inspect them from external Python. If that occurs, use PyDev predefined completions or project-local type stubs later rather than forcing runtime imports into `.venv`.
+## Development Install
 
-### Run and debug model
+Current Windows development uses a PowerShell script and a directory junction:
 
-- Pure Python tests and quality tools run under `.venv`.
-- Workbench startup, FreeCAD API behavior, Qt behavior, and document mutation run inside FreeCAD.
-- The ordinary loop is:
+```text
+%APPDATA%\FreeCAD\v1-1\Mod\mcp -> <repository>\src
+```
+
+Run from the repository root:
+
+```powershell
+.\scripts\install-dev.ps1
+```
+
+The installed addon folder is lowercase `mcp`; the visible FreeCAD workbench
+name is `MCP`. If multiple FreeCAD user directories exist and the script cannot
+select one safely, pass `-FreeCADModRoot` explicitly.
+
+Linux and macOS support is intended to use symbolic links and the
+platform-appropriate FreeCAD user `Mod` directories later. That support is not
+implemented yet, and Windows junction mechanics are not architectural
+requirements.
+
+## Run and Test
+
+Pure Python checks run under the project venv:
+
+```powershell
+.\scripts\test.ps1
+```
+
+Workbench startup, FreeCAD API behavior, Qt behavior, and document mutation
+must be tested inside FreeCAD.
+
+Typical loop:
 
 ```text
 Edit in Eclipse
-→ run scripts/test.ps1 for pure code
-→ restart FreeCAD
-→ select CAD MCP workbench
-→ inspect Report View
-→ run the current command
+run scripts/test.ps1
+restart FreeCAD
+select MCP workbench
+inspect Report View
+run the current command
 ```
 
-Python module reload can be introduced later for selected pure modules, but restarting FreeCAD is the reliable baseline while workbench lifecycle code is changing.
+## Report View Verification
 
-### Report View
+In FreeCAD, enable **View -> Panels -> Report View**. Also enable redirection of
+Python output/errors in FreeCAD preferences when diagnosing startup failures.
 
-In FreeCAD, enable **View → Panels → Report View**. Also enable redirection of Python output/errors in FreeCAD preferences when diagnosing startup failures.
-
-### Optional remote debugging later
-
-Remote debugging is not required for the bootstrap milestone. Later, a compatible `pydevd` package can be made available to FreeCAD's embedded Python and invoked from a deliberate debug-only command. The version must match the installed PyDev debugger protocol, startup must never block normal FreeCAD use, and the debug listener must bind locally unless explicitly configured otherwise.
-
-Do not install `pydevd` into FreeCAD automatically. Document the exact FreeCAD Python package location and obtain approval before changing it.
-
-## Manual milestone test
+Manual bootstrap check:
 
 1. Exit every FreeCAD process.
-2. In repository PowerShell, run `.\scripts\install-dev.ps1`.
-3. Verify the script prints both link and target paths.
-4. Start FreeCAD.
-5. Enable **View → Panels → Report View**.
-6. Select **CAD MCP** from the workbench selector.
-7. Confirm a toolbar named **CAD MCP** appears with one icon.
-8. Click **Report MCP Status**.
-9. Confirm this message appears:
+2. Run `.\scripts\install-dev.ps1`.
+3. Start FreeCAD.
+4. Open Report View.
+5. Select the **MCP** workbench.
+6. Click **Report MCP Status**.
+7. Confirm Report View contains:
 
 ```text
-[CAD MCP] Workbench command is active; shared command dispatch succeeded.
+[MCP] Workbench command is active; shared command dispatch succeeded.
 ```
 
-10. Close FreeCAD and run `.\scripts\uninstall-dev.ps1` only when the development link is no longer wanted.
-
-If startup fails, record the complete Report View traceback and the output of:
+If startup fails, record the complete Report View traceback and this console
+output:
 
 ```python
 import sys
 print(sys.version)
 print(App.getUserAppDataDir())
 ```
-
-## AiderDesk profile
-
-A reusable profile template is committed at:
-
-```text
-.aider-desk\agents\python-engineer-power-tools\
-```
-
-AiderDesk supports project profiles in `{projectDir}/.aider-desk/agents/`. The included profile deliberately leaves provider, model, and project directory blank because those values are machine/account-specific. Open the profile in AiderDesk settings and select them before first use.
-
-The profile uses Power Tools and Aider tools, allows read/search and targeted editing, asks before shell commands, new-file writes, Aider prompts, network fetches, or delegation, and disables automatic subagent delegation. The full generic behavior is in the profile's `rules/python-engineer.md`.
-
-Project-specific FreeCAD and MCP constraints are in the repository root `AGENTS.md`, which AiderDesk reads as project context.
-
-### Engineer versus manager profile
-
-Use **Python Engineer – Power Tools** as the initial default. It directly inspects, edits, tests, and maintains the repository with fewer orchestration layers. A manager profile becomes worthwhile only after provider/model selection, subagent quality, task isolation, and delegation approval behavior have been verified on this installation. At that point, create a separate manager profile that delegates bounded tasks to this engineer rather than replacing it.
-
-## Release packaging
-
-This milestone validates the junction-based development install. Addon Manager publication and distributable release packaging are future tasks. Keep `src/FreeCADMCP` self-contained so it can later be packaged without relying on the monorepo layout.

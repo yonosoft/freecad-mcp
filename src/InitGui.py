@@ -1,4 +1,4 @@
-"""FreeCAD GUI bootstrap for the CAD MCP workbench."""
+"""FreeCAD GUI bootstrap for the MCP workbench."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import sys
 import FreeCAD as App  # type: ignore[import-not-found]
 import FreeCADGui as Gui  # type: ignore[import-not-found]
 
-_WORKBENCH_ID = "FreeCADMCPWorkbench"
-_WORKBENCH_NAME = "CAD MCP"
+_WORKBENCH_ID = "MCPWorkbench"
+_WORKBENCH_NAME = "MCP"
 
 
 def _resolve_workbench_root():
@@ -24,8 +24,8 @@ def _resolve_workbench_root():
 
     user_data_dir = Path(App.getUserAppDataDir())
     for user_candidate in (
-        user_data_dir / "Mod" / "FreeCADMCP",
-        *(user_data_dir.glob("v*/Mod/FreeCADMCP") if user_data_dir.is_dir() else ()),
+        user_data_dir / "Mod" / "mcp",
+        *(user_data_dir.glob("v*/Mod/mcp") if user_data_dir.is_dir() else ()),
     ):
         if user_candidate.is_dir():
             return user_candidate.resolve()
@@ -37,7 +37,7 @@ def _resolve_workbench_root():
         if (candidate / "freecad_mcp").is_dir() and (candidate / "InitGui.py").is_file():
             return candidate.resolve()
 
-    raise RuntimeError("Could not locate the CAD MCP workbench root.")
+    raise RuntimeError("Could not locate the MCP workbench root.")
 
 
 try:
@@ -52,10 +52,10 @@ except Exception as exc:
     raise
 
 
-class FreeCADMCPWorkbench(Gui.Workbench):
+class MCPWorkbench(Gui.Workbench):
     """External Python workbench for typed CAD and MCP commands."""
 
-    MenuText = "CAD MCP"
+    MenuText = "MCP"
     ToolTip = "Typed local MCP tools and shared CAD commands"
 
     def Initialize(self) -> None:
@@ -75,12 +75,12 @@ class FreeCADMCPWorkbench(Gui.Workbench):
         return "Gui::PythonWorkbench"
 
 
-FreeCADMCPWorkbench.Icon = _WORKBENCH_ICON
+MCPWorkbench.Icon = _WORKBENCH_ICON
 
 
 try:
     if _WORKBENCH_ID not in Gui.listWorkbenches():
-        Gui.addWorkbench(FreeCADMCPWorkbench())
+        Gui.addWorkbench(MCPWorkbench())
 except Exception as exc:
     App.Console.PrintError(
         f"[{_WORKBENCH_NAME}] Startup failed during InitGui.py workbench registration: {exc}\n"

@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-ADDON_ROOT = REPOSITORY_ROOT / "src" / "FreeCADMCP"
+ADDON_ROOT = REPOSITORY_ROOT / "src"
 
 
 def test_package_metadata_references_existing_files() -> None:
@@ -29,5 +29,5 @@ def test_package_metadata_uses_visible_workbench_name() -> None:
     root = ET.parse(ADDON_ROOT / "package.xml").getroot()
     namespace = {"pkg": "https://wiki.freecad.org/Package_Metadata"}
 
-    assert root.findtext("pkg:name", namespaces=namespace) == "CAD MCP"
-    assert root.findtext("pkg:content/pkg:workbench/pkg:name", namespaces=namespace) == "CAD MCP"
+    assert root.findtext("pkg:name", namespaces=namespace) == "MCP"
+    assert root.findtext("pkg:content/pkg:workbench/pkg:name", namespaces=namespace) == "MCP"

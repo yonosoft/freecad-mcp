@@ -7,7 +7,9 @@ from pathlib import Path
 from freecad_mcp.application import create_application
 from freecad_mcp.gui.report import write_result
 
-COMMAND_REPORT_STATUS = "FreeCADMCP_ReportStatus"
+COMMAND_REPORT_STATUS = "MCP_ReportStatus"
+COMMAND_CREATE_DOCUMENT = "MCP_CreateDocument"
+COMMAND_START_SERVER = "MCP_StartServer"
 COMMAND_IDS = [COMMAND_REPORT_STATUS]
 _REGISTERED = False
 
@@ -24,7 +26,7 @@ class ReportStatusCommand:
         return {
             "Pixmap": _icon_path("report-status.svg"),
             "MenuText": "Report MCP Status",
-            "ToolTip": "Write the CAD MCP bootstrap status to Report View",
+            "ToolTip": "Write the MCP bootstrap status to Report View",
         }
 
     def Activated(self) -> None:

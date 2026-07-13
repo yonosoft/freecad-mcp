@@ -31,12 +31,12 @@ function Get-FreeCADModCandidates {
 
 $links = @(
     Get-FreeCADModCandidates -RequestedRoot $FreeCADModRoot |
-        ForEach-Object { Join-Path $_ "FreeCADMCP" } |
+        ForEach-Object { Join-Path $_ "mcp" } |
         Where-Object { Test-Path -LiteralPath $_ }
 )
 
 if ($links.Count -eq 0) {
-    Write-Host "No CAD MCP development link was found in the FreeCAD user directories."
+    Write-Host "No MCP development link was found in the FreeCAD user directories."
     exit 0
 }
 
@@ -51,7 +51,7 @@ foreach ($link in $links) {
     $target = @($item.Target)[0]
     Remove-Item -LiteralPath $link -Force
 
-    Write-Host "Removed CAD MCP development link."
+    Write-Host "Removed MCP development link."
     Write-Host "Link:   $link"
     if ($target) {
         Write-Host "Former target (not deleted): $target"

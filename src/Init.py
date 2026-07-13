@@ -1,4 +1,4 @@
-"""FreeCAD application-mode bootstrap for the CAD MCP addon."""
+"""FreeCAD application-mode bootstrap for the MCP addon."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import sys
 
 import FreeCAD as App  # type: ignore[import-not-found]
 
-_WORKBENCH_NAME = "CAD MCP"
+_WORKBENCH_NAME = "MCP"
 
 
 def _resolve_workbench_root():
@@ -22,8 +22,8 @@ def _resolve_workbench_root():
 
     user_data_dir = Path(App.getUserAppDataDir())
     for user_candidate in (
-        user_data_dir / "Mod" / "FreeCADMCP",
-        *(user_data_dir.glob("v*/Mod/FreeCADMCP") if user_data_dir.is_dir() else ()),
+        user_data_dir / "Mod" / "mcp",
+        *(user_data_dir.glob("v*/Mod/mcp") if user_data_dir.is_dir() else ()),
     ):
         if user_candidate.is_dir():
             return user_candidate.resolve()
@@ -35,7 +35,7 @@ def _resolve_workbench_root():
         if (candidate / "freecad_mcp").is_dir() and (candidate / "Init.py").is_file():
             return candidate.resolve()
 
-    raise RuntimeError("Could not locate the CAD MCP workbench root.")
+    raise RuntimeError("Could not locate the MCP workbench root.")
 
 
 try:

@@ -17,7 +17,7 @@ function Resolve-FreeCADModRoot {
 
     $freeCADDataRoot = Join-Path $env:APPDATA "FreeCAD"
     if (-not (Test-Path -LiteralPath $freeCADDataRoot -PathType Container)) {
-        return (Join-Path $freeCADDataRoot "Mod")
+        throw "FreeCAD user data directory was not found at '$freeCADDataRoot'. Start FreeCAD once, or re-run with -FreeCADModRoot '<path>\Mod'."
     }
 
     $versionedRoots = @(
@@ -44,12 +44,17 @@ function Resolve-FreeCADModRoot {
         throw "Multiple versioned FreeCAD user directories were found: '$choices'. Re-run with -FreeCADModRoot '<path>\Mod'."
     }
 
-    return (Join-Path $freeCADDataRoot "Mod")
+    $unversionedRoot = Join-Path $freeCADDataRoot "Mod"
+    if (Test-Path -LiteralPath $unversionedRoot -PathType Container) {
+        return $unversionedRoot
+    }
+
+    throw "No active FreeCAD user Mod directory was found under '$freeCADDataRoot'. Start FreeCAD once, or re-run with -FreeCADModRoot '<path>\Mod'."
 }
 
 $FreeCADModRoot = Resolve-FreeCADModRoot -RequestedRoot $FreeCADModRoot
-$source = (Resolve-Path (Join-Path $RepoRoot "src\FreeCADMCP")).Path
-$link = Join-Path $FreeCADModRoot "FreeCADMCP"
+$source = (Resolve-Path (Join-Path $RepoRoot "src")).Path
+$link = Join-Path $FreeCADModRoot "mcp"
 
 foreach ($required in @("Init.py", "InitGui.py", "package.xml")) {
     $requiredPath = Join-Path $source $required
@@ -96,7 +101,7 @@ if (Test-Path -LiteralPath $link) {
 
 New-Item -ItemType Junction -Path $link -Target $source | Out-Null
 
-Write-Host "Installed CAD MCP development junction."
+Write-Host "Installed MCP development junction."
 Write-Host "Link:   $link"
 Write-Host "Target: $source"
-Write-Host "Restart FreeCAD, select the 'CAD MCP' workbench, and inspect Report View."
+Write-Host "Restart FreeCAD, select the 'MCP' workbench, and inspect Report View."

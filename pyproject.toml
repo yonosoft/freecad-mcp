@@ -20,20 +20,21 @@ dev = [
 ]
 
 [tool.setuptools]
-package-dir = {"" = "src/FreeCADMCP"}
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
-where = ["src/FreeCADMCP"]
+where = ["src"]
 include = ["freecad_mcp*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["src/FreeCADMCP", "tests"]
+src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
@@ -41,6 +42,6 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-mypy_path = "src/FreeCADMCP"
-files = ["src/FreeCADMCP/freecad_mcp", "tests"]
-exclude = ["src/FreeCADMCP/Init.py", "src/FreeCADMCP/InitGui.py"]
+mypy_path = "src"
+files = ["src/freecad_mcp", "tests"]
+exclude = ["src/Init.py", "src/InitGui.py"]

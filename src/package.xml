@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
-  <name>CAD MCP</name>
+  <name>MCP</name>
   <description>Typed local MCP tools and shared GUI commands for FreeCAD.</description>
   <version>0.1.0</version>
   <date>2026-07-13</date>
@@ -10,8 +10,8 @@
   <pythonmin>3.11</pythonmin>
   <content>
     <workbench>
-      <name>CAD MCP</name>
-      <classname>FreeCADMCPWorkbench</classname>
+      <name>MCP</name>
+      <classname>MCPWorkbench</classname>
       <subdirectory>./</subdirectory>
       <icon>Resources/icons/freecad-mcp.svg</icon>
       <tag>mcp</tag>
