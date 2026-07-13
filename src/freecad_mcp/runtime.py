@@ -1,0 +1,65 @@
+"""FreeCAD application composition and process-owned lifecycle state."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from freecad_mcp.application import Application, create_application
+from freecad_mcp.commands.document import CreateDocumentHandler
+from freecad_mcp.core.logging import get_logger
+from freecad_mcp.freecad.document import FreeCADDocumentAdapter
+from freecad_mcp.freecad.qt_dispatcher import create_qt_main_thread_dispatcher
+from freecad_mcp.mcp.runner import UvicornMCPRunner
+from freecad_mcp.server.config import ServerConfig
+from freecad_mcp.server.lifecycle import LifecycleService, LifecycleState
+
+_LOGGER = get_logger("runtime")
+
+
+@dataclass(slots=True, weakref_slot=True)
+class Runtime:
+    """Own the application service for one FreeCAD process."""
+
+    application: Application
+
+    def shutdown(self) -> None:
+        """Stop the in-process server during FreeCAD shutdown."""
+        if self.application.lifecycle.state is not LifecycleState.RUNNING:
+            return
+        result = self.application.stop_server()
+        if not result.ok:
+            _LOGGER.error("MCP shutdown failed: %s", result.to_dict())
+
+
+_runtime: Runtime | None = None
+
+
+def get_application() -> Application:
+    """Return the lazily built, process-owned FreeCAD application service."""
+    global _runtime
+    if _runtime is None:
+        _runtime = _build_runtime()
+    return _runtime.application
+
+
+def _build_runtime() -> Runtime:
+    config = ServerConfig()
+    handler = CreateDocumentHandler(
+        adapter=FreeCADDocumentAdapter(),
+        dispatcher=create_qt_main_thread_dispatcher(),
+    )
+    lifecycle = LifecycleService(
+        config=config,
+        runner_factory=lambda: UvicornMCPRunner(config=config, handler=handler),
+    )
+    runtime = Runtime(create_application(lifecycle, handler))
+    _connect_shutdown(runtime)
+    return runtime
+
+
+def _connect_shutdown(runtime: Runtime) -> None:
+    from PySide import QtCore  # type: ignore[import-not-found]
+
+    application = QtCore.QCoreApplication.instance()
+    if application is not None:
+        application.aboutToQuit.connect(runtime.shutdown)
