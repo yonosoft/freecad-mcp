@@ -40,10 +40,16 @@ Run:
 .\scripts\install-dev.ps1
 ```
 
-Default link:
+Detected link location (for FreeCAD 1.1, typically):
 
 ```text
-%APPDATA%\FreeCAD\Mod\FreeCADMCP
+%APPDATA%\FreeCAD\v1-1\Mod\FreeCADMCP
+```
+
+The installer searches `%APPDATA%\FreeCAD` for a versioned user directory. If multiple candidates exist and it cannot select one safely, use:
+
+```powershell
+.\scripts\install-dev.ps1 -FreeCADModRoot "$env:APPDATA\FreeCAD\v1-1\Mod"
 ```
 
 Default target:
@@ -137,7 +143,7 @@ For PyDev editor warnings, **Forced Builtins** can be tried for `FreeCAD`, `Free
 Edit in Eclipse
 → run scripts/test.ps1 for pure code
 → restart FreeCAD
-→ select FreeCAD MCP workbench
+→ select CAD MCP workbench
 → inspect Report View
 → run the current command
 ```
@@ -161,13 +167,13 @@ Do not install `pydevd` into FreeCAD automatically. Document the exact FreeCAD P
 3. Verify the script prints both link and target paths.
 4. Start FreeCAD.
 5. Enable **View → Panels → Report View**.
-6. Select **FreeCAD MCP** from the workbench selector.
-7. Confirm a toolbar named **FreeCAD MCP** appears with one icon.
+6. Select **CAD MCP** from the workbench selector.
+7. Confirm a toolbar named **CAD MCP** appears with one icon.
 8. Click **Report MCP Status**.
 9. Confirm this message appears:
 
 ```text
-[FreeCAD MCP] Workbench command is active; shared command dispatch succeeded.
+[CAD MCP] Workbench command is active; shared command dispatch succeeded.
 ```
 
 10. Close FreeCAD and run `.\scripts\uninstall-dev.ps1` only when the development link is no longer wanted.

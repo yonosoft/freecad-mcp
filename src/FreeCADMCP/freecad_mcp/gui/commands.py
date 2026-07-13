@@ -24,7 +24,7 @@ class ReportStatusCommand:
         return {
             "Pixmap": _icon_path("report-status.svg"),
             "MenuText": "Report MCP Status",
-            "ToolTip": "Write the FreeCAD MCP bootstrap status to Report View",
+            "ToolTip": "Write the CAD MCP bootstrap status to Report View",
         }
 
     def Activated(self) -> None:

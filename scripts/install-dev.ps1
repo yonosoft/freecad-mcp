@@ -1,13 +1,53 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
-    [string]$FreeCADModRoot = (Join-Path $env:APPDATA "FreeCAD\Mod"),
+    [string]$FreeCADModRoot,
     [switch]$Force
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Resolve-FreeCADModRoot {
+    param([string]$RequestedRoot)
+
+    if ($RequestedRoot) {
+        return [IO.Path]::GetFullPath($RequestedRoot)
+    }
+
+    $freeCADDataRoot = Join-Path $env:APPDATA "FreeCAD"
+    if (-not (Test-Path -LiteralPath $freeCADDataRoot -PathType Container)) {
+        return (Join-Path $freeCADDataRoot "Mod")
+    }
+
+    $versionedRoots = @(
+        Get-ChildItem -LiteralPath $freeCADDataRoot -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^v\d+(?:-\d+)*$' } |
+            Sort-Object Name -Descending
+    )
+
+    if ($versionedRoots.Count -eq 1) {
+        return (Join-Path $versionedRoots[0].FullName "Mod")
+    }
+
+    if ($versionedRoots.Count -gt 1) {
+        $withConfig = @(
+            $versionedRoots | Where-Object {
+                Test-Path -LiteralPath (Join-Path $_.FullName "user.cfg") -PathType Leaf
+            }
+        )
+        if ($withConfig.Count -eq 1) {
+            return (Join-Path $withConfig[0].FullName "Mod")
+        }
+
+        $choices = ($versionedRoots.FullName -join "', '")
+        throw "Multiple versioned FreeCAD user directories were found: '$choices'. Re-run with -FreeCADModRoot '<path>\Mod'."
+    }
+
+    return (Join-Path $freeCADDataRoot "Mod")
+}
+
+$FreeCADModRoot = Resolve-FreeCADModRoot -RequestedRoot $FreeCADModRoot
 $source = (Resolve-Path (Join-Path $RepoRoot "src\FreeCADMCP")).Path
 $link = Join-Path $FreeCADModRoot "FreeCADMCP"
 
@@ -56,7 +96,7 @@ if (Test-Path -LiteralPath $link) {
 
 New-Item -ItemType Junction -Path $link -Target $source | Out-Null
 
-Write-Host "Installed FreeCAD MCP development junction."
+Write-Host "Installed CAD MCP development junction."
 Write-Host "Link:   $link"
 Write-Host "Target: $source"
-Write-Host "Restart FreeCAD, select the 'FreeCAD MCP' workbench, and inspect Report View."
+Write-Host "Restart FreeCAD, select the 'CAD MCP' workbench, and inspect Report View."

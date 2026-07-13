@@ -1,4 +1,4 @@
-"""FreeCAD application-mode bootstrap for the FreeCAD MCP addon."""
+"""FreeCAD application-mode bootstrap for the CAD MCP addon."""
 
 from __future__ import annotations
 

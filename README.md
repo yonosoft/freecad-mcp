@@ -1,4 +1,4 @@
-# FreeCAD MCP
+# CAD MCP
 
 A Python-based, installable FreeCAD workbench intended to host a local Model Context Protocol (MCP) server inside FreeCAD. The project will expose explicit typed CAD tools, not arbitrary Python execution.
 
@@ -41,14 +41,14 @@ Keep the repository in a normal development folder. From PowerShell in the repos
 .\scripts\install-dev.ps1
 ```
 
-This creates a directory junction:
+The script detects FreeCAD's active versioned user directory and creates a directory junction such as:
 
 ```text
-%APPDATA%\FreeCAD\Mod\FreeCADMCP
+%APPDATA%\FreeCAD\v1-1\Mod\FreeCADMCP
     -> <repository>\src\FreeCADMCP
 ```
 
-The script refuses to overwrite an ordinary directory. It only replaces an existing reparse point when `-Force` is supplied.
+When more than one versioned user directory is present and the active one cannot be determined safely, pass `-FreeCADModRoot` explicitly. The script refuses to overwrite an ordinary directory. It only replaces an existing reparse point when `-Force` is supplied.
 
 Remove the link with:
 
@@ -64,12 +64,12 @@ No source files are copied. Edits made in Eclipse are visible to FreeCAD after t
 2. Run `scripts\install-dev.ps1`.
 3. Start FreeCAD 1.1 or later.
 4. Open **View → Panels → Report View**.
-5. Select **FreeCAD MCP** in the workbench selector.
-6. Click **Report MCP Status** on the toolbar or in the **FreeCAD MCP** menu.
+5. Select **CAD MCP** in the workbench selector.
+6. Click **Report MCP Status** on the toolbar or in the **CAD MCP** menu.
 7. Confirm Report View contains:
 
 ```text
-[FreeCAD MCP] Workbench command is active; shared command dispatch succeeded.
+[CAD MCP] Workbench command is active; shared command dispatch succeeded.
 ```
 
 If the workbench is absent, inspect Report View for import errors and run this in FreeCAD's Python console:

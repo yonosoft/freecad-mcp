@@ -2,7 +2,7 @@
 
 ## Purpose
 
-FreeCAD MCP is an external Python FreeCAD workbench that will embed a local MCP server. It is designed around explicit typed CAD operations, shared command handlers, validation, and structured state feedback.
+CAD MCP is an external Python FreeCAD workbench that will embed a local MCP server. It is designed around explicit typed CAD operations, shared command handlers, validation, and structured state feedback.
 
 ## Component model
 

@@ -23,3 +23,11 @@ def test_package_metadata_references_existing_files() -> None:
 
 def test_addon_and_repository_licenses_match() -> None:
     assert (ADDON_ROOT / "LICENSE").read_bytes() == (REPOSITORY_ROOT / "LICENSE").read_bytes()
+
+
+def test_package_metadata_uses_visible_workbench_name() -> None:
+    root = ET.parse(ADDON_ROOT / "package.xml").getroot()
+    namespace = {"pkg": "https://wiki.freecad.org/Package_Metadata"}
+
+    assert root.findtext("pkg:name", namespaces=namespace) == "CAD MCP"
+    assert root.findtext("pkg:content/pkg:workbench/pkg:name", namespaces=namespace) == "CAD MCP"
