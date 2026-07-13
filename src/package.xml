@@ -8,6 +8,7 @@
   <license file="LICENSE">LGPL-2.1-or-later</license>
   <icon>Resources/icons/freecad-mcp.svg</icon>
   <pythonmin>3.11</pythonmin>
+  <depend type="python" version_gte="1.27.2" version_lt="2">mcp</depend>
   <content>
     <workbench>
       <name>MCP</name>

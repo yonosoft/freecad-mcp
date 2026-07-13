@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import runpy
 import sys
 from pathlib import Path
@@ -69,16 +70,45 @@ def test_initgui_registers_workbench_and_status_command_once(monkeypatch: Any) -
     workbench = workbenches["MCPWorkbench"]
     workbench.Initialize()  # type: ignore[attr-defined]
 
-    assert workbench.toolbars == [("MCP", ["MCP_ReportStatus"])]
-    assert workbench.menus == [("MCP", ["MCP_ReportStatus"])]
+    expected_commands = [
+        "MCP_StartServer",
+        "MCP_StopServer",
+        "MCP_ReportStatus",
+        "MCP_CreateDocument",
+    ]
+    assert workbench.toolbars == [("MCP", expected_commands)]
+    assert workbench.menus == [("MCP", expected_commands)]
+    assert list(commands) == expected_commands
+
+    from freecad_mcp.core.result import CommandResult
+    from freecad_mcp.gui import commands as gui_commands
+
+    class ApplicationStub:
+        def report_status(self) -> CommandResult:
+            return CommandResult.success(
+                "server_status",
+                "MCP server status reported.",
+                {"state": "stopped", "url": "http://127.0.0.1:8765/mcp"},
+            )
+
+    monkeypatch.setattr(gui_commands, "get_application", ApplicationStub)
 
     command = commands["MCP_ReportStatus"]
     command.Activated()  # type: ignore[attr-defined]
 
     assert console.errors == []
-    assert console.messages == [
-        "[MCP] Workbench command is active; shared command dispatch succeeded.\n"
-    ]
+    assert len(console.messages) == 1
+    payload = json.loads(console.messages[0].removeprefix("[MCP] "))
+    assert payload == {
+        "ok": True,
+        "state": "stopped",
+        "url": "http://127.0.0.1:8765/mcp",
+        "message": "MCP server status reported.",
+    }
+
+    for registered_command in commands.values():
+        resources = registered_command.GetResources()  # type: ignore[attr-defined]
+        assert Path(resources["Pixmap"]).is_file()
 
 
 def test_initgui_loads_without_dunder_file(monkeypatch: Any) -> None:
@@ -126,6 +156,35 @@ def test_init_loads_without_dunder_file(monkeypatch: Any) -> None:
     exec(compile(source, "Init.py", "exec"), {}, {"__name__": "MCP_Init"})
 
     assert sys.path[0] == str(addon_root)
+    assert console.errors == []
+
+
+def test_init_processes_freecad_dependency_pth_files(monkeypatch: Any, tmp_path: Path) -> None:
+    repository_root = Path(__file__).resolve().parents[1]
+    addon_root = repository_root / "src"
+    user_data_dir = tmp_path / "FreeCAD" / "v1-1"
+    dependency_dir = (
+        user_data_dir
+        / "AdditionalPythonPackages"
+        / f"py{sys.version_info.major}{sys.version_info.minor}"
+    )
+    pth_entry = dependency_dir / "dependency-path"
+    pth_entry.mkdir(parents=True)
+    (dependency_dir / "dependency-path.pth").write_text("dependency-path\n", encoding="utf-8")
+
+    console = ConsoleStub()
+    app_module = ModuleType("FreeCAD")
+    app_module.Console = console  # type: ignore[attr-defined]
+    app_module.getUserAppDataDir = lambda: str(user_data_dir)  # type: ignore[attr-defined]
+
+    monkeypatch.setitem(sys.modules, "FreeCAD", app_module)
+    monkeypatch.syspath_prepend(str(dependency_dir))
+    monkeypatch.syspath_prepend(str(addon_root))
+
+    source = (addon_root / "Init.py").read_text(encoding="utf-8")
+    exec(compile(source, "Init.py", "exec"), {}, {"__name__": "MCP_Init"})
+
+    assert str(pth_entry) in sys.path
     assert console.errors == []
 
 

@@ -34,3 +34,16 @@ class CommandResult:
     ) -> CommandResult:
         """Build a failed command result."""
         return cls(ok=False, code=code, message=message, data=data or {})
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the result for MCP responses and Report View output."""
+        if self.ok:
+            return {"ok": True, **self.data, "message": self.message}
+        return {
+            "ok": False,
+            "error": {
+                "code": self.code,
+                "message": self.message,
+                "details": dict(self.data),
+            },
+        }

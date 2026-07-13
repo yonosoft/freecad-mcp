@@ -1,4 +1,5 @@
-"""Future embedded MCP transport package.
+"""Official MCP SDK transport adapters."""
 
-The bootstrap milestone intentionally contains no MCP server implementation.
-"""
+from freecad_mcp.mcp.runner import UvicornMCPRunner
+
+__all__ = ["UvicornMCPRunner"]

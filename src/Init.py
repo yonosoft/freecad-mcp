@@ -9,6 +9,32 @@ import FreeCAD as App  # type: ignore[import-not-found]
 _WORKBENCH_NAME = "MCP"
 
 
+def _activate_freecad_python_packages() -> None:
+    """Process FreeCAD's pip target so dependency ``.pth`` files take effect."""
+    import site
+    import sys
+    from pathlib import Path
+
+    import FreeCAD as App  # type: ignore[import-not-found]
+
+    version_directory = f"py{sys.version_info.major}{sys.version_info.minor}"
+    candidates = [Path(App.getUserAppDataDir()) / "AdditionalPythonPackages" / version_directory]
+    candidates.extend(
+        Path(entry)
+        for entry in sys.path
+        if entry
+        and Path(entry).name == version_directory
+        and Path(entry).parent.name == "AdditionalPythonPackages"
+    )
+
+    activated: set[Path] = set()
+    for candidate in candidates:
+        if candidate in activated or not candidate.is_dir():
+            continue
+        site.addsitedir(str(candidate))
+        activated.add(candidate)
+
+
 def _resolve_workbench_root():
     """Locate the addon root even when FreeCAD omits ``__file__``."""
     import sys
@@ -39,6 +65,7 @@ def _resolve_workbench_root():
 
 
 try:
+    _activate_freecad_python_packages()
     _WORKBENCH_ROOT = _resolve_workbench_root()
     if str(_WORKBENCH_ROOT) not in sys.path:
         sys.path.insert(0, str(_WORKBENCH_ROOT))

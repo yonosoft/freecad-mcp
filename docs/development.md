@@ -41,6 +41,20 @@ py -3.11 -m venv .venv
 
 The repository scripts never install packages automatically.
 
+The MCP server uses the official MCP SDK. The development venv receives it from
+the project's normal dependency declaration. The FreeCAD runtime is separate;
+for the current FreeCAD 1.1 Windows build, install the dependency once into its
+per-user package target:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pip install `
+  --target "$env:APPDATA\FreeCAD\v1-1\AdditionalPythonPackages\py311" `
+  "mcp>=1.27.2,<2"
+```
+
+This target is the location used by FreeCAD's Addon Manager. It is not the
+project `.venv` and does not modify `Program Files`.
+
 ## Eclipse/PyDev
 
 Configure PyDev with standalone Python 3.11, preferably the project venv:
@@ -135,7 +149,7 @@ run scripts/test.ps1
 restart FreeCAD
 select MCP workbench
 inspect Report View
-run the current command
+start or stop the MCP server
 ```
 
 ## Report View Verification
@@ -143,19 +157,51 @@ run the current command
 In FreeCAD, enable **View -> Panels -> Report View**. Also enable redirection of
 Python output/errors in FreeCAD preferences when diagnosing startup failures.
 
-Manual bootstrap check:
+## Server and Client Verification
+
+Manual runtime check:
 
 1. Exit every FreeCAD process.
-2. Run `.\scripts\install-dev.ps1`.
+2. Confirm or create the development junction with `.\scripts\install-dev.ps1`.
 3. Start FreeCAD.
 4. Open Report View.
 5. Select the **MCP** workbench.
-6. Click **Report MCP Status**.
-7. Confirm Report View contains:
+6. Confirm the four toolbar commands are visible.
+7. Click **Report Status** and confirm the state is `stopped`.
+8. Click **Start Server** and confirm FreeCAD remains responsive.
+9. Click **Report Status** and confirm the state is `running` and URL is:
 
 ```text
-[MCP] Workbench command is active; shared command dispatch succeeded.
+http://127.0.0.1:8765/mcp
 ```
+
+Use a dedicated MCP client test profile containing only:
+
+```json
+{
+  "mcpServers": {
+    "freecad": {
+      "type": "http",
+      "url": "http://127.0.0.1:8765/mcp"
+    }
+  }
+}
+```
+
+Confirm the client lists `create_document`, then request:
+
+```text
+Use the MCP create_document tool to create a document named TestDocument with the label "MCP Test".
+```
+
+The document should appear immediately. Repeat without a label, then verify an
+invalid internal name and duplicate name return structured errors. Stop and
+restart the server in the same FreeCAD session, reconnect the client, and close
+FreeCAD with the server running to confirm there is no separate or orphaned
+server process.
+
+Report View writes one JSON object per explicit command, prefixed with `[MCP]`.
+Startup remains quiet unless bootstrap initialization fails.
 
 If startup fails, record the complete Report View traceback and this console
 output:

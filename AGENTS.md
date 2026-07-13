@@ -55,8 +55,8 @@ local MCP server inside FreeCAD.
   geometric selection criteria are possible.
 - Keep tool contracts versioned and documented. Do not silently change request
   or response fields.
-- The first planned MCP tool is `create_document`; it is not part of the
-  initial workbench milestone.
+- The first explicit MCP tool is `create_document`; keep its GUI and transport
+  adapters on the same shared application handler.
 
 ## Python Standards
 
