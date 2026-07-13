@@ -54,6 +54,10 @@ class Application:
             overwrite=overwrite,
         )
 
+    def list_objects(self, document_name: object) -> CommandResult:
+        """List objects in an open document through the shared application handler."""
+        return self.documents.object_query.execute(document_name=document_name)
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

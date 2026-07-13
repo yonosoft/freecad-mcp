@@ -60,6 +60,37 @@ class DocumentCollection:
     documents: tuple[DocumentSummary, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class ObjectSummary:
+    """Stable public state for one FreeCAD document object.
+
+    ``name`` is FreeCAD's stable internal object identifier and ``label`` is its
+    user-visible label. ``type_id`` is the FreeCAD type identifier such as
+    ``PartDesign::Body``. ``visibility`` is the current GUI visibility when
+    available, defaulting to ``True`` when no view provider exists. ``parent``
+    is the internal name of the primary containing object or ``None``. ``children``
+    is a deterministic sorted list of direct child internal names.
+    """
+
+    name: str
+    label: str
+    type_id: str
+    visibility: bool
+    parent: str | None
+    children: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the shared object state for command and MCP results."""
+        return {
+            "name": self.name,
+            "label": self.label,
+            "type_id": self.type_id,
+            "visibility": self.visibility,
+            "parent": self.parent,
+            "children": list(self.children),
+        }
+
+
 class DocumentAlreadyExistsError(RuntimeError):
     """Raised when the requested internal document name is already open."""
 
@@ -94,6 +125,9 @@ class DocumentAdapter(Protocol):
 
     def save_document(self, name: str, file_path: str | None) -> DocumentSummary:
         """Save in place, or save as ``file_path`` when one is supplied."""
+
+    def list_objects(self, document_name: str) -> tuple[ObjectSummary, ...]:
+        """Return all objects in one open document by exact internal name."""
 
 
 class Dispatcher(Protocol):

@@ -197,6 +197,7 @@ create_document
 list_documents
 get_document
 save_document
+list_objects
 ```
 
 All four are MCP-only; the workbench has no matching document toolbar or menu
@@ -229,6 +230,25 @@ sequence through the MCP client:
    path is the requested target, and `modified` is false.
 9. Request `save_document` to a path under a missing parent directory and confirm
    `parent_directory_not_found`; no directory should be created.
+
+### Object Listing Verification
+
+1. Create or open a document containing at least one object (such as a Part
+   Design Body) in FreeCAD.
+2. Call `list_objects` with the document's internal name.
+3. Confirm the result returns `ok: true` with the correct `document_name`.
+4. For an empty document, confirm `objects` is an empty list and the message is
+   "No objects found."
+5. For a populated document, confirm each object entry includes its internal
+   `name`, visible `label`, `type_id`, `visibility`, `parent`, and `children`.
+6. Hide an object in FreeCAD, call `list_objects` again, and confirm
+   `visibility` changes to `false`.
+7. Call `list_objects` with an unknown document name and confirm a structured
+   `document_not_found` error is returned.
+8. Call `list_objects` with an empty or whitespace-only name and confirm a
+   `validation_error` is returned.
+9. Confirm the document was not modified by any `list_objects` call (check
+   FreeCAD's modified/saved state).
 
 The original create-only smoke prompt remains useful:
 

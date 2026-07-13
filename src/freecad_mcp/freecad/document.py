@@ -13,6 +13,7 @@ from freecad_mcp.commands.document import (
     DocumentSaveError,
     DocumentSummary,
     FreeCADDocumentError,
+    ObjectSummary,
 )
 
 
@@ -106,6 +107,33 @@ class FreeCADDocumentAdapter:
         except Exception as exc:
             raise DocumentSaveError(str(exc)) from exc
 
+    def list_objects(self, document_name: str) -> tuple[ObjectSummary, ...]:
+        """Return controlled summaries for every object in one document."""
+        import FreeCAD as App
+
+        try:
+            document = App.listDocuments().get(document_name)
+            if document is None:
+                raise DocumentNotFoundError(document_name)
+
+            summaries = []
+            for obj in sorted(document.Objects, key=lambda o: str(o.Name)):
+                summaries.append(
+                    ObjectSummary(
+                        name=str(obj.Name),
+                        label=str(obj.Label),
+                        type_id=str(obj.TypeId),
+                        visibility=_object_visibility(obj),
+                        parent=_object_parent(obj),
+                        children=_object_children(obj),
+                    )
+                )
+            return tuple(summaries)
+        except DocumentNotFoundError:
+            raise
+        except Exception as exc:
+            raise FreeCADDocumentError(str(exc)) from exc
+
 
 def _active_document_name(App: Any) -> str | None:
     active_document = App.activeDocument()
@@ -136,3 +164,54 @@ def _get_gui_document(Gui: Any, name: str) -> Any:
 def _require_successful_save(result: object, operation: str) -> None:
     if result is False:
         raise DocumentSaveError(f"FreeCAD Document.{operation}() returned false.")
+
+
+def _object_visibility(obj: Any) -> bool:
+    """Return the current GUI visibility for an object.
+
+    Uses the standard ``obj.ViewObject.Visibility`` property.
+    Falls back to ``True`` when the view object is not available
+    (headless or fake environments), consistent with the expectation
+    that objects are visible by default.
+    """
+    try:
+        view_object = obj.ViewObject
+        if view_object is None:
+            return True
+        return bool(view_object.Visibility)
+    except Exception:
+        return True
+
+
+def _object_children(obj: Any) -> tuple[str, ...]:
+    """Return sorted direct child names from the ``Group`` property.
+
+    Only group-like objects (Body, Part, DocumentObjectGroup) expose a
+    ``Group`` attribute containing their directly contained children.
+    Non-container objects return an empty tuple. Never uses ``OutList``
+    because it mixes dependency links with containment.
+    """
+    group = getattr(obj, "Group", None)
+    if group is None:
+        return ()
+    return tuple(sorted(str(child.Name) for child in group))
+
+
+def _object_parent(obj: Any) -> str | None:
+    """Return the internal name of the direct container, or ``None``.
+
+    Uses ``getParentGeoFeatureGroup()`` (PartDesign Body, GeoFeatureGroup)
+    then ``getParentGroup()`` (App::Part, regular groups). Both return
+    ``None`` when no supported container exists. Never uses ``InList``
+    because it includes generic dependency links that are not containment.
+    """
+    for method_name in ("getParentGeoFeatureGroup", "getParentGroup"):
+        method = getattr(obj, method_name, None)
+        if callable(method):
+            try:
+                parent = method()
+                if parent is not None:
+                    return str(parent.Name)
+            except Exception:
+                pass
+    return None

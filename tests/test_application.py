@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from freecad_mcp.application import Application, create_application
 from freecad_mcp.commands import (
@@ -10,6 +10,7 @@ from freecad_mcp.commands import (
     DocumentHandlers,
     GetDocumentHandler,
     ListDocumentsHandler,
+    ListObjectsHandler,
     SaveDocumentHandler,
 )
 from freecad_mcp.commands.document import DocumentCollection, DocumentSummary
@@ -48,6 +49,9 @@ class AdapterStub:
         )
         return self.document
 
+    def list_objects(self, document_name: str) -> tuple[Any, ...]:
+        return ()
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -71,6 +75,7 @@ def make_application() -> Application:
         list=ListDocumentsHandler(adapter, dispatcher),
         get=GetDocumentHandler(adapter, dispatcher),
         save=SaveDocumentHandler(adapter, dispatcher),
+        object_query=ListObjectsHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
 

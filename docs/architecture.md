@@ -203,6 +203,63 @@ This guard does not block a normal `save()` to a document's own backing file.
 Filesystem checks and the FreeCAD save execute inside the single dispatched
 operation, while transport threads never access a document directly.
 
+## Object Inspection
+
+`list_objects` is the first MCP-only object-inspection tool. It returns
+controlled `ObjectSummary` records through the full dispatch chain:
+
+```text
+MCP tool → Application → ListObjectsHandler → FreeCADDocumentAdapter → Qt dispatcher → FreeCAD API
+```
+
+### Shared Object Summary
+
+Each `ObjectSummary` provides a narrow, stable view of one FreeCAD document
+object without exposing arbitrary properties:
+
+- `name`: FreeCAD's stable internal object identifier;
+- `label`: the user-visible object label;
+- `type_id`: FreeCAD's type identifier such as `PartDesign::Body`;
+- `visibility`: current GUI visibility (`True` when no view provider exists);
+- `parent`: internal name of the primary containing object, or `null` for
+  top-level objects;
+- `children`: deterministic list of direct child internal names, sorted
+  alphabetically.
+
+### Parent and Child Semantics
+
+The parent is the first entry in the FreeCAD object's `InList`. When `InList` is
+non-empty, another object depends on or contains this one. Top-level objects
+with no incoming reference receive `null`.
+
+Children are the object's `OutList` entries sorted by internal name. This
+captures dependency and containment relationships; a future refinement may
+distinguish strict container membership from general dependency links.
+
+### Deterministic Ordering
+
+Top-level result objects are sorted by internal name within the adapter. Each
+`children` list is also sorted by internal name. This ensures repeatable
+ordering across calls.
+
+### Visibility Fallback
+
+When a FreeCAD GUI document or view provider is not available (headless
+environments, fake objects, or error conditions), visibility defaults to `True`
+rather than `null` or an exception. This keeps the tool usable without a GUI
+while still returning actual visibility when the GUI is present.
+
+### Why Arbitrary Properties Are Not Exposed
+
+FreeCAD objects carry dozens of properties, expressions, links, and
+view-provider internals. Exposing all of them would:
+- couple MCP clients to FreeCAD implementation details;
+- produce extremely large responses;
+- break when FreeCAD's internal representation changes.
+
+The `ObjectSummary` model is deliberately narrow. Future tools such as
+`get_object` can add detail incrementally without changing this contract.
+
 ## Tool Levels
 
 - **High-level workflows:** common modeling sequences with strong validation and

@@ -5,7 +5,7 @@ import socket
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
@@ -15,6 +15,7 @@ from freecad_mcp.commands import (
     DocumentHandlers,
     GetDocumentHandler,
     ListDocumentsHandler,
+    ListObjectsHandler,
     SaveDocumentHandler,
 )
 from freecad_mcp.commands.document import DocumentCollection, DocumentSummary
@@ -26,6 +27,7 @@ from freecad_mcp.tool_registry import (
     CREATE_DOCUMENT_TOOL,
     GET_DOCUMENT_TOOL,
     LIST_DOCUMENTS_TOOL,
+    LIST_OBJECTS_TOOL,
     REGISTERED_TOOL_NAMES,
     SAVE_DOCUMENT_TOOL,
 )
@@ -49,6 +51,7 @@ class AdapterStub:
         self.list_calls = 0
         self.get_calls: list[str] = []
         self.save_calls: list[tuple[str, str | None]] = []
+        self.list_objects_calls: list[str] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -72,6 +75,10 @@ class AdapterStub:
         )
         return self.document
 
+    def list_objects(self, document_name: str) -> tuple[Any, ...]:
+        self.list_objects_calls.append(document_name)
+        return ()
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -87,6 +94,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             list=ListDocumentsHandler(actual_adapter, dispatcher),
             get=GetDocumentHandler(actual_adapter, dispatcher),
             save=SaveDocumentHandler(actual_adapter, dispatcher),
+            object_query=ListObjectsHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,
     )
@@ -126,6 +134,7 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
     assert actual_tools == list(REGISTERED_TOOL_NAMES)
     assert lifecycle.status().data["tools"] == actual_tools
     assert "MCP_CreateDocument" not in actual_tools
+    assert "list_objects" in actual_tools
 
 
 def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
@@ -143,6 +152,10 @@ def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
             SAVE_DOCUMENT_TOOL,
             {"name": "TestDocument", "file_path": str(tmp_path / "TestDocument")},
         )
+        await server.call_tool(
+            LIST_OBJECTS_TOOL,
+            {"document_name": "TestDocument"},
+        )
 
     asyncio.run(call_tools())
 
@@ -152,6 +165,7 @@ def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
     assert adapter.save_calls == [
         ("TestDocument", str((tmp_path / "TestDocument.FCStd").resolve()))
     ]
+    assert adapter.list_objects_calls == ["TestDocument"]
 
 
 def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:

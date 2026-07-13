@@ -90,6 +90,19 @@ Available document tools:
 - `list_documents` lists open documents and identifies the active document;
 - `get_document` inspects one document by its internal name;
 - `save_document` persists a document using protected save or save-as behavior.
+- `list_objects` returns controlled summaries of all objects in an open FreeCAD
+  document: internal name, visible label, type ID, visibility, parent container,
+  and children.
+
+Tool names the MCP client can see:
+
+```text
+create_document
+list_documents
+get_document
+save_document
+list_objects
+```
 
 All four document tools are MCP-only and do not add workbench commands or
 toolbar icons.

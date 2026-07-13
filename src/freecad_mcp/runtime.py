@@ -10,6 +10,7 @@ from freecad_mcp.commands import (
     DocumentHandlers,
     GetDocumentHandler,
     ListDocumentsHandler,
+    ListObjectsHandler,
     SaveDocumentHandler,
 )
 from freecad_mcp.core.logging import get_logger
@@ -55,6 +56,7 @@ def _build_runtime() -> Runtime:
         list=ListDocumentsHandler(adapter=adapter, dispatcher=dispatcher),
         get=GetDocumentHandler(adapter=adapter, dispatcher=dispatcher),
         save=SaveDocumentHandler(adapter=adapter, dispatcher=dispatcher),
+        object_query=ListObjectsHandler(adapter=adapter, dispatcher=dispatcher),
     )
     lifecycle = LifecycleService(
         config=config,
