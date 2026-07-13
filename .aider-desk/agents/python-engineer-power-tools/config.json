@@ -1,8 +1,8 @@
 {
   "id": "3c4f33d8-b274-4d7e-9105-28d6fcf6a7d2",
   "name": "Python Engineer – Power Tools",
-  "provider": "",
-  "model": "",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5",
   "maxIterations": 100,
   "minTimeBetweenToolCalls": 0,
   "toolApprovals": {
