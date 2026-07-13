@@ -34,4 +34,11 @@ dist/
 Thumbs.db
 *.swp
 *.swo
+
+# Ignore Aider files, but keep the project research rule
 .aider*
+!.aider-desk/
+.aider-desk/*
+!.aider-desk/rules/
+.aider-desk/rules/*
+!.aider-desk/rules/SEARCH.md
