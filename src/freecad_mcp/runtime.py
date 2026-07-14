@@ -15,6 +15,7 @@ from freecad_mcp.commands import (
     RecomputeDocumentHandler,
     SaveDocumentHandler,
 )
+from freecad_mcp.commands.body import CreateBodyHandler
 from freecad_mcp.core.logging import get_logger
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter
 from freecad_mcp.freecad.qt_dispatcher import create_qt_main_thread_dispatcher
@@ -60,6 +61,7 @@ def _build_runtime() -> Runtime:
         save=SaveDocumentHandler(adapter=adapter, dispatcher=dispatcher),
         object_query=ListObjectsHandler(adapter=adapter, dispatcher=dispatcher),
         get_object=GetObjectHandler(adapter=adapter, dispatcher=dispatcher),
+        create_body=CreateBodyHandler(adapter=adapter, dispatcher=dispatcher),
         recompute=RecomputeDocumentHandler(adapter=adapter, dispatcher=dispatcher),
     )
     lifecycle = LifecycleService(

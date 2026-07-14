@@ -122,9 +122,7 @@ class RecomputeDocumentHandler:
         assert isinstance(document_name, str)
 
         try:
-            summary = self.dispatcher.call(
-                lambda: self.adapter.recompute_document(document_name)
-            )
+            summary = self.dispatcher.call(lambda: self.adapter.recompute_document(document_name))
         except DocumentNotFoundError:
             return CommandResult.failure(
                 code="document_not_found",

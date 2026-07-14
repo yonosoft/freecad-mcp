@@ -69,6 +69,14 @@ class Application:
         """Recompute one open document through the shared application handler."""
         return self.documents.recompute.execute(document_name=document_name)
 
+    def create_body(
+        self, document_name: object, name: object, label: object | None = None
+    ) -> CommandResult:
+        """Create a PartDesign::Body in an open document through the shared application handler."""
+        return self.documents.create_body.execute(
+            document_name=document_name, name=name, label=label
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

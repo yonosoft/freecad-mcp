@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from freecad_mcp.commands.body import CreateBodyHandler
 from freecad_mcp.commands.document import CreateDocumentHandler
 from freecad_mcp.commands.document_query import (
     GetDocumentHandler,
@@ -23,10 +24,12 @@ class DocumentHandlers:
     save: SaveDocumentHandler
     object_query: ListObjectsHandler
     get_object: GetObjectHandler
+    create_body: CreateBodyHandler
     recompute: RecomputeDocumentHandler
 
 
 __all__ = [
+    "CreateBodyHandler",
     "CreateDocumentHandler",
     "DocumentHandlers",
     "GetDocumentHandler",

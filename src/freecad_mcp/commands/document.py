@@ -195,6 +195,14 @@ class ObjectNotFoundError(RuntimeError):
     """Raised when an internal object name is not found in an open document."""
 
 
+class ObjectAlreadyExistsError(RuntimeError):
+    """Raised when an object with the requested internal name already exists."""
+
+
+class BodyCreationError(RuntimeError):
+    """Raised when FreeCAD cannot create or initialize a PartDesign::Body."""
+
+
 class DocumentAdapter(Protocol):
     """FreeCAD document operations used by the shared handlers."""
 
@@ -218,6 +226,12 @@ class DocumentAdapter(Protocol):
 
     def recompute_document(self, document_name: str) -> DocumentSummary:
         """Recompute one open document and return its updated summary."""
+
+    def create_body(self, document_name: str, name: str, label: str | None) -> ObjectDetail:
+        """Create a PartDesign::Body and return its controlled detail.
+
+        Raise a typed adapter error when creation fails.
+        """
 
 
 class Dispatcher(Protocol):

@@ -11,7 +11,7 @@ This repository is at its first functional MCP server milestone. It provides:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- typed MCP document tools for creating, listing, inspecting, and saving documents;
+- typed MCP document tools for creating, listing, inspecting, and saving documents, and creating PartDesign bodies;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - Python quality tooling and unit tests.
@@ -99,6 +99,7 @@ Available document tools:
 
 - `recompute_document` recomputes one open document and returns its updated
   controlled summary.
+- `create_body` creates one empty Part Design Body in an open document. It requires exact internal document and object names, applies an optional visible label, opens a FreeCAD transaction, creates the body, recomputes, commits, and returns the controlled object detail with placement. Duplicate internal names are rejected. The tool does not save automatically or create sketches or features.
 
 Tool names the MCP client can see:
 
@@ -110,6 +111,7 @@ save_document
 list_objects
 get_object
 recompute_document
+create_body
 ```
 
 These document and object-inspection tools are MCP-only capabilities. They do not

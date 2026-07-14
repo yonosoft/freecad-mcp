@@ -82,15 +82,14 @@ def make_handler(
     actual_adapter = adapter or RecomputeAdapterStub()
     actual_dispatcher = dispatcher or RecordingDispatcher()
     return (
-        RecomputeDocumentHandler(
-            cast(DocumentAdapter, actual_adapter), actual_dispatcher
-        ),
+        RecomputeDocumentHandler(cast(DocumentAdapter, actual_adapter), actual_dispatcher),
         actual_dispatcher,
         actual_adapter,
     )
 
 
 # --- Validation ---
+
 
 @pytest.mark.parametrize("name", [None, "", "   "])
 def test_recompute_rejects_missing_or_empty_document_name(name: object) -> None:
@@ -127,6 +126,7 @@ def test_recompute_rejects_names_freecad_would_sanitize(name: str) -> None:
 
 # --- Success ---
 
+
 def test_recompute_returns_updated_summary() -> None:
     summary = make_summary("TestDoc", label="Test Label", object_count=4)
     adapter = RecomputeAdapterStub(summary=summary)
@@ -152,6 +152,7 @@ def test_recompute_routes_through_dispatcher() -> None:
 
 # --- Error: document not found ---
 
+
 def test_recompute_returns_document_not_found() -> None:
     adapter = RecomputeAdapterStub(error=DocumentNotFoundError("UnknownDoc"))
 
@@ -163,6 +164,7 @@ def test_recompute_returns_document_not_found() -> None:
 
 
 # --- Error: recompute failure ---
+
 
 def test_recompute_returns_recompute_failure() -> None:
     adapter = RecomputeAdapterStub(error=DocumentRecomputeError("recompute failed"))
@@ -177,6 +179,7 @@ def test_recompute_returns_recompute_failure() -> None:
 
 # --- Error: adapter failure ---
 
+
 def test_recompute_converts_adapter_failure() -> None:
     adapter = RecomputeAdapterStub(error=FreeCADDocumentError("inspection failed"))
 
@@ -189,6 +192,7 @@ def test_recompute_converts_adapter_failure() -> None:
 
 
 # --- Error: dispatch failure ---
+
 
 def test_recompute_reports_dispatch_failure() -> None:
     class FailingDispatcher:
@@ -209,6 +213,7 @@ def test_recompute_reports_dispatch_failure() -> None:
 
 
 # --- Success envelope exact keys ---
+
 
 def test_recompute_success_result_has_exact_outer_keys() -> None:
     """Regression: success result must include code, ok, document, message."""

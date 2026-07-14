@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import math
 import sys
+from contextlib import suppress
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
 from freecad_mcp.commands.document import (
+    BodyCreationError,
     DocumentNotFoundError,
     DocumentSaveError,
     FreeCADDocumentError,
+    ObjectAlreadyExistsError,
     ObjectNotFoundError,
 )
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter, _extract_placement
@@ -42,9 +46,22 @@ class AppDocumentStub:
         self.save_calls = 0
         self.save_as_calls: list[str] = []
         self.recompute_calls = 0
+        self.open_transaction_calls = 0
+        self.commit_transaction_calls = 0
+        self.abort_transaction_calls = 0
+        self.addObject_calls: list[tuple[str, str]] = []
+        self._add_object_none_result = False
+        self._add_object_rename: str | None = None
+        self._recompute_error: BaseException | None = None
+        self._commit_error: BaseException | None = None
+        self._abort_error: BaseException | None = None
+        self._label_error_for_added_object: Exception | None = None
+        self._pending_transaction_objects: list[Any] = []
 
     def recompute(self) -> None:
         self.recompute_calls += 1
+        if self._recompute_error is not None:
+            raise self._recompute_error
 
     def save(self) -> bool:
         self.save_calls += 1
@@ -63,6 +80,42 @@ class AppDocumentStub:
             if getattr(obj, "Name", None) == name:
                 return obj  # type: ignore[return-value]
         return None
+
+    def openTransaction(self, name: str) -> None:
+        self.open_transaction_calls += 1
+        self._pending_transaction_objects.clear()
+
+    def commitTransaction(self) -> None:
+        self.commit_transaction_calls += 1
+        if self._commit_error is not None:
+            raise self._commit_error
+        self._pending_transaction_objects.clear()
+
+    def abortTransaction(self) -> None:
+        self.abort_transaction_calls += 1
+        for obj in self._pending_transaction_objects:
+            with suppress(ValueError):
+                self.Objects.remove(obj)
+        self._pending_transaction_objects.clear()
+        if self._abort_error is not None:
+            raise self._abort_error
+
+    def addObject(self, type_id: str, name: str) -> DocumentObjectStub | None:
+        self.addObject_calls.append((type_id, name))
+        if self._add_object_none_result:
+            return None
+        obj = DocumentObjectStub(
+            name=name,
+            type_id=type_id,
+            label_assignment_error=self._label_error_for_added_object,
+        )
+        if self._add_object_rename is not None:
+            rename = self._add_object_rename
+            self._add_object_rename = None
+            obj.Name = rename
+        self.Objects.append(obj)
+        self._pending_transaction_objects.append(obj)
+        return obj
 
 
 def install_freecad_stubs(
@@ -117,9 +170,11 @@ class DocumentObjectStub:
         parent_geo: DocumentObjectStub | None = None,
         parent_group: DocumentObjectStub | None = None,
         visibility: bool = True,
+        label_assignment_error: Exception | None = None,
     ) -> None:
         self.Name = name
-        self.Label = label or name
+        self._label = label or name
+        self._label_assignment_error = label_assignment_error
         self.TypeId = type_id
         self.InList = in_list or []
         self.OutList = out_list or []
@@ -136,6 +191,16 @@ class DocumentObjectStub:
 
         view_obj = type("ViewObjectStub", (), {"Visibility": visibility})()
         self.ViewObject = view_obj
+
+    @property
+    def Label(self) -> str:
+        return self._label
+
+    @Label.setter
+    def Label(self, value: str) -> None:
+        if self._label_assignment_error is not None:
+            raise self._label_assignment_error
+        self._label = value
 
     def getParentGeoFeatureGroup(self) -> DocumentObjectStub | None:
         return self._parent_geo
@@ -852,3 +917,374 @@ def test_extract_placement_returns_none_on_attribute_error() -> None:
     result = _extract_placement(BrokenStub())
 
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# create_body adapter tests
+# ---------------------------------------------------------------------------
+
+
+def test_create_body_uses_add_object_with_correct_args(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+    FreeCADDocumentAdapter().create_body("TestDoc", "Body", "Custom Body")
+
+    assert doc_stub.addObject_calls == [("PartDesign::Body", "Body")]
+
+
+def test_create_body_preserves_exact_requested_internal_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    detail = FreeCADDocumentAdapter().create_body("TestDoc", "MyBody", None)
+
+    assert detail.name == "MyBody"
+
+
+def test_create_body_sets_optional_label(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    detail = FreeCADDocumentAdapter().create_body("TestDoc", "Body", "Bracket Body")
+
+    assert detail.label == "Bracket Body"
+
+
+def test_create_body_omitted_label_uses_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    detail = FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    # default label when stub creates an unnamed object is the internal name
+    assert detail.label == "Body"
+
+
+def test_create_body_transaction_opens_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    assert doc_stub.open_transaction_calls == 1
+
+
+def test_create_body_recompute_called_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    assert doc_stub.recompute_calls == 1
+
+
+def test_create_body_commits_after_recompute(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    assert doc_stub.commit_transaction_calls == 1
+    assert doc_stub.open_transaction_calls == 1
+
+
+def test_create_body_does_not_save(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    assert doc_stub.save_calls == 0
+    assert doc_stub.save_as_calls == []
+
+
+def test_create_body_result_type_is_part_design_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    detail = FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    assert detail.type_id == "PartDesign::Body"
+
+
+def test_create_body_returns_object_detail_with_children_from_hierarchy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document(
+        "TestDoc",
+        modified=False,
+        objects=[],
+    )
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    detail = FreeCADDocumentAdapter().create_body("TestDoc", "Body", "Bracket Body")
+    assert detail.name == "Body"
+    assert detail.children == ()
+
+
+def test_create_body_document_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    _ = install_freecad_stubs(monkeypatch, {}, {}, active_name=None)
+
+    with pytest.raises(DocumentNotFoundError):
+        FreeCADDocumentAdapter().create_body("NoSuchDoc", "Body", None)
+
+
+def test_create_body_duplicate_name_rejected_before_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_body = _make_object_stub("Body")
+    doc_stub, gui_stub = make_document(
+        "TestDoc",
+        modified=False,
+        objects=[existing_body],
+    )
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(ObjectAlreadyExistsError):
+        FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    # Transaction must NOT have been opened
+    assert doc_stub.open_transaction_calls == 0
+
+
+def test_create_body_duplicate_label_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    body_a = _make_object_stub("BodyA", label="Shared Label")
+    doc_stub, gui_stub = make_document(
+        "TestDoc",
+        modified=False,
+        objects=[body_a],
+    )
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    # The same label is allowed on a different internal name
+    detail = FreeCADDocumentAdapter().create_body("TestDoc", "BodyB", "Shared Label")
+    assert detail.name == "BodyB"
+    assert detail.label == "Shared Label"
+
+
+def test_create_body_add_object_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    doc_stub._add_object_none_result = True
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(BodyCreationError):
+        FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    # Transaction must have been opened and then aborted
+    assert doc_stub.open_transaction_calls == 1
+    assert doc_stub.abort_transaction_calls == 1
+
+
+def test_create_body_freecad_renames_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    # simulate rename to Body001
+    doc_stub._add_object_rename = "Body001"
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(BodyCreationError):
+        FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    assert doc_stub.open_transaction_calls == 1
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+def test_create_body_label_assignment_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    label_error = RuntimeError("cannot set label")
+    doc_stub._label_error_for_added_object = label_error
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(BodyCreationError):
+        FreeCADDocumentAdapter().create_body("TestDoc", "Body", "Fancy Label")
+
+    # abort attempted
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+def test_create_body_recompute_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    doc_stub._recompute_error = RuntimeError("recompute crash")
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(BodyCreationError):
+        FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+def test_create_body_commit_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    doc_stub._commit_error = BodyCreationError("commit refused")
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(BodyCreationError) as exc_info:
+        FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    assert "commit refused" in str(exc_info.value)
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+def test_create_body_abort_failure_does_not_hide_original_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    doc_stub._commit_error = BodyCreationError("commit refused")
+    doc_stub._abort_error = RuntimeError("abort failure")
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(BodyCreationError) as exc_info:
+        FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    # Original error preserved even when abort raises
+    assert "commit refused" in str(exc_info.value)
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+def test_create_body_transaction_aborted_on_add_object_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    # Make addObject raise, e.g., by returning None but we already have test for None
+    # We simulate a direct exception: inject a failing method
+    original_add = doc_stub.addObject
+
+    def failing_add(type_id: str, name: str) -> None:
+        original_add(type_id, name)  # ensure tracking
+        raise RuntimeError("addObject exploded")
+
+    doc_stub.addObject = failing_add  # type: ignore[method-assign]
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(BodyCreationError):
+        FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+def test_create_body_failure_does_not_leave_orphan_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[])
+    doc_stub._commit_error = BodyCreationError("commit rejected")
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": gui_stub},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(BodyCreationError):
+        FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
+
+    # After abort, the document should not contain the orphan object
+    body_names = [obj.Name for obj in doc_stub.Objects]  # type: ignore[attr-defined]
+    assert "Body" not in body_names

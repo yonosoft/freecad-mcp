@@ -6,6 +6,7 @@ from contextlib import suppress
 from typing import Any
 
 from freecad_mcp.commands.document import (
+    BodyCreationError,
     DocumentAlreadyExistsError,
     DocumentCollection,
     DocumentCreationError,
@@ -14,6 +15,7 @@ from freecad_mcp.commands.document import (
     DocumentSaveError,
     DocumentSummary,
     FreeCADDocumentError,
+    ObjectAlreadyExistsError,
     ObjectDetail,
     ObjectNotFoundError,
     ObjectSummary,
@@ -21,6 +23,19 @@ from freecad_mcp.commands.document import (
     PlacementPosition,
     PlacementRotation,
 )
+
+
+def _build_object_detail(obj: Any) -> ObjectDetail:
+    placement = _extract_placement(obj)
+    return ObjectDetail(
+        name=str(obj.Name),
+        label=str(obj.Label),
+        type_id=str(obj.TypeId),
+        visibility=_object_visibility(obj),
+        parent=_object_parent(obj),
+        children=_object_children(obj),
+        placement=placement,
+    )
 
 
 class FreeCADDocumentAdapter:
@@ -155,17 +170,7 @@ class FreeCADDocumentAdapter:
                     f"Object '{object_name}' not found in document '{document_name}'."
                 )
 
-            placement = _extract_placement(obj)
-
-            return ObjectDetail(
-                name=str(obj.Name),
-                label=str(obj.Label),
-                type_id=str(obj.TypeId),
-                visibility=_object_visibility(obj),
-                parent=_object_parent(obj),
-                children=_object_children(obj),
-                placement=placement,
-            )
+            return _build_object_detail(obj)
         except (DocumentNotFoundError, ObjectNotFoundError):
             raise
         except Exception as exc:
@@ -187,6 +192,69 @@ class FreeCADDocumentAdapter:
             raise
         except Exception as exc:
             raise DocumentRecomputeError(str(exc)) from exc
+
+    def create_body(self, document_name: str, name: str, label: str | None) -> ObjectDetail:
+        import FreeCAD as App
+
+        try:
+            document = App.listDocuments().get(document_name)
+            if document is None:
+                raise DocumentNotFoundError(document_name)
+        except DocumentNotFoundError:
+            raise
+        except Exception as exc:
+            raise FreeCADDocumentError(str(exc)) from exc
+
+        # Check for duplicate name before opening a transaction
+        if document.getObject(name) is not None:
+            raise ObjectAlreadyExistsError(
+                f"Object '{name}' already exists in document '{document_name}'."
+            )
+
+        opened_transaction = False
+        created_obj: Any = None
+        try:
+            document.openTransaction("MCP Create Body")
+            opened_transaction = True
+
+            created_obj = document.addObject("PartDesign::Body", name)
+            if created_obj is None:
+                raise BodyCreationError(
+                    f"FreeCAD addObject returned None for PartDesign::Body '{name}'."
+                )
+
+            actual_name = str(created_obj.Name)
+            if actual_name != name:
+                raise BodyCreationError(
+                    f"FreeCAD renamed body from '{name}' to '{actual_name}'. "
+                    f"Requested exact internal name not preserved."
+                )
+
+            if label is not None:
+                try:
+                    created_obj.Label = label
+                except Exception as exc:
+                    raise BodyCreationError(f"Could not set label on body '{name}': {exc}") from exc
+
+            document.recompute()
+
+            detail = _build_object_detail(created_obj)
+
+            document.commitTransaction()
+            opened_transaction = False
+
+            return detail
+
+        except (DocumentNotFoundError, ObjectAlreadyExistsError, BodyCreationError):
+            if opened_transaction:
+                with suppress(Exception):
+                    document.abortTransaction()
+            raise
+        except Exception as exc:
+            if opened_transaction:
+                with suppress(Exception):
+                    document.abortTransaction()
+            raise BodyCreationError(str(exc)) from exc
 
 
 def _active_document_name(App: Any) -> str | None:

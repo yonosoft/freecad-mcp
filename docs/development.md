@@ -287,6 +287,37 @@ sequence through the MCP client:
 7. Confirm the document was not saved by the recompute call (check FreeCAD's
    modified/saved state).
 
+### Body Creation Verification
+
+1. Start FreeCAD, select the MCP workbench, start the server.
+2. Create a new unsaved document named `BodyTest` with `create_document`.
+3. Call `create_body` with `document_name` `BodyTest`, `name` `MainBody`,
+   and `label` `Main Body`. Confirm `ok: true`, `code: body_created`,
+   `document_name: BodyTest`, and the `object` has `name: MainBody`,
+   `label: Main Body`, `type_id: PartDesign::Body`.
+4. Call `list_objects` on `BodyTest` and confirm the body appears with
+   its correct name, label, and type. Confirm the object count is 1.
+5. Call `get_object` with `document_name: BodyTest` and
+   `object_name: MainBody` and confirm the returned detail matches
+   the `create_body` result.
+6. Verify in the FreeCAD GUI that the document is modified and the body
+   exists with the correct label.
+7. Call `create_body` again with the same `document_name` and `name` and
+   confirm a structured `object_already_exists` error.
+8. Call `create_body` with `name` `SecondBody` but the same `label`
+   `Main Body` and confirm duplicate labels are allowed (object already
+   exists error should NOT occur).
+9. Call `create_body` with a non-existent document name and confirm
+   `document_not_found`.
+10. Call `create_body` without a `document_name` and confirm
+    `validation_error`.
+11. After each failed attempt, call `list_objects` and confirm the object
+    count did not increase from a failed mutation.
+12. Confirm no `create_body` toolbar button, menu item, or FreeCAD GUI
+    command was added.
+13. In the MCP client, confirm exactly eight tools are listed, including
+    `create_body`.
+
 The original create-only smoke prompt remains useful:
 
 ```text

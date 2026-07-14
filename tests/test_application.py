@@ -6,6 +6,7 @@ from typing import Any, TypeVar
 
 from freecad_mcp.application import Application, create_application
 from freecad_mcp.commands import (
+    CreateBodyHandler,
     CreateDocumentHandler,
     DocumentHandlers,
     GetDocumentHandler,
@@ -78,6 +79,23 @@ class AdapterStub:
             ),
         )
 
+    def create_body(self, document_name: str, name: str, label: str | None) -> ObjectDetail:
+        return ObjectDetail(
+            name=name,
+            label=label if label is not None else name,
+            type_id="PartDesign::Body",
+            visibility=True,
+            parent=None,
+            children=(),
+            placement=PlacementData(
+                position=PlacementPosition(x=0.0, y=0.0, z=0.0),
+                rotation=PlacementRotation(
+                    axis=PlacementPosition(x=0.0, y=0.0, z=1.0),
+                    angle_degrees=0.0,
+                ),
+            ),
+        )
+
     def recompute_document(self, document_name: str) -> DocumentSummary:
         return self.document
 
@@ -106,6 +124,7 @@ def make_application() -> Application:
         save=SaveDocumentHandler(adapter, dispatcher),
         object_query=ListObjectsHandler(adapter, dispatcher),
         get_object=GetObjectHandler(adapter, dispatcher),
+        create_body=CreateBodyHandler(adapter, dispatcher),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
@@ -131,3 +150,12 @@ def test_application_dispatches_lifecycle_and_document_commands() -> None:
     assert created.data["document"] == inspected.data["document"]
     assert listed.data["active_document"] == "TestDocument"
     assert listed.data["documents"] == [created.data["document"]]
+
+
+def test_application_dispatches_create_body_command() -> None:
+    application = make_application()
+    result = application.create_body("TestDocument", "Body", "Bracket Body")
+    assert result.ok is True
+    assert result.code == "body_created"
+    assert result.data["document_name"] == "TestDocument"
+    assert result.data["object"]["name"] == "Body"  # type: ignore[index]

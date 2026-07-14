@@ -336,6 +336,81 @@ A dedicated `document_recompute_failed` error is returned when the FreeCAD
 recompute itself fails. Missing documents use the existing `document_not_found`
 convention. The tool is MCP-only and has no matching toolbar or menu command.
 
+## Body Creation
+
+### create_body
+
+`create_body` is the first modelling mutation tool. It creates exactly one
+`PartDesign::Body` in an open document through the full dispatch chain:
+
+```text
+MCP tool → Application → CreateBodyHandler → FreeCADDocumentAdapter → Qt dispatcher → FreeCAD API
+```
+
+The handler validates inputs using the shared document-name policy and an
+object-name policy that identifies the body-name field as ``"name"``. It then
+marshals execution to the main thread through the existing dispatcher.
+
+#### Success Contract
+
+On success, the result returns the same controlled ``ObjectDetail`` contract
+used by `get_object`:
+
+```json
+{
+  "ok": true,
+  "code": "body_created",
+  "document_name": "BracketDesign",
+  "object": {
+    "name": "Body",
+    "label": "Bracket Body",
+    "type_id": "PartDesign::Body",
+    "visibility": true,
+    "parent": null,
+    "children": [],
+    "placement": {
+      "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+      "rotation": {
+        "axis": {"x": 0.0, "y": 0.0, "z": 1.0},
+        "angle_degrees": 0.0
+      }
+    }
+  },
+  "message": "FreeCAD body created."
+}
+```
+
+#### Transaction and Rollback
+
+The adapter opens a FreeCAD document transaction with the label
+``"MCP Create Body"`` before creating the body. After successful creation and
+recomputation, the transaction is committed. On any failure after the
+transaction is opened, ``abortTransaction()`` is attempted on a best-effort
+basis and the original error is preserved. An abort failure does not replace
+the primary error.
+
+#### Duplicate Name Rejection
+
+The adapter checks for an existing object with the requested internal name
+before opening a transaction. If one exists, ``ObjectAlreadyExistsError`` is
+raised and the handler returns ``object_already_exists``. If FreeCAD silently
+renames the body (e.g., from ``"Body"`` to ``"Body001"``), that is treated as
+``BodyCreationError`` and the handler returns ``body_creation_failed``. Labels
+may be duplicated freely.
+
+#### Error Codes
+
+- ``validation_error``: invalid or missing document name, body name, or label;
+- ``document_not_found``: the document does not exist;
+- ``object_already_exists``: an object with the requested internal name
+  already exists;
+- ``body_creation_failed``: FreeCAD could not create the body, including
+  addObject returning null, unexpected renaming, label assignment failure,
+  recompute failure, or commit failure;
+- ``freecad_error``: main-thread dispatch failure or FreeCAD document
+  inspection failure;
+- ``internal_error``: unexpected exceptions.
+
 ## Tool Levels
 
 - **High-level workflows:** common modeling sequences with strong validation and

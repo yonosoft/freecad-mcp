@@ -9,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from freecad_mcp.commands import DocumentHandlers
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import (
+    CREATE_BODY_TOOL,
     CREATE_DOCUMENT_TOOL,
     GET_DOCUMENT_TOOL,
     GET_OBJECT_TOOL,
@@ -101,5 +102,27 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     )
     def recompute_document(document_name: str) -> dict[str, object]:
         return handlers.recompute.execute(document_name=document_name).to_dict()
+
+    @server.tool(
+        name=CREATE_BODY_TOOL,
+        description=(
+            "Create one empty Part Design Body in an open FreeCAD document. "
+            "Use exact internal document and object names, not labels. "
+            "The tool recomputes the document but does not save it or create "
+            "sketches or features. Use list_documents and list_objects first "
+            "when the required internal names are unknown."
+        ),
+        structured_output=True,
+    )
+    def create_body(
+        document_name: str,
+        name: str,
+        label: str | None = None,
+    ) -> dict[str, object]:
+        return handlers.create_body.execute(
+            document_name=document_name,
+            name=name,
+            label=label,
+        ).to_dict()
 
     return server
