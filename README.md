@@ -1,7 +1,6 @@
-# MCP
+# FreeCad MCP
 
-MCP is a Python-based external FreeCAD workbench that hosts a local Model
-Context Protocol server inside FreeCAD. It exposes explicit typed CAD tools and
+FreeCad Context Protocol server inside FreeCAD. It exposes explicit typed CAD tools and
 shared command handlers rather than arbitrary Python execution.
 
 ## Current Maturity
