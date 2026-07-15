@@ -11,6 +11,7 @@ from freecad_mcp.commands.document_query import (
 )
 from freecad_mcp.commands.document_save import SaveDocumentHandler
 from freecad_mcp.commands.object_query import GetObjectHandler, ListObjectsHandler
+from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.commands.status import report_status
 
 
@@ -25,12 +26,14 @@ class DocumentHandlers:
     object_query: ListObjectsHandler
     get_object: GetObjectHandler
     create_body: CreateBodyHandler
+    create_sketch: CreateSketchHandler
     recompute: RecomputeDocumentHandler
 
 
 __all__ = [
     "CreateBodyHandler",
     "CreateDocumentHandler",
+    "CreateSketchHandler",
     "DocumentHandlers",
     "GetDocumentHandler",
     "GetObjectHandler",

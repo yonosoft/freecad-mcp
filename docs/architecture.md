@@ -411,6 +411,93 @@ may be duplicated freely.
   inspection failure;
 - ``internal_error``: unexpected exceptions.
 
+## Sketch Creation
+
+### create_sketch
+
+`create_sketch` is the second modelling mutation tool. It creates exactly one
+empty, unattached `Sketcher::SketchObject` inside an existing `PartDesign::Body`
+through the full dispatch chain:
+
+```text
+MCP tool → Application → CreateSketchHandler → FreeCADDocumentAdapter → Qt dispatcher → FreeCAD API
+```
+
+The handler validates document, body, and sketch names using the shared policies,
+then marshals execution to the main thread. The adapter resolves the document
+and body by exact internal name, verifies the body type, checks for duplicate
+sketch names before opening a transaction, and creates the sketch using
+`body.newObject("Sketcher::SketchObject", name)` to establish correct ownership.
+
+#### Success Contract
+
+On success the result returns the same controlled `ObjectDetail` contract:
+
+```json
+{
+  "ok": true,
+  "code": "sketch_created",
+  "document_name": "BracketDesign",
+  "body_name": "Body",
+  "object": {
+    "name": "BaseSketch",
+    "label": "Base Sketch",
+    "type_id": "Sketcher::SketchObject",
+    "visibility": true,
+    "parent": "Body",
+    "children": [],
+    "placement": {
+      "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+      "rotation": {
+        "axis": {"x": 0.0, "y": 0.0, "z": 1.0},
+        "angle_degrees": 0.0
+      }
+    }
+  },
+  "message": "FreeCAD sketch created."
+}
+```
+
+#### Transaction and Rollback
+
+The adapter opens a FreeCAD document transaction with the label
+``"MCP Create Sketch"`` before creating the sketch. After successful creation,
+recomputation, and ownership verification, the transaction is committed. On any
+failure after the transaction is opened, ``abortTransaction()`` is attempted on a
+best-effort basis and the original error is preserved. An abort failure does not
+replace the primary error.
+
+#### Ownership Verification
+
+After recomputation the adapter uses the shared `_build_object_detail` function
+and verifies that the computed ``parent`` field equals the requested body's
+internal name. If it does not, the transaction is aborted and
+``SketchCreationError`` is raised.
+
+#### Unattached Sketch
+
+Stage 1 creates an empty, unattached sketch. The implementation does not set
+``Support``, ``MapMode``, or ``AttachmentOffset``. No geometry, constraints, or
+edit mode operations are performed.
+
+#### Error Codes
+
+- ``validation_error``: invalid or missing document name, body name, sketch
+  name, or label;
+- ``document_not_found``: the document does not exist;
+- ``body_not_found``: no object with the requested body internal name exists;
+- ``body_type_mismatch``: an object with the body name exists but is not a
+  PartDesign::Body;
+- ``object_already_exists``: an object with the requested sketch internal
+  name already exists (detected before transaction start);
+- ``sketch_creation_failed``: FreeCAD could not create the sketch, including
+  newObject returning null, unexpected renaming, wrong returned type,
+  missing body ownership, label assignment failure, recompute failure, or
+  commit failure;
+- ``freecad_error``: main-thread dispatch failure or FreeCAD document
+  inspection failure;
+- ``internal_error``: unexpected exceptions.
+
 ## Tool Levels
 
 - **High-level workflows:** common modeling sequences with strong validation and

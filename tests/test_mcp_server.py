@@ -22,6 +22,7 @@ from freecad_mcp.commands import (
     SaveDocumentHandler,
 )
 from freecad_mcp.commands.document import DocumentCollection, DocumentSummary
+from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.mcp.runner import UvicornMCPRunner
 from freecad_mcp.mcp.server import build_mcp_server
 from freecad_mcp.server.config import ServerConfig
@@ -29,6 +30,7 @@ from freecad_mcp.server.lifecycle import LifecycleService
 from freecad_mcp.tool_registry import (
     CREATE_BODY_TOOL,
     CREATE_DOCUMENT_TOOL,
+    CREATE_SKETCH_TOOL,
     GET_DOCUMENT_TOOL,
     GET_OBJECT_TOOL,
     LIST_DOCUMENTS_TOOL,
@@ -61,6 +63,7 @@ class AdapterStub:
         self.get_object_calls: list[tuple[str, str]] = []
         self.recompute_calls: list[str] = []
         self.create_body_calls: list[tuple[str, str, str | None]] = []
+        self.create_sketch_calls: list[tuple[str, str, str, str | None]] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -138,6 +141,33 @@ class AdapterStub:
             ),
         )
 
+    def create_sketch(
+        self, document_name: str, body_name: str, name: str, label: str | None
+    ) -> Any:
+        self.create_sketch_calls.append((document_name, body_name, name, label))
+        from freecad_mcp.commands.document import (
+            ObjectDetail,
+            PlacementData,
+            PlacementPosition,
+            PlacementRotation,
+        )
+
+        return ObjectDetail(
+            name=name,
+            label=label if label is not None else name,
+            type_id="Sketcher::SketchObject",
+            visibility=True,
+            parent=body_name,
+            children=(),
+            placement=PlacementData(
+                position=PlacementPosition(x=0.0, y=0.0, z=0.0),
+                rotation=PlacementRotation(
+                    axis=PlacementPosition(x=0.0, y=0.0, z=1.0),
+                    angle_degrees=0.0,
+                ),
+            ),
+        )
+
     def recompute_document(self, document_name: str) -> DocumentSummary:
         self.recompute_calls.append(document_name)
         return self.document
@@ -160,6 +190,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             object_query=ListObjectsHandler(actual_adapter, dispatcher),
             get_object=GetObjectHandler(actual_adapter, dispatcher),
             create_body=CreateBodyHandler(actual_adapter, dispatcher),
+            create_sketch=CreateSketchHandler(actual_adapter, dispatcher),
             recompute=RecomputeDocumentHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,
@@ -194,6 +225,13 @@ def test_mcp_server_registers_typed_document_tools() -> None:
     assert set(schemas[RECOMPUTE_DOCUMENT_TOOL]["properties"]) == {"document_name"}
     assert schemas[CREATE_BODY_TOOL]["required"] == ["document_name", "name"]
     assert set(schemas[CREATE_BODY_TOOL]["properties"]) == {"document_name", "name", "label"}
+    assert schemas[CREATE_SKETCH_TOOL]["required"] == ["document_name", "body_name", "name"]
+    assert set(schemas[CREATE_SKETCH_TOOL]["properties"]) == {
+        "document_name",
+        "body_name",
+        "name",
+        "label",
+    }
     assert all(tool.outputSchema is not None for tool in tools)
 
 
@@ -211,6 +249,7 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
     assert "list_objects" in actual_tools
     assert "get_object" in actual_tools
     assert "create_body" in actual_tools
+    assert "create_sketch" in actual_tools
     assert "recompute_document" in actual_tools
 
 
@@ -241,6 +280,15 @@ def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
             CREATE_BODY_TOOL,
             {"document_name": "TestDocument", "name": "Body", "label": "Bracket Body"},
         )
+        await server.call_tool(
+            CREATE_SKETCH_TOOL,
+            {
+                "document_name": "TestDocument",
+                "body_name": "Body",
+                "name": "BaseSketch",
+                "label": "Base Sketch",
+            },
+        )
 
     asyncio.run(call_tools())
 
@@ -253,6 +301,7 @@ def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
     assert adapter.list_objects_calls == ["TestDocument"]
     assert adapter.get_object_calls == [("TestDocument", "Body")]
     assert adapter.create_body_calls == [("TestDocument", "Body", "Bracket Body")]
+    assert adapter.create_sketch_calls == [("TestDocument", "Body", "BaseSketch", "Base Sketch")]
 
 
 def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:

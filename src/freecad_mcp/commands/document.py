@@ -203,6 +203,18 @@ class BodyCreationError(RuntimeError):
     """Raised when FreeCAD cannot create or initialize a PartDesign::Body."""
 
 
+class SketchCreationError(RuntimeError):
+    """Raised when FreeCAD cannot create or initialize a Sketcher::SketchObject."""
+
+
+class BodyNotFoundError(RuntimeError):
+    """Raised when a requested PartDesign::Body is not found in a document."""
+
+
+class BodyTypeMismatchError(RuntimeError):
+    """Raised when an object exists with the requested body name but is not a PartDesign::Body."""
+
+
 class DocumentAdapter(Protocol):
     """FreeCAD document operations used by the shared handlers."""
 
@@ -232,6 +244,15 @@ class DocumentAdapter(Protocol):
 
         Raise a typed adapter error when creation fails.
         """
+
+    def create_sketch(
+        self,
+        document_name: str,
+        body_name: str,
+        name: str,
+        label: str | None,
+    ) -> ObjectDetail:
+        """Create a Sketcher::SketchObject in a PartDesign::Body and return its detail."""
 
 
 class Dispatcher(Protocol):

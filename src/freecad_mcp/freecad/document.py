@@ -7,6 +7,8 @@ from typing import Any
 
 from freecad_mcp.commands.document import (
     BodyCreationError,
+    BodyNotFoundError,
+    BodyTypeMismatchError,
     DocumentAlreadyExistsError,
     DocumentCollection,
     DocumentCreationError,
@@ -22,6 +24,7 @@ from freecad_mcp.commands.document import (
     PlacementData,
     PlacementPosition,
     PlacementRotation,
+    SketchCreationError,
 )
 
 
@@ -255,6 +258,97 @@ class FreeCADDocumentAdapter:
                 with suppress(Exception):
                     document.abortTransaction()
             raise BodyCreationError(str(exc)) from exc
+
+    def create_sketch(
+        self, document_name: str, body_name: str, name: str, label: str | None
+    ) -> ObjectDetail:
+        import FreeCAD as App
+
+        try:
+            document = App.listDocuments().get(document_name)
+            if document is None:
+                raise DocumentNotFoundError(document_name)
+        except DocumentNotFoundError:
+            raise
+        except Exception as exc:
+            raise FreeCADDocumentError(str(exc)) from exc
+
+        body = document.getObject(body_name)
+        if body is None:
+            raise BodyNotFoundError(f"Body '{body_name}' not found in document '{document_name}'.")
+        if str(body.TypeId) != "PartDesign::Body":
+            raise BodyTypeMismatchError(
+                f"Object '{body_name}' in document '{document_name}' is not a PartDesign::Body."
+            )
+
+        if document.getObject(name) is not None:
+            raise ObjectAlreadyExistsError(
+                f"Object '{name}' already exists in document '{document_name}'."
+            )
+
+        opened_transaction = False
+        created_obj: Any = None
+        try:
+            document.openTransaction("MCP Create Sketch")
+            opened_transaction = True
+
+            created_obj = body.newObject("Sketcher::SketchObject", name)
+            if created_obj is None:
+                raise SketchCreationError(
+                    f"FreeCAD body.newObject returned None for Sketcher::SketchObject '{name}'."
+                )
+
+            actual_name = str(created_obj.Name)
+            if actual_name != name:
+                raise SketchCreationError(
+                    f"FreeCAD renamed sketch from '{name}' to '{actual_name}'. "
+                    f"Requested exact internal name not preserved."
+                )
+
+            if str(created_obj.TypeId) != "Sketcher::SketchObject":
+                raise SketchCreationError(
+                    f"FreeCAD returned unexpected type '{created_obj.TypeId!s}' "
+                    f"for sketch '{name}'."
+                )
+
+            if label is not None:
+                try:
+                    created_obj.Label = label
+                except Exception as exc:
+                    raise SketchCreationError(
+                        f"Could not set label on sketch '{name}': {exc}"
+                    ) from exc
+
+            document.recompute()
+
+            detail = _build_object_detail(created_obj)
+
+            if detail.parent != body_name:
+                raise SketchCreationError(
+                    f"Sketch '{name}' is not owned by body '{body_name}' after creation."
+                )
+
+            document.commitTransaction()
+            opened_transaction = False
+
+            return detail
+
+        except (
+            DocumentNotFoundError,
+            BodyNotFoundError,
+            BodyTypeMismatchError,
+            ObjectAlreadyExistsError,
+            SketchCreationError,
+        ):
+            if opened_transaction:
+                with suppress(Exception):
+                    document.abortTransaction()
+            raise
+        except Exception as exc:
+            if opened_transaction:
+                with suppress(Exception):
+                    document.abortTransaction()
+            raise SketchCreationError(str(exc)) from exc
 
 
 def _active_document_name(App: Any) -> str | None:

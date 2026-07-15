@@ -77,6 +77,21 @@ class Application:
             document_name=document_name, name=name, label=label
         )
 
+    def create_sketch(
+        self,
+        document_name: object,
+        body_name: object,
+        name: object,
+        label: object | None = None,
+    ) -> CommandResult:
+        """Create a Sketcher::SketchObject in a PartDesign::Body through the shared handler."""
+        return self.documents.create_sketch.execute(
+            document_name=document_name,
+            body_name=body_name,
+            name=name,
+            label=label,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

@@ -24,6 +24,7 @@ from freecad_mcp.commands.document import (
     PlacementPosition,
     PlacementRotation,
 )
+from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService
 
@@ -96,6 +97,25 @@ class AdapterStub:
             ),
         )
 
+    def create_sketch(
+        self, document_name: str, body_name: str, name: str, label: str | None
+    ) -> ObjectDetail:
+        return ObjectDetail(
+            name=name,
+            label=label if label is not None else name,
+            type_id="Sketcher::SketchObject",
+            visibility=True,
+            parent=body_name,
+            children=(),
+            placement=PlacementData(
+                position=PlacementPosition(x=0.0, y=0.0, z=0.0),
+                rotation=PlacementRotation(
+                    axis=PlacementPosition(x=0.0, y=0.0, z=1.0),
+                    angle_degrees=0.0,
+                ),
+            ),
+        )
+
     def recompute_document(self, document_name: str) -> DocumentSummary:
         return self.document
 
@@ -125,6 +145,7 @@ def make_application() -> Application:
         object_query=ListObjectsHandler(adapter, dispatcher),
         get_object=GetObjectHandler(adapter, dispatcher),
         create_body=CreateBodyHandler(adapter, dispatcher),
+        create_sketch=CreateSketchHandler(adapter, dispatcher),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
@@ -159,3 +180,15 @@ def test_application_dispatches_create_body_command() -> None:
     assert result.code == "body_created"
     assert result.data["document_name"] == "TestDocument"
     assert result.data["object"]["name"] == "Body"  # type: ignore[index]
+
+
+def test_application_dispatches_create_sketch_command() -> None:
+    application = make_application()
+    result = application.create_sketch("TestDocument", "Body", "BaseSketch", "Base Sketch")
+    assert result.ok is True
+    assert result.code == "sketch_created"
+    assert result.data["document_name"] == "TestDocument"
+    assert result.data["body_name"] == "Body"
+    assert result.data["object"]["name"] == "BaseSketch"  # type: ignore[index]
+    assert result.data["object"]["type_id"] == "Sketcher::SketchObject"  # type: ignore[index]
+    assert result.data["object"]["parent"] == "Body"  # type: ignore[index]

@@ -315,8 +315,47 @@ sequence through the MCP client:
     count did not increase from a failed mutation.
 12. Confirm no `create_body` toolbar button, menu item, or FreeCAD GUI
     command was added.
-13. In the MCP client, confirm exactly eight tools are listed, including
-    `create_body`.
+13. In the MCP client, confirm exactly nine tools are listed, including
+    `create_body` and `create_sketch`.
+
+### create_sketch live acceptance
+
+1. Start FreeCAD, select the MCP workbench, start the server.
+2. Create a new unsaved document named `SketchTest` with `create_document`.
+3. Call `create_body` to create a body named `MainBody` in `SketchTest`.
+4. Call `create_sketch` with `document_name` `SketchTest`, `body_name` `MainBody`,
+   `name` `BaseSketch`, and `label` `Base Sketch`. Confirm `ok: true`,
+   `code: sketch_created`, `document_name: SketchTest`, `body_name: MainBody`,
+   and the `object` has `name: BaseSketch`, `label: Base Sketch`,
+   `type_id: Sketcher::SketchObject`, `parent: MainBody`, `children: []`.
+5. Call `list_objects` on `SketchTest` and confirm the object count is 2
+   (one body, one sketch). Confirm `BaseSketch` appears with the correct
+   parent.
+6. Call `get_object` with `document_name: SketchTest` and
+   `object_name: BaseSketch` and confirm the returned detail matches
+   the `create_sketch` result.
+7. Verify in the FreeCAD GUI that the document is modified, the body exists
+   with the sketch inside it, and the sketch is visible in the tree.
+8. Verify the sketch is unattached: in the FreeCAD property editor, confirm
+   `Support` is empty and `MapMode` is `Deactivated` or equivalent default.
+9. Call `create_sketch` again with the same `document_name`, `body_name`,
+   and `name` and confirm a structured `object_already_exists` error.
+10. Call `create_sketch` with a non-existent body name and confirm
+    `body_not_found`.
+11. Call `create_sketch` with a non-body object (e.g. `App::Part`) as the
+    body name and confirm `body_type_mismatch`.
+12. Call `create_sketch` with `name` `SecondSketch` but the same `label`
+    `Base Sketch` and confirm duplicate labels are allowed.
+13. Call `create_sketch` with a non-existent document name and confirm
+    `document_not_found`.
+14. Call `create_sketch` without a `document_name` and confirm
+    `validation_error`.
+15. After each failed attempt, call `list_objects` and confirm the object
+    count did not increase from a failed mutation.
+16. Confirm no `MCP_CreateSketch` GUI command, toolbar button, or menu entry
+    exists in the MCP workbench.
+17. In the MCP client, confirm exactly nine tools are listed, including
+    `create_sketch`.
 
 The original create-only smoke prompt remains useful:
 

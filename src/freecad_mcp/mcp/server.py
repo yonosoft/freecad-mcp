@@ -11,6 +11,7 @@ from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import (
     CREATE_BODY_TOOL,
     CREATE_DOCUMENT_TOOL,
+    CREATE_SKETCH_TOOL,
     GET_DOCUMENT_TOOL,
     GET_OBJECT_TOOL,
     LIST_DOCUMENTS_TOOL,
@@ -121,6 +122,31 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     ) -> dict[str, object]:
         return handlers.create_body.execute(
             document_name=document_name,
+            name=name,
+            label=label,
+        ).to_dict()
+
+    @server.tool(
+        name=CREATE_SKETCH_TOOL,
+        description=(
+            "Create one empty, unattached sketch inside an existing Part Design Body. "
+            "Use exact internal document, body and sketch names, not labels. "
+            "The tool recomputes the document but does not save it, attach the sketch "
+            "to a plane, add geometry, add constraints or open sketch edit mode. "
+            "Use list_documents, list_objects and get_object first when internal "
+            "names are unknown."
+        ),
+        structured_output=True,
+    )
+    def create_sketch(
+        document_name: str,
+        body_name: str,
+        name: str,
+        label: str | None = None,
+    ) -> dict[str, object]:
+        return handlers.create_sketch.execute(
+            document_name=document_name,
+            body_name=body_name,
             name=name,
             label=label,
         ).to_dict()
