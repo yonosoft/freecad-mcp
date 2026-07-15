@@ -7,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, TypeVar
 
+import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
@@ -29,6 +30,7 @@ from freecad_mcp.commands.document import (
     SketchCreationResult,
 )
 from freecad_mcp.commands.sketch import CreateSketchHandler
+from freecad_mcp.mcp import server as mcp_server_module
 from freecad_mcp.mcp.runner import UvicornMCPRunner
 from freecad_mcp.mcp.server import build_mcp_server
 from freecad_mcp.server.config import ServerConfig
@@ -227,6 +229,40 @@ def test_mcp_server_registers_typed_document_tools() -> None:
     tools = asyncio.run(server.list_tools())
 
     assert [tool.name for tool in tools] == TOOL_NAMES
+    descriptions = {tool.name: tool.description for tool in tools}
+    assert descriptions == {
+        CREATE_DOCUMENT_TOOL: ("Create a new unsaved document in the running FreeCAD application."),
+        LIST_DOCUMENTS_TOOL: ("List open FreeCAD documents and identify the active document."),
+        GET_DOCUMENT_TOOL: "Inspect an open FreeCAD document by its internal name.",
+        SAVE_DOCUMENT_TOOL: ("Save or save as an open FreeCAD document with overwrite protection."),
+        LIST_OBJECTS_TOOL: (
+            "List controlled summaries of all objects in an open FreeCAD document."
+        ),
+        GET_OBJECT_TOOL: (
+            "Retrieve one FreeCAD object by exact internal document and object name "
+            "with controlled placement."
+        ),
+        RECOMPUTE_DOCUMENT_TOOL: (
+            "Recompute an open FreeCAD document and return its updated controlled summary."
+        ),
+        CREATE_BODY_TOOL: (
+            "Create one empty Part Design Body in an open FreeCAD document. "
+            "Use exact internal document and object names, not labels. "
+            "The tool recomputes the document but does not save it or create "
+            "sketches or features. Use list_documents and list_objects first "
+            "when the required internal names are unknown."
+        ),
+        CREATE_SKETCH_TOOL: (
+            "Create one empty sketch inside an existing Part Design Body. "
+            "Optionally attach it to that body's XY, XZ or YZ origin plane "
+            "using the support_plane selector. Use exact internal document, "
+            "body and sketch names, not labels. The tool recomputes the "
+            "document but does not save it, add geometry or constraints, "
+            "use arbitrary faces, apply attachment offsets or open sketch "
+            "edit mode. Use list_documents, list_objects and get_object "
+            "first when internal names are unknown."
+        ),
+    }
     schemas = {tool.name: tool.inputSchema for tool in tools}
     assert schemas[CREATE_DOCUMENT_TOOL]["required"] == ["name"]
     assert set(schemas[CREATE_DOCUMENT_TOOL]["properties"]) == {"name", "label"}
@@ -240,6 +276,8 @@ def test_mcp_server_registers_typed_document_tools() -> None:
         "overwrite",
     }
     assert schemas[SAVE_DOCUMENT_TOOL]["properties"]["overwrite"]["default"] is False
+    assert schemas[CREATE_DOCUMENT_TOOL]["properties"]["label"]["default"] is None
+    assert schemas[SAVE_DOCUMENT_TOOL]["properties"]["file_path"]["default"] is None
     assert schemas[LIST_OBJECTS_TOOL]["required"] == ["document_name"]
     assert set(schemas[LIST_OBJECTS_TOOL]["properties"]) == {"document_name"}
     assert schemas[GET_OBJECT_TOOL]["required"] == ["document_name", "object_name"]
@@ -248,6 +286,7 @@ def test_mcp_server_registers_typed_document_tools() -> None:
     assert set(schemas[RECOMPUTE_DOCUMENT_TOOL]["properties"]) == {"document_name"}
     assert schemas[CREATE_BODY_TOOL]["required"] == ["document_name", "name"]
     assert set(schemas[CREATE_BODY_TOOL]["properties"]) == {"document_name", "name", "label"}
+    assert schemas[CREATE_BODY_TOOL]["properties"]["label"]["default"] is None
     assert schemas[CREATE_SKETCH_TOOL]["required"] == ["document_name", "body_name", "name"]
     assert set(schemas[CREATE_SKETCH_TOOL]["properties"]) == {
         "document_name",
@@ -256,7 +295,54 @@ def test_mcp_server_registers_typed_document_tools() -> None:
         "label",
         "support_plane",
     }
+    assert schemas[CREATE_SKETCH_TOOL]["properties"]["label"]["default"] is None
+    assert schemas[CREATE_SKETCH_TOOL]["properties"]["support_plane"]["default"] is None
     assert all(tool.outputSchema is not None for tool in tools)
+
+
+def test_mcp_server_composes_explicit_registration_groups(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    handlers, _ = make_handlers()
+    calls: list[str] = []
+
+    def recorder(name: str) -> Callable[[Any, DocumentHandlers], None]:
+        def register(_server: Any, actual_handlers: DocumentHandlers) -> None:
+            assert actual_handlers is handlers
+            calls.append(name)
+
+        return register
+
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_document_tools",
+        recorder("document_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_object_tools",
+        recorder("object_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_recompute_document_tool",
+        recorder("recompute_document_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_creation_tools",
+        recorder("creation_tools"),
+    )
+
+    server = mcp_server_module.build_mcp_server(handlers, ServerConfig())
+
+    assert calls == [
+        "document_tools",
+        "object_tools",
+        "recompute_document_tool",
+        "creation_tools",
+    ]
+    assert asyncio.run(server.list_tools()) == []
 
 
 def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> None:

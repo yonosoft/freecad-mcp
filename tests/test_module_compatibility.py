@@ -3,6 +3,13 @@
 from freecad_mcp import exceptions, models, protocols, validation
 from freecad_mcp.commands import body, document, document_save, sketch
 from freecad_mcp.core import dispatch
+from freecad_mcp.freecad import FreeCADDocumentAdapter as PackageFreeCADDocumentAdapter
+from freecad_mcp.freecad import document as freecad_document
+from freecad_mcp.freecad import (
+    document_operations,
+    object_inspection,
+    sketch_creation,
+)
 from freecad_mcp.server import lifecycle
 
 
@@ -72,3 +79,32 @@ def test_legacy_modules_reexport_validation_by_identity() -> None:
     assert (
         vars(sketch)["_validate_create_sketch_request"] is validation.validate_create_sketch_request
     )
+
+
+def test_freecad_document_facade_preserves_adapter_and_helper_identity() -> None:
+    adapter: protocols.DocumentAdapter = freecad_document.FreeCADDocumentAdapter()
+
+    assert type(adapter) is freecad_document.FreeCADDocumentAdapter
+    assert PackageFreeCADDocumentAdapter is freecad_document.FreeCADDocumentAdapter
+
+    document_helpers = (
+        "_active_document_name",
+        "_get_gui_document",
+        "_require_successful_save",
+        "_summarize_document",
+    )
+    object_helpers = (
+        "_build_object_detail",
+        "_extract_placement",
+        "_object_children",
+        "_object_parent",
+        "_object_visibility",
+    )
+    sketch_helpers = ("_assign_origin_plane_support", "_verify_attachment")
+
+    for name in document_helpers:
+        assert getattr(freecad_document, name) is getattr(document_operations, name)
+    for name in object_helpers:
+        assert getattr(freecad_document, name) is getattr(object_inspection, name)
+    for name in sketch_helpers:
+        assert getattr(freecad_document, name) is getattr(sketch_creation, name)

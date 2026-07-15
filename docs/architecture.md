@@ -33,6 +33,14 @@ The lowercase installed folder keeps filesystem behavior predictable across
 platforms. The Python package remains `freecad_mcp` to avoid colliding with MCP
 SDK modules that may use the `mcp` namespace.
 
+The concrete FreeCAD integration is divided by responsibility while retaining
+one public adapter type. `freecad.document` defines `FreeCADDocumentAdapter` as
+the stable facade; `freecad.document_operations` owns document lookup,
+summaries, persistence, creation, and recomputation;
+`freecad.object_inspection` owns controlled object hierarchy, visibility, and
+placement extraction; and `freecad.body_creation` and
+`freecad.sketch_creation` own their respective transactional mutations.
+
 ## Component Model
 
 ```text
@@ -106,6 +114,14 @@ therefore not a headless `FreeCADCmd` service.
 Document adapters own imports such as `FreeCAD`, `Part`, and `Sketcher` and
 translate semantic requests into FreeCAD API operations.
 
+`FreeCADDocumentAdapter` remains the sole concrete implementation of the shared
+`DocumentAdapter` protocol and is imported from `freecad_mcp.freecad.document`.
+Its methods delegate to the focused FreeCAD integration modules without moving
+handlers, validation, transport, or runtime composition into that package.
+Object-detail construction is shared by inspection, body creation, and sketch
+creation, while transaction ownership stays with each mutating operation so its
+FreeCAD call order and rollback boundary remain explicit.
+
 FreeCAD document changes must:
 
 1. execute on the main Qt thread;
@@ -165,6 +181,14 @@ http://127.0.0.1:8765/mcp
 SDK-specific registration is isolated under `freecad_mcp.mcp`; it parses typed
 requests, calls the shared handler, and serializes structured results without
 containing CAD implementation logic.
+
+FastMCP registrations are explicit and grouped by contract:
+`mcp.document_tools` registers document creation, listing, lookup, saving, and
+recomputation; `mcp.object_tools` registers object listing and lookup; and
+`mcp.creation_tools` registers body and sketch creation. `mcp.server` is the
+small composition module that constructs FastMCP and invokes those registration
+functions in authoritative tool-registry order. Registration modules depend on
+handlers and the tool registry, never on the concrete FreeCAD adapter.
 
 A dependency-free tool registry is the authoritative source for tool names and
 ordering. FastMCP registration and lifecycle status both consume that registry,
@@ -555,3 +579,10 @@ The official MCP SDK is the only declared runtime dependency and is constrained
 to `mcp>=1.27.2,<2` while SDK v2 remains prerelease. FreeCAD imports remain
 runtime adapter dependencies. Development tools (`pytest`, `ruff`, `mypy`) run
 under an external Python 3.11 virtual environment.
+
+`runtime.py` is the concrete composition root. It constructs the single
+`FreeCADDocumentAdapter`, the Qt dispatcher, all application handlers, and the
+MCP runner/lifecycle service. Dependency direction remains MCP registration to
+application handlers to shared protocols/models/exceptions/validation to the
+concrete FreeCAD integration and Qt dispatcher; lower layers do not import the
+composition root or transport registration.
