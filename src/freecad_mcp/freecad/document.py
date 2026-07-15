@@ -5,29 +5,31 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import Any
 
-from freecad_mcp.commands.document import (
-    AttachmentInfo,
+from freecad_mcp.exceptions import (
     BodyCreationError,
     BodyNotFoundError,
     BodyTypeMismatchError,
     DocumentAlreadyExistsError,
-    DocumentCollection,
     DocumentCreationError,
     DocumentNotFoundError,
     DocumentRecomputeError,
     DocumentSaveError,
-    DocumentSummary,
     FreeCADDocumentError,
     ObjectAlreadyExistsError,
-    ObjectDetail,
     ObjectNotFoundError,
+    OriginPlaneNotFoundError,
+    SketchCreationError,
+)
+from freecad_mcp.models import (
+    AttachmentInfo,
+    DocumentCollection,
+    DocumentSummary,
+    ObjectDetail,
     ObjectSummary,
     OriginPlane,
-    OriginPlaneNotFoundError,
     PlacementData,
     PlacementPosition,
     PlacementRotation,
-    SketchCreationError,
     SketchCreationResult,
 )
 

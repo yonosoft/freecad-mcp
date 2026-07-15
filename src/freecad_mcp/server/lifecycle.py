@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from enum import StrEnum
 from threading import RLock
-from typing import Protocol
 
 from freecad_mcp.core.result import CommandResult
+from freecad_mcp.protocols import RunnerFactory as RunnerFactory
+from freecad_mcp.protocols import ServerRunner as ServerRunner
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import REGISTERED_TOOL_NAMES
 
@@ -20,19 +20,6 @@ class LifecycleState(StrEnum):
     RUNNING = "running"
     STOPPING = "stopping"
     ERROR = "error"
-
-
-class ServerRunner(Protocol):
-    """Background transport runner controlled by the lifecycle service."""
-
-    def start(self, on_exit: Callable[[BaseException | None], None]) -> None:
-        """Start and report unexpected or requested transport exit."""
-
-    def stop(self) -> None:
-        """Request graceful shutdown and wait for runner exit."""
-
-
-RunnerFactory = Callable[[], ServerRunner]
 
 
 class LifecycleService:
@@ -224,3 +211,11 @@ class LifecycleService:
 
     def _failure(self, code: str, message: str) -> CommandResult:
         return CommandResult.failure(code=code, message=message, data=self._data())
+
+
+__all__ = [
+    "LifecycleService",
+    "LifecycleState",
+    "RunnerFactory",
+    "ServerRunner",
+]

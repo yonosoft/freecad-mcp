@@ -4,99 +4,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from freecad_mcp.commands.document import (
+from freecad_mcp.core.result import CommandResult
+from freecad_mcp.exceptions import (
     BodyNotFoundError,
     BodyTypeMismatchError,
-    Dispatcher,
-    DocumentAdapter,
+    DispatchError,
     DocumentNotFoundError,
     FreeCADDocumentError,
     ObjectAlreadyExistsError,
-    OriginPlane,
     OriginPlaneNotFoundError,
     SketchCreationError,
-    validate_document_reference,
 )
-from freecad_mcp.core.dispatch import DispatchError
-from freecad_mcp.core.result import CommandResult
-
-_OBJECT_NAME_PATTERN = __import__("re").compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
-_OBJECT_NAME_RULE = "ASCII letter or underscore, followed by letters, digits, or underscores"
-
-
-def _validate_create_sketch_request(
-    document_name: object,
-    body_name: object,
-    name: object,
-    label: object | None,
-    support_plane: object | None,
-) -> CommandResult | None:
-    """Validate create-sketch arguments using shared document-name policy."""
-    doc_error = validate_document_reference(document_name)
-    if doc_error is not None:
-        return doc_error
-
-    if not isinstance(body_name, str):
-        return CommandResult.failure(
-            code="validation_error",
-            message="Body name must be a non-empty string.",
-            data={"field": "body_name", "actual_type": type(body_name).__name__},
-        )
-    if not body_name.strip():
-        return CommandResult.failure(
-            code="validation_error",
-            message="Body name must not be empty or whitespace.",
-            data={"field": "body_name"},
-        )
-    if _OBJECT_NAME_PATTERN.fullmatch(body_name) is None:
-        return CommandResult.failure(
-            code="validation_error",
-            message="Body name does not satisfy the MCP object-name policy.",
-            data={"field": "body_name", "name": body_name, "rule": _OBJECT_NAME_RULE},
-        )
-
-    if not isinstance(name, str):
-        return CommandResult.failure(
-            code="validation_error",
-            message="Sketch name must be a non-empty string.",
-            data={"field": "name", "actual_type": type(name).__name__},
-        )
-    if not name.strip():
-        return CommandResult.failure(
-            code="validation_error",
-            message="Sketch name must not be empty or whitespace.",
-            data={"field": "name"},
-        )
-    if _OBJECT_NAME_PATTERN.fullmatch(name) is None:
-        return CommandResult.failure(
-            code="validation_error",
-            message="Sketch name does not satisfy the MCP object-name policy.",
-            data={"field": "name", "name": name, "rule": _OBJECT_NAME_RULE},
-        )
-
-    if label is not None and not isinstance(label, str):
-        return CommandResult.failure(
-            code="validation_error",
-            message="Sketch label must be a string when supplied.",
-            data={"field": "label", "actual_type": type(label).__name__},
-        )
-
-    if support_plane is not None:
-        valid_planes = {p.value for p in OriginPlane}
-        if not isinstance(support_plane, str) or support_plane not in valid_planes:
-            return CommandResult.failure(
-                code="validation_error",
-                message=(
-                    "support_plane must be one of 'xy_plane', 'xz_plane', 'yz_plane' or omitted."
-                ),
-                data={
-                    "field": "support_plane",
-                    "actual_value": support_plane,
-                    "allowed": sorted(valid_planes),
-                },
-            )
-
-    return None
+from freecad_mcp.models import OriginPlane
+from freecad_mcp.protocols import Dispatcher, DocumentAdapter
+from freecad_mcp.validation import (
+    validate_create_sketch_request as _validate_create_sketch_request,
+)
 
 
 @dataclass(frozen=True, slots=True)

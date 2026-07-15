@@ -4,16 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from freecad_mcp.commands.document import (
-    Dispatcher,
-    DocumentAdapter,
+from freecad_mcp.core.result import CommandResult
+from freecad_mcp.exceptions import (
+    DispatchError,
     DocumentNotFoundError,
     DocumentRecomputeError,
     FreeCADDocumentError,
-    validate_document_reference,
 )
-from freecad_mcp.core.dispatch import DispatchError
-from freecad_mcp.core.result import CommandResult
+from freecad_mcp.protocols import Dispatcher, DocumentAdapter
+from freecad_mcp.validation import validate_document_reference
 
 
 @dataclass(frozen=True, slots=True)

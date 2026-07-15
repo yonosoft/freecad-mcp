@@ -4,55 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from freecad_mcp.commands.document import (
+from freecad_mcp.core.result import CommandResult
+from freecad_mcp.exceptions import (
     BodyCreationError,
-    Dispatcher,
-    DocumentAdapter,
+    DispatchError,
     DocumentNotFoundError,
     FreeCADDocumentError,
     ObjectAlreadyExistsError,
-    validate_document_reference,
 )
-from freecad_mcp.core.dispatch import DispatchError
-from freecad_mcp.core.result import CommandResult
-
-_OBJECT_NAME_PATTERN = __import__("re").compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
-_OBJECT_NAME_RULE = "ASCII letter or underscore, followed by letters, digits, or underscores"
-
-
-def _validate_create_body_request(
-    document_name: object, name: object, label: object | None
-) -> CommandResult | None:
-    """Validate create-body arguments using the shared document-name policy
-    and a body-specific object-name validator that identifies the field as 'name'."""
-    doc_error = validate_document_reference(document_name)
-    if doc_error is not None:
-        return doc_error
-    if not isinstance(name, str):
-        return CommandResult.failure(
-            code="validation_error",
-            message="Body name must be a non-empty string.",
-            data={"field": "name", "actual_type": type(name).__name__},
-        )
-    if not name.strip():
-        return CommandResult.failure(
-            code="validation_error",
-            message="Body name must not be empty or whitespace.",
-            data={"field": "name"},
-        )
-    if _OBJECT_NAME_PATTERN.fullmatch(name) is None:
-        return CommandResult.failure(
-            code="validation_error",
-            message="Body name does not satisfy the MCP object-name policy.",
-            data={"field": "name", "name": name, "rule": _OBJECT_NAME_RULE},
-        )
-    if label is not None and not isinstance(label, str):
-        return CommandResult.failure(
-            code="validation_error",
-            message="Body label must be a string when supplied.",
-            data={"field": "label", "actual_type": type(label).__name__},
-        )
-    return None
+from freecad_mcp.protocols import Dispatcher, DocumentAdapter
+from freecad_mcp.validation import (
+    validate_create_body_request as _validate_create_body_request,
+)
 
 
 @dataclass(frozen=True, slots=True)

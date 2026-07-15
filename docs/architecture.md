@@ -65,6 +65,15 @@ imports. Handlers return `CommandResult` objects with stable codes, user-facing
 messages, and structured data. This layer is the common entry point for GUI
 commands and MCP transport adapters.
 
+Shared structural concerns sit below the handlers: `freecad_mcp.models` owns
+controlled document, object, placement, and attachment data;
+`freecad_mcp.protocols` defines the document-adapter, dispatch, executor, and
+server-runner boundaries; `freecad_mcp.exceptions` owns controlled failures;
+and `freecad_mcp.validation` owns explicit request validation. These modules
+remain pure Python and do not import handlers or concrete FreeCAD, Qt, MCP, or
+server implementations. Legacy command-module imports are compatibility
+re-exports of the same objects.
+
 Document handlers validate requests and dispatch adapter operations to the main
 Qt thread. The MCP server accepts internal names consisting of an ASCII letter
 or underscore followed by letters, digits, or underscores. This is an MCP input

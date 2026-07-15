@@ -5,39 +5,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from freecad_mcp.commands.document import (
-    Dispatcher,
-    DocumentAdapter,
+from freecad_mcp.core.result import CommandResult
+from freecad_mcp.exceptions import (
+    DispatchError,
     DocumentNotFoundError,
     DocumentSaveError,
-    DocumentSummary,
+    FileAlreadyExistsError,
+    FilePathRequiredError,
+    FileSystemCheckError,
     FreeCADDocumentError,
-    validate_document_reference,
+    InvalidFilePathError,
+    ParentDirectoryNotFoundError,
 )
-from freecad_mcp.core.dispatch import DispatchError
-from freecad_mcp.core.result import CommandResult
+from freecad_mcp.models import DocumentSummary
+from freecad_mcp.protocols import Dispatcher, DocumentAdapter
+from freecad_mcp.validation import validate_document_reference
 
 _FREECAD_EXTENSION = ".FCStd"
-
-
-class FilePathRequiredError(RuntimeError):
-    """Raised when an unsaved document has no requested destination."""
-
-
-class InvalidFilePathError(RuntimeError):
-    """Raised when a requested destination is not a valid FCStd path."""
-
-
-class ParentDirectoryNotFoundError(RuntimeError):
-    """Raised when a save-as destination has no existing parent directory."""
-
-
-class FileAlreadyExistsError(RuntimeError):
-    """Raised when save-as would overwrite without explicit permission."""
-
-
-class FileSystemCheckError(RuntimeError):
-    """Raised when destination safety checks cannot inspect the filesystem."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,3 +204,13 @@ def _normalize_current_path(file_path: str) -> Path:
         return Path(file_path).expanduser().resolve(strict=False)
     except (OSError, RuntimeError, ValueError) as exc:
         raise DocumentSaveError(f"Could not normalize FreeCAD's current file path: {exc}") from exc
+
+
+__all__ = [
+    "FileAlreadyExistsError",
+    "FilePathRequiredError",
+    "FileSystemCheckError",
+    "InvalidFilePathError",
+    "ParentDirectoryNotFoundError",
+    "SaveDocumentHandler",
+]
