@@ -7,7 +7,7 @@ on:
 jobs:
   quality:
     # Requires a repository or organization Forgejo runner with the docker label.
-    runs-on: docker
+    runs-on: codeberg-small
     container:
       # Node is required by the checkout action; Debian bookworm supplies Python 3.11.
       image: node:24-bookworm-slim
