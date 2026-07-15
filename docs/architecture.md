@@ -161,6 +161,10 @@ A dependency-free tool registry is the authoritative source for tool names and
 ordering. FastMCP registration and lifecycle status both consume that registry,
 so reported capabilities cannot drift from the registered set.
 
+The registry currently exposes `create_document`, `list_documents`,
+`get_document`, `save_document`, `list_objects`, `get_object`,
+`recompute_document`, `create_body`, and `create_sketch`.
+
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
 document, object, constraint, geometry, and error data.

@@ -138,6 +138,24 @@ Pure Python checks run under the project venv:
 .\scripts\test.ps1
 ```
 
+The portable CI entry point runs the same checks on every host and can be run
+with the active Python 3.11 interpreter:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\ci.py
+```
+
+It runs Ruff lint, Ruff formatting check, Mypy, and Pytest, in that order. It
+does not install FreeCAD or run live GUI acceptance. GitHub Actions and Forgejo
+Actions invoke this same script after `pip install -e ".[dev]"`, so the hosted
+checks remain equivalent.
+
+GitHub uses an Ubuntu hosted runner. Codeberg uses Forgejo Actions: enable the
+repository's **Actions** unit and provide a repository or organization runner
+with the `docker` label before its workflow can run. Codeberg's hosted Actions
+availability is limited; no credentials or publishing configuration are needed
+for this workflow.
+
 Workbench startup, FreeCAD API behavior, Qt behavior, and document mutation
 must be tested inside FreeCAD.
 
@@ -190,7 +208,8 @@ Use a dedicated MCP client test profile containing only:
 }
 ```
 
-Confirm the client lists exactly these document tools:
+Confirm the client lists exactly these MCP tools, in the order defined by
+`src/freecad_mcp/tool_registry.py`:
 
 ```text
 create_document
@@ -200,6 +219,8 @@ save_document
 list_objects
 get_object
 recompute_document
+create_body
+create_sketch
 ```
 
 These document and object-inspection tools are MCP-only; the workbench has no

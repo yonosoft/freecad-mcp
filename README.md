@@ -6,18 +6,34 @@ shared command handlers rather than arbitrary Python execution.
 
 ## Current Maturity
 
-This repository is at its first functional MCP server milestone. It provides:
+This repository is in active early-stage development. It provides controlled
+document and object inspection plus body and sketch creation; it is not yet a
+complete Part Design or Sketcher automation API, and it is not production-ready.
+
+Current capabilities include:
 
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- typed MCP document tools for creating, listing, inspecting, and saving documents, and creating PartDesign bodies and unattached sketches;
+- typed MCP tools for document creation, inspection, saving, recomputation, and
+  controlled Part Design body and sketch creation;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
-- Python quality tooling and unit tests.
+- pure-Python quality tooling and unit tests, with documented live FreeCAD
+  acceptance checks.
 
-The milestone intentionally has no configuration panel, remote binding, or
+The project intentionally has no configuration panel, remote binding, or
 arbitrary Python execution.
+
+The repository is mirrored on [GitHub](https://github.com/yonosoft/freecad-mcp)
+and [Codeberg](https://codeberg.org/aeromaker/freecad-mcp).
+
+## Verified Environment
+
+The currently verified live environment is FreeCAD `1.1.1.20260414` with
+embedded Python `3.11.15` and PySide6 / Qt `6.8.3`. The MCP SDK uses stable v1
+(`>=1.27.2,<2`). Pure-Python automated checks run with standalone Python 3.11;
+live FreeCAD acceptance remains a manual check.
 
 ## Repository Layout
 
@@ -83,27 +99,8 @@ Restart FreeCAD, select **MCP**, and use **Start Server**, **Stop Server**, or
 }
 ```
 
-Available document tools:
-
-- `create_document` creates a new unsaved document from a required internal
-  `name` and optional visible `label`;
-- `list_documents` lists open documents and identifies the active document;
-- `get_document` inspects one document by its internal name;
-- `save_document` persists a document using protected save or save-as behavior.
-- `list_objects` returns controlled summaries of all objects in an open FreeCAD
-  document: internal name, visible label, type ID, visibility, parent container,
-  and children.
-- `get_object` retrieves one object by exact internal document name and exact
-  internal object name, returning its summary fields plus controlled placement
-  data.
-
-- `recompute_document` recomputes one open document and returns its updated
-  controlled summary.
-- `create_body` creates one empty Part Design Body in an open document. It requires exact internal document and object names, applies an optional visible label, opens a FreeCAD transaction, creates the body, recomputes, commits, and returns the controlled object detail with placement. Duplicate internal names are rejected. The tool does not save automatically or create sketches or features.
-
-- `create_sketch` creates one empty sketch inside an existing Part Design Body. It requires exact internal document, body and sketch names, and accepts an optional visible label. An optional `support_plane` parameter (`xy_plane`, `xz_plane`, `yz_plane`) attaches the sketch to that body's origin plane using flat-face mapping. Omitted or null leaves the sketch unattached. The tool opens a FreeCAD transaction, creates the sketch through the body, optionally assigns support, recomputes, verifies attachment, commits, and returns the controlled object detail with attachment metadata (or `null`). Duplicate internal names are rejected. The document is modified but not saved automatically. No geometry, constraints, arbitrary faces, or attachment offsets are applied.
-
-Tool names the MCP client can see:
+The exact tool names and order are defined by the authoritative
+`src/freecad_mcp/tool_registry.py` registry:
 
 ```text
 create_document
@@ -117,6 +114,20 @@ create_body
 create_sketch
 ```
 
+`create_body` requires exact internal document and body names, accepts an
+optional visible label, creates one `PartDesign::Body` in a transaction,
+recomputes, and returns a structured controlled result. It does not save
+automatically, create sketches or features, or add a toolbar/menu command.
+
+`create_sketch` requires exact internal document, body, and sketch names and
+accepts an optional visible label. It creates one empty body-owned sketch. Its
+optional `support_plane` is limited to `xy_plane`, `xz_plane`, or `yz_plane`;
+omitted or `null` means unattached. Attached sketches resolve the target body's
+origin plane by semantic role and use controlled `flat_face` attachment. It
+does not accept arbitrary faces or datum planes, alter attachment offsets, add
+geometry or constraints, enter sketch edit mode, save automatically, or add a
+toolbar/menu command.
+
 These document and object-inspection tools are MCP-only capabilities. They do not
 add workbench commands or toolbar icons. `get_object` performs exact internal-name
 lookup only; labels are not used as lookup keys. If placement is unavailable the
@@ -125,7 +136,7 @@ lookup only; labels are not used as lookup keys. If placement is unavailable the
 ## Documentation
 
 - [Architecture](docs/architecture.md)
-- [Development setup](docs/development.md)
+- [Development setup and CI](docs/development.md)
 
 ## License
 
