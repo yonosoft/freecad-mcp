@@ -12,6 +12,8 @@ from freecad_mcp.commands.document import (
     DocumentNotFoundError,
     FreeCADDocumentError,
     ObjectAlreadyExistsError,
+    OriginPlane,
+    OriginPlaneNotFoundError,
     SketchCreationError,
     validate_document_reference,
 )
@@ -27,6 +29,7 @@ def _validate_create_sketch_request(
     body_name: object,
     name: object,
     label: object | None,
+    support_plane: object | None,
 ) -> CommandResult | None:
     """Validate create-sketch arguments using shared document-name policy."""
     doc_error = validate_document_reference(document_name)
@@ -78,6 +81,21 @@ def _validate_create_sketch_request(
             data={"field": "label", "actual_type": type(label).__name__},
         )
 
+    if support_plane is not None:
+        valid_planes = {p.value for p in OriginPlane}
+        if not isinstance(support_plane, str) or support_plane not in valid_planes:
+            return CommandResult.failure(
+                code="validation_error",
+                message=(
+                    "support_plane must be one of 'xy_plane', 'xz_plane', 'yz_plane' or omitted."
+                ),
+                data={
+                    "field": "support_plane",
+                    "actual_value": support_plane,
+                    "allowed": sorted(valid_planes),
+                },
+            )
+
     return None
 
 
@@ -94,9 +112,12 @@ class CreateSketchHandler:
         body_name: object,
         name: object,
         label: object | None = None,
+        support_plane: object | None = None,
     ) -> CommandResult:
         """Create a sketch and convert expected failures to structured results."""
-        validation_error = _validate_create_sketch_request(document_name, body_name, name, label)
+        validation_error = _validate_create_sketch_request(
+            document_name, body_name, name, label, support_plane
+        )
         if validation_error is not None:
             return validation_error
 
@@ -104,10 +125,15 @@ class CreateSketchHandler:
         assert isinstance(body_name, str)
         assert isinstance(name, str)
         assert label is None or isinstance(label, str)
+        support_plane_value: OriginPlane | None = None
+        if isinstance(support_plane, str):
+            support_plane_value = OriginPlane(support_plane)
 
         try:
-            detail = self.dispatcher.call(
-                lambda: self.adapter.create_sketch(document_name, body_name, name, label)
+            result = self.dispatcher.call(
+                lambda: self.adapter.create_sketch(
+                    document_name, body_name, name, label, support_plane_value
+                )
             )
         except DocumentNotFoundError:
             return CommandResult.failure(
@@ -134,6 +160,18 @@ class CreateSketchHandler:
                 data={
                     "document_name": document_name,
                     "body_name": body_name,
+                },
+            )
+        except OriginPlaneNotFoundError:
+            return CommandResult.failure(
+                code="origin_plane_not_found",
+                message=(
+                    f"Origin plane '{support_plane}' could not be resolved for body '{body_name}'."
+                ),
+                data={
+                    "document_name": document_name,
+                    "body_name": body_name,
+                    "support_plane": support_plane,
                 },
             )
         except ObjectAlreadyExistsError:
@@ -197,6 +235,15 @@ class CreateSketchHandler:
                 "code": "sketch_created",
                 "document_name": document_name,
                 "body_name": body_name,
-                "object": detail.to_dict(),
+                "attachment": (
+                    {
+                        "kind": result.attachment.kind,
+                        "plane": result.attachment.plane.value,
+                        "map_mode": result.attachment.map_mode,
+                    }
+                    if result.attachment is not None
+                    else None
+                ),
+                "object": result.object.to_dict(),
             },
         )

@@ -356,6 +356,21 @@ sequence through the MCP client:
     exists in the MCP workbench.
 17. In the MCP client, confirm exactly nine tools are listed, including
     `create_sketch`.
+18. Call `create_sketch` with `support_plane: xy_plane` and confirm
+    `attachment.kind: body_origin_plane`, `attachment.plane: xy_plane`,
+    `attachment.map_mode: flat_face`.
+19. Repeat with `xz_plane` and `yz_plane`.
+20. Call `create_sketch` with `support_plane: XY_Plane` (wrong case) and
+    confirm `validation_error`.
+21. Call `create_sketch` with `support_plane: flat_face` (invalid value) and
+    confirm `validation_error`.
+22. Create a second body in the same document with `create_body`. Create an
+    attached sketch on each body. Verify each sketch resolves that body's
+    own origin plane.
+23. In the FreeCAD property editor, verify `MapMode` is `FlatFace` and
+    `AttachmentOffset` is identity for attached sketches.
+24. Undo an attached sketch creation and verify the sketch and support are
+    removed together. Redo restores both.
 
 The original create-only smoke prompt remains useful:
 

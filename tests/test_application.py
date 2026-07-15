@@ -17,12 +17,15 @@ from freecad_mcp.commands import (
     SaveDocumentHandler,
 )
 from freecad_mcp.commands.document import (
+    AttachmentInfo,
     DocumentCollection,
     DocumentSummary,
     ObjectDetail,
+    OriginPlane,
     PlacementData,
     PlacementPosition,
     PlacementRotation,
+    SketchCreationResult,
 )
 from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.server.config import ServerConfig
@@ -98,21 +101,37 @@ class AdapterStub:
         )
 
     def create_sketch(
-        self, document_name: str, body_name: str, name: str, label: str | None
-    ) -> ObjectDetail:
-        return ObjectDetail(
-            name=name,
-            label=label if label is not None else name,
-            type_id="Sketcher::SketchObject",
-            visibility=True,
-            parent=body_name,
-            children=(),
-            placement=PlacementData(
-                position=PlacementPosition(x=0.0, y=0.0, z=0.0),
-                rotation=PlacementRotation(
-                    axis=PlacementPosition(x=0.0, y=0.0, z=1.0),
-                    angle_degrees=0.0,
+        self,
+        document_name: str,
+        body_name: str,
+        name: str,
+        label: str | None,
+        support_plane: OriginPlane | None = None,
+    ) -> SketchCreationResult:
+        return SketchCreationResult(
+            object=ObjectDetail(
+                name=name,
+                label=label if label is not None else name,
+                type_id="Sketcher::SketchObject",
+                visibility=True,
+                parent=body_name,
+                children=(),
+                placement=PlacementData(
+                    position=PlacementPosition(x=0.0, y=0.0, z=0.0),
+                    rotation=PlacementRotation(
+                        axis=PlacementPosition(x=0.0, y=0.0, z=1.0),
+                        angle_degrees=0.0,
+                    ),
                 ),
+            ),
+            attachment=(
+                AttachmentInfo(
+                    kind="body_origin_plane",
+                    plane=support_plane,
+                    map_mode="flat_face",
+                )
+                if support_plane is not None
+                else None
             ),
         )
 
@@ -192,3 +211,18 @@ def test_application_dispatches_create_sketch_command() -> None:
     assert result.data["object"]["name"] == "BaseSketch"  # type: ignore[index]
     assert result.data["object"]["type_id"] == "Sketcher::SketchObject"  # type: ignore[index]
     assert result.data["object"]["parent"] == "Body"  # type: ignore[index]
+    assert result.data["attachment"] is None
+
+
+def test_application_dispatches_create_sketch_with_support_plane() -> None:
+    application = make_application()
+    result = application.create_sketch(
+        "TestDocument", "Body", "BaseSketch", "Base Sketch", "xy_plane"
+    )
+    assert result.ok is True
+    assert result.code == "sketch_created"
+    attachment = result.data["attachment"]
+    assert attachment is not None
+    assert attachment["kind"] == "body_origin_plane"  # type: ignore[index]
+    assert attachment["plane"] == "xy_plane"  # type: ignore[index]
+    assert attachment["map_mode"] == "flat_face"  # type: ignore[index]

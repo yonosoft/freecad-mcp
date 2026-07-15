@@ -83,6 +83,7 @@ class Application:
         body_name: object,
         name: object,
         label: object | None = None,
+        support_plane: object | None = None,
     ) -> CommandResult:
         """Create a Sketcher::SketchObject in a PartDesign::Body through the shared handler."""
         return self.documents.create_sketch.execute(
@@ -90,6 +91,7 @@ class Application:
             body_name=body_name,
             name=name,
             label=label,
+            support_plane=support_plane,
         )
 
     def can_start_server(self) -> bool:

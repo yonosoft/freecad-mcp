@@ -21,7 +21,13 @@ from freecad_mcp.commands import (
     RecomputeDocumentHandler,
     SaveDocumentHandler,
 )
-from freecad_mcp.commands.document import DocumentCollection, DocumentSummary
+from freecad_mcp.commands.document import (
+    AttachmentInfo,
+    DocumentCollection,
+    DocumentSummary,
+    OriginPlane,
+    SketchCreationResult,
+)
 from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.mcp.runner import UvicornMCPRunner
 from freecad_mcp.mcp.server import build_mcp_server
@@ -63,7 +69,7 @@ class AdapterStub:
         self.get_object_calls: list[tuple[str, str]] = []
         self.recompute_calls: list[str] = []
         self.create_body_calls: list[tuple[str, str, str | None]] = []
-        self.create_sketch_calls: list[tuple[str, str, str, str | None]] = []
+        self.create_sketch_calls: list[tuple[str, str, str, str | None, OriginPlane | None]] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -142,29 +148,46 @@ class AdapterStub:
         )
 
     def create_sketch(
-        self, document_name: str, body_name: str, name: str, label: str | None
-    ) -> Any:
-        self.create_sketch_calls.append((document_name, body_name, name, label))
+        self,
+        document_name: str,
+        body_name: str,
+        name: str,
+        label: str | None,
+        support_plane: OriginPlane | None = None,
+    ) -> SketchCreationResult:
+        self.create_sketch_calls.append((document_name, body_name, name, label, support_plane))
         from freecad_mcp.commands.document import (
             ObjectDetail,
             PlacementData,
             PlacementPosition,
             PlacementRotation,
+            SketchCreationResult,
         )
 
-        return ObjectDetail(
-            name=name,
-            label=label if label is not None else name,
-            type_id="Sketcher::SketchObject",
-            visibility=True,
-            parent=body_name,
-            children=(),
-            placement=PlacementData(
-                position=PlacementPosition(x=0.0, y=0.0, z=0.0),
-                rotation=PlacementRotation(
-                    axis=PlacementPosition(x=0.0, y=0.0, z=1.0),
-                    angle_degrees=0.0,
+        return SketchCreationResult(
+            object=ObjectDetail(
+                name=name,
+                label=label if label is not None else name,
+                type_id="Sketcher::SketchObject",
+                visibility=True,
+                parent=body_name,
+                children=(),
+                placement=PlacementData(
+                    position=PlacementPosition(x=0.0, y=0.0, z=0.0),
+                    rotation=PlacementRotation(
+                        axis=PlacementPosition(x=0.0, y=0.0, z=1.0),
+                        angle_degrees=0.0,
+                    ),
                 ),
+            ),
+            attachment=(
+                AttachmentInfo(
+                    kind="body_origin_plane",
+                    plane=support_plane,
+                    map_mode="flat_face",
+                )
+                if support_plane is not None
+                else None
             ),
         )
 
@@ -231,6 +254,7 @@ def test_mcp_server_registers_typed_document_tools() -> None:
         "body_name",
         "name",
         "label",
+        "support_plane",
     }
     assert all(tool.outputSchema is not None for tool in tools)
 
@@ -289,6 +313,16 @@ def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
                 "label": "Base Sketch",
             },
         )
+        await server.call_tool(
+            CREATE_SKETCH_TOOL,
+            {
+                "document_name": "TestDocument",
+                "body_name": "Body",
+                "name": "AttachedSketch",
+                "label": "Attached Sketch",
+                "support_plane": "xy_plane",
+            },
+        )
 
     asyncio.run(call_tools())
 
@@ -301,7 +335,16 @@ def test_mcp_tools_call_the_shared_document_handlers(tmp_path: Path) -> None:
     assert adapter.list_objects_calls == ["TestDocument"]
     assert adapter.get_object_calls == [("TestDocument", "Body")]
     assert adapter.create_body_calls == [("TestDocument", "Body", "Bracket Body")]
-    assert adapter.create_sketch_calls == [("TestDocument", "Body", "BaseSketch", "Base Sketch")]
+    assert adapter.create_sketch_calls == [
+        ("TestDocument", "Body", "BaseSketch", "Base Sketch", None),
+        (
+            "TestDocument",
+            "Body",
+            "AttachedSketch",
+            "Attached Sketch",
+            OriginPlane.XY,
+        ),
+    ]
 
 
 def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Protocol, TypeVar
 
 from freecad_mcp.core.dispatch import DispatchError
@@ -215,6 +216,44 @@ class BodyTypeMismatchError(RuntimeError):
     """Raised when an object exists with the requested body name but is not a PartDesign::Body."""
 
 
+class OriginPlaneNotFoundError(RuntimeError):
+    """Raised when a requested origin plane cannot be resolved from a body."""
+
+
+class OriginPlane(StrEnum):
+    """Public plane selectors for body-origin attachment."""
+
+    XY = "xy_plane"
+    XZ = "xz_plane"
+    YZ = "yz_plane"
+
+
+@dataclass(frozen=True)
+class AttachmentInfo:
+    """Controlled attachment metadata for MCP results.
+
+    ``kind`` is always ``"body_origin_plane"``. ``plane`` is the selected
+    ``OriginPlane`` value. ``map_mode`` is the public mode name, currently
+    always ``"flat_face"``.
+    """
+
+    kind: str
+    plane: OriginPlane
+    map_mode: str
+
+
+@dataclass(frozen=True)
+class SketchCreationResult:
+    """Returned by the adapter when creating a sketch.
+
+    ``object`` is the controlled ``ObjectDetail``. ``attachment`` is ``None``
+    for unattached sketches and an ``AttachmentInfo`` for attached sketches.
+    """
+
+    object: ObjectDetail
+    attachment: AttachmentInfo | None
+
+
 class DocumentAdapter(Protocol):
     """FreeCAD document operations used by the shared handlers."""
 
@@ -251,7 +290,8 @@ class DocumentAdapter(Protocol):
         body_name: str,
         name: str,
         label: str | None,
-    ) -> ObjectDetail:
+        support_plane: OriginPlane | None = None,
+    ) -> SketchCreationResult:
         """Create a Sketcher::SketchObject in a PartDesign::Body and return its detail."""
 
 

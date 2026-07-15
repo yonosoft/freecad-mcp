@@ -8,6 +8,7 @@ from typing import TypeVar, cast
 import pytest
 
 from freecad_mcp.commands.document import (
+    AttachmentInfo,
     BodyNotFoundError,
     BodyTypeMismatchError,
     DocumentAdapter,
@@ -15,10 +16,12 @@ from freecad_mcp.commands.document import (
     FreeCADDocumentError,
     ObjectAlreadyExistsError,
     ObjectDetail,
+    OriginPlane,
     PlacementData,
     PlacementPosition,
     PlacementRotation,
     SketchCreationError,
+    SketchCreationResult,
 )
 from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.core.dispatch import DispatchError
@@ -52,15 +55,31 @@ class SketchAdapterStub:
     ) -> None:
         self.detail = detail if detail is not None else _make_default_detail()
         self.error = error
-        self.create_calls: list[tuple[str, str, str, str | None]] = []
+        self.create_calls: list[tuple[str, str, str, str | None, OriginPlane | None]] = []
 
     def create_sketch(
-        self, document_name: str, body_name: str, name: str, label: str | None
-    ) -> ObjectDetail:
-        self.create_calls.append((document_name, body_name, name, label))
+        self,
+        document_name: str,
+        body_name: str,
+        name: str,
+        label: str | None,
+        support_plane: OriginPlane | None = None,
+    ) -> SketchCreationResult:
+        self.create_calls.append((document_name, body_name, name, label, support_plane))
         if self.error is not None:
             raise self.error
-        return self.detail
+        return SketchCreationResult(
+            object=self.detail,
+            attachment=(
+                AttachmentInfo(
+                    kind="body_origin_plane",
+                    plane=support_plane,
+                    map_mode="flat_face",
+                )
+                if support_plane is not None
+                else None
+            ),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +281,61 @@ def test_non_string_label_is_rejected() -> None:
 
 
 # ============================================================================
+# Validation - support_plane
+# ============================================================================
+
+
+@pytest.mark.parametrize("value", ["xy_plane", "xz_plane", "yz_plane"])
+def test_valid_support_plane_accepted(value: str) -> None:
+    handler, _, _ = make_handler()
+    result = handler.execute("TestDoc", "Body", "Sketch", None, support_plane=value)
+    assert result.ok is True
+
+
+@pytest.mark.parametrize("value", ["XY_Plane", "xy", "flat_face", "", "   ", "invalid"])
+def test_invalid_support_plane_rejected(value: str) -> None:
+    handler, _, _ = make_handler()
+    result = handler.execute("TestDoc", "Body", "Sketch", None, support_plane=value)
+    assert result.ok is False
+    assert result.data["field"] == "support_plane"
+
+
+def test_nonn_string_support_plane_rejected() -> None:
+    handler, _, _ = make_handler()
+    result = handler.execute("TestDoc", "Body", "Sketch", None, support_plane=42)
+    assert result.ok is False
+    assert result.data["field"] == "support_plane"
+
+
+def test_explicit_null_support_plane_accepted() -> None:
+    handler, _, _ = make_handler()
+    result = handler.execute("TestDoc", "Body", "Sketch", None, support_plane=None)
+    assert result.ok is True
+    assert result.data["attachment"] is None
+
+
+def test_attached_sketch_result_contains_attachment() -> None:
+    adapter = SketchAdapterStub()
+    handler, _, _ = make_handler(adapter=cast(DocumentAdapter, adapter))
+    result = handler.execute("Doc", "Body", "Sketch", "Label", support_plane="xy_plane")
+    assert result.ok is True
+    attachment = result.data["attachment"]
+    assert attachment is not None
+    assert attachment["kind"] == "body_origin_plane"  # type: ignore[index]
+    assert attachment["plane"] == "xy_plane"  # type: ignore[index]
+    assert attachment["map_mode"] == "flat_face"  # type: ignore[index]
+
+
+def test_origin_plane_not_found_returns_expected_code() -> None:
+    from freecad_mcp.commands.document import OriginPlaneNotFoundError
+
+    adapter = SketchAdapterStub(error=OriginPlaneNotFoundError("plane missing"))
+    handler, _, _ = make_handler(adapter=cast(DocumentAdapter, adapter))
+    result = handler.execute("Doc", "Body", "Sketch", None, support_plane="xy_plane")
+    assert result.code == "origin_plane_not_found"
+
+
+# ============================================================================
 # Success
 # ============================================================================
 
@@ -273,21 +347,30 @@ def test_dispatcher_called_exactly_once() -> None:
     adapter = cast(SketchAdapterStub, raw_adapter)
     handler.execute("TestDoc", "Body", "Sketch", "Base Sketch")
     assert disp.calls == 1
-    assert adapter.create_calls == [("TestDoc", "Body", "Sketch", "Base Sketch")]
+    assert adapter.create_calls == [("TestDoc", "Body", "Sketch", "Base Sketch", None)]
 
 
 def test_success_result_has_required_keys() -> None:
     """The structured result contains ``ok``, ``code``, ``document_name``,
-    ``body_name``, ``object``, and ``message``."""
+    ``body_name``, ``object``, ``message``, and ``attachment``."""
     handler, _, _ = make_handler()
     result = handler.execute("TestDoc", "Body", "Sketch", "Base Sketch")
     result_dict = result.to_dict()
-    expected_keys = {"ok", "code", "document_name", "body_name", "object", "message"}
+    expected_keys = {
+        "ok",
+        "code",
+        "document_name",
+        "body_name",
+        "object",
+        "message",
+        "attachment",
+    }
     assert set(result_dict.keys()) == expected_keys
     assert result_dict["ok"] is True
     assert result_dict["code"] == "sketch_created"
     assert result_dict["document_name"] == "TestDoc"
     assert result_dict["body_name"] == "Body"
+    assert result_dict["attachment"] is None
     obj = result_dict["object"]
     assert obj["name"] == "Sketch"  # type: ignore[index]
     assert obj["label"] == "Base Sketch"  # type: ignore[index]
@@ -316,7 +399,7 @@ def test_custom_label_preserved() -> None:
     handler, _, _ = make_handler(adapter=cast(DocumentAdapter, adapter))
     result = handler.execute("Doc", "Body", "CustomSketch", "Custom Label")
     assert result.data["object"]["label"] == "Custom Label"  # type: ignore[index]
-    assert adapter.create_calls == [("Doc", "Body", "CustomSketch", "Custom Label")]
+    assert adapter.create_calls == [("Doc", "Body", "CustomSketch", "Custom Label", None)]
 
 
 def test_omitted_label_behaviour() -> None:
@@ -327,7 +410,7 @@ def test_omitted_label_behaviour() -> None:
     handler, _, _ = make_handler(adapter=cast(DocumentAdapter, adapter))
     result = handler.execute("Doc", "Body", "Sketch", None)
     # adapter call recorded with None
-    assert adapter.create_calls == [("Doc", "Body", "Sketch", None)]
+    assert adapter.create_calls == [("Doc", "Body", "Sketch", None, None)]
     # the stub always returns the default detail whose label is "Base Sketch"
     assert result.data["object"]["label"] == "Base Sketch"  # type: ignore[index]
 

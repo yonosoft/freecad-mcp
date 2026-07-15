@@ -18,6 +18,8 @@ from freecad_mcp.commands.document import (
     FreeCADDocumentError,
     ObjectAlreadyExistsError,
     ObjectNotFoundError,
+    OriginPlane,
+    OriginPlaneNotFoundError,
     SketchCreationError,
 )
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter, _extract_placement
@@ -190,6 +192,13 @@ class DocumentObjectStub:
         new_object_none_result: bool = False,
         new_object_rename: str | None = None,
         new_object_type_error: str | None = None,
+        origin: Any = None,
+        origin_features: list[DocumentObjectStub] | None = None,
+        map_mode: str = "Deactivated",
+        support_property: tuple[Any, list[str]] | None = None,
+        attachment_support: tuple[Any, list[str]] | None = None,
+        attachment_support_error: Exception | None = None,
+        map_mode_error: Exception | None = None,
     ) -> None:
         self.Name = name
         self._label = label or name
@@ -201,10 +210,18 @@ class DocumentObjectStub:
         self._parent_geo = parent_geo
         self._parent_group = parent_group
         self._visibility = visibility
+        self.Role: Any = None
         self._new_object_none_result = new_object_none_result
         self._new_object_rename = new_object_rename
         self._new_object_type_error = new_object_type_error
         self.newObject_calls: list[tuple[str, str]] = []
+        self._origin = origin
+        self._origin_features = origin_features
+        self.MapMode = map_mode
+        self._support = support_property
+        self._attachment_support = attachment_support
+        self._attachment_support_error = attachment_support_error
+        self._map_mode_error = map_mode_error
 
         # Minimal Document reference used by _summarize_document
         class _FakeDocument:
@@ -253,6 +270,42 @@ class DocumentObjectStub:
         if self._new_object_type_error is not None:
             obj.TypeId = self._new_object_type_error
         return obj
+
+    @property
+    def Origin(self) -> Any:
+        return self._origin
+
+    @Origin.setter
+    def Origin(self, value: Any) -> None:
+        self._origin = value
+
+    @property
+    def OriginFeatures(self) -> list[DocumentObjectStub]:
+        return self._origin_features if self._origin_features is not None else []
+
+    @OriginFeatures.setter
+    def OriginFeatures(self, value: list[DocumentObjectStub]) -> None:
+        self._origin_features = value
+
+    @property
+    def Support(self) -> tuple[Any, list[str]] | None:
+        return self._support
+
+    @Support.setter
+    def Support(self, value: tuple[Any, list[str]]) -> None:
+        if self._attachment_support_error:
+            raise self._attachment_support_error
+        self._support = value
+
+    @property
+    def AttachmentSupport(self) -> tuple[Any, list[str]] | None:
+        return self._attachment_support
+
+    @AttachmentSupport.setter
+    def AttachmentSupport(self, value: tuple[Any, list[str]]) -> None:
+        if self._attachment_support_error:
+            raise self._attachment_support_error
+        self._attachment_support = value
 
     def getParentGeoFeatureGroup(self) -> DocumentObjectStub | None:
         return self._parent_geo
@@ -425,6 +478,36 @@ def test_adapter_converts_missing_gui_document(monkeypatch: pytest.MonkeyPatch) 
         FreeCADDocumentAdapter().get_document("BracketDesign")
 
 
+def _make_origin_feature(
+    name: str,
+    role: str,
+) -> DocumentObjectStub:
+    obj = DocumentObjectStub(name=name, type_id="App::Plane")
+    obj.Role = role
+    return obj
+
+
+def _make_body_with_origin(
+    body_name: str = "Body",
+    origin_name: str = "Origin",
+    xy_name: str = "XY_Plane",
+    xz_name: str = "XZ_Plane",
+    yz_name: str = "YZ_Plane",
+) -> DocumentObjectStub:
+    xy = _make_origin_feature(xy_name, "XY_Plane")
+    xz = _make_origin_feature(xz_name, "XZ_Plane")
+    yz = _make_origin_feature(yz_name, "YZ_Plane")
+    origin_features = [xy, xz, yz]
+    origin = DocumentObjectStub(name=origin_name)
+    origin.OriginFeatures = origin_features
+    return _make_object_stub(
+        body_name,
+        type_id="PartDesign::Body",
+        origin=origin,
+        origin_features=origin_features,
+    )
+
+
 # --- list_objects adapter extraction tests ---
 
 
@@ -443,6 +526,13 @@ def _make_object_stub(
     new_object_none_result: bool = False,
     new_object_rename: str | None = None,
     new_object_type_error: str | None = None,
+    origin: Any = None,
+    origin_features: list[DocumentObjectStub] | None = None,
+    map_mode: str = "Deactivated",
+    support_property: tuple[Any, list[str]] | None = None,
+    attachment_support: tuple[Any, list[str]] | None = None,
+    attachment_support_error: Exception | None = None,
+    map_mode_error: Exception | None = None,
 ) -> DocumentObjectStub:
     return DocumentObjectStub(
         name=name,
@@ -458,6 +548,13 @@ def _make_object_stub(
         new_object_none_result=new_object_none_result,
         new_object_rename=new_object_rename,
         new_object_type_error=new_object_type_error,
+        origin=origin,
+        origin_features=origin_features,
+        map_mode=map_mode,
+        support_property=support_property,
+        attachment_support=attachment_support,
+        attachment_support_error=attachment_support_error,
+        map_mode_error=map_mode_error,
     )
 
 
@@ -1378,9 +1475,9 @@ def test_create_sketch_preserves_exact_requested_internal_name(
         monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
     )
 
-    detail = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
+    result = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
 
-    assert detail.name == "BaseSketch"
+    assert result.object.name == "BaseSketch"
 
 
 def test_create_sketch_sets_optional_label(
@@ -1392,9 +1489,9 @@ def test_create_sketch_sets_optional_label(
         monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
     )
 
-    detail = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", "Base Sketch")
+    result = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", "Base Sketch")
 
-    assert detail.label == "Base Sketch"
+    assert result.object.label == "Base Sketch"
 
 
 def test_create_sketch_omitted_label_uses_default(
@@ -1406,10 +1503,10 @@ def test_create_sketch_omitted_label_uses_default(
         monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
     )
 
-    detail = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
+    result = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
 
     # default label when stub creates an unnamed object is the internal name
-    assert detail.label == "BaseSketch"
+    assert result.object.label == "BaseSketch"
 
 
 def test_create_sketch_transaction_opens_once(
@@ -1479,9 +1576,9 @@ def test_create_sketch_result_type_is_sketcher_sketch_object(
         monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
     )
 
-    detail = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
+    result = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
 
-    assert detail.type_id == "Sketcher::SketchObject"
+    assert result.object.type_id == "Sketcher::SketchObject"
 
 
 def test_create_sketch_result_parent_is_requested_body(
@@ -1493,10 +1590,10 @@ def test_create_sketch_result_parent_is_requested_body(
         monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
     )
 
-    detail = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
+    result = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
 
-    assert detail.parent == "Body"
-    assert detail.children == ()
+    assert result.object.parent == "Body"
+    assert result.object.children == ()
 
 
 def test_create_sketch_document_not_found(
@@ -1560,9 +1657,9 @@ def test_create_sketch_duplicate_label_allowed(
         monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
     )
 
-    detail = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "SketchB", "Shared Label")
-    assert detail.name == "SketchB"
-    assert detail.label == "Shared Label"
+    result = FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "SketchB", "Shared Label")
+    assert result.object.name == "SketchB"
+    assert result.object.label == "Shared Label"
 
 
 def test_create_sketch_body_new_object_returns_none(
@@ -1752,6 +1849,553 @@ def test_create_sketch_failure_does_not_leave_orphan_sketch(
 
     # After abort, the body's Group should not contain the orphan sketch
     resolved = doc_stub.getObject("Body")
+    assert resolved is not None
+    group_names = [obj.Name for obj in (resolved.Group or [])]
+    assert "BaseSketch" not in group_names
+
+
+def test_verify_attachment_accepts_nested_tuple_format(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+    import types
+
+    xy_plane = body.OriginFeatures[0]
+
+    def _custom_newObject(self: Any, type_id: str, name: str) -> DocumentObjectStub:
+        self.newObject_calls.append((type_id, name))
+        obj = DocumentObjectStub(
+            name=name,
+            type_id=type_id,
+            parent_geo=self,
+            map_mode="FlatFace",
+            attachment_support=[(xy_plane, "")],  # type: ignore[arg-type]
+        )
+        if self.Group is None:
+            self.Group = [obj]
+        else:
+            self.Group.append(obj)
+        doc = getattr(self, "Document", None)
+        if doc is not None:
+            if hasattr(doc, "Objects"):
+                doc.Objects.append(obj)
+            if hasattr(doc, "_pending_transaction_objects"):
+                doc._pending_transaction_objects.append(obj)
+        return obj
+
+    body.newObject = types.MethodType(_custom_newObject, body)  # type: ignore[method-assign]
+    result = FreeCADDocumentAdapter().create_sketch(
+        "TestDoc",
+        "MainBody",
+        "BaseSketch",
+        None,
+        support_plane=OriginPlane.XY,
+    )
+    assert result.attachment is not None
+    assert result.attachment.plane == OriginPlane.XY
+
+
+def test_verify_attachment_accepts_direct_feature_format(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+    import types
+
+    xy_plane = body.OriginFeatures[0]
+
+    def _custom_newObject(self: Any, type_id: str, name: str) -> DocumentObjectStub:
+        self.newObject_calls.append((type_id, name))
+        obj = DocumentObjectStub(
+            name=name,
+            type_id=type_id,
+            parent_geo=self,
+            map_mode="FlatFace",
+            attachment_support=[xy_plane],  # type: ignore[arg-type]
+        )
+        if self.Group is None:
+            self.Group = [obj]
+        else:
+            self.Group.append(obj)
+        doc = getattr(self, "Document", None)
+        if doc is not None:
+            if hasattr(doc, "Objects"):
+                doc.Objects.append(obj)
+            if hasattr(doc, "_pending_transaction_objects"):
+                doc._pending_transaction_objects.append(obj)
+        return obj
+
+    body.newObject = types.MethodType(_custom_newObject, body)  # type: ignore[method-assign]
+    result = FreeCADDocumentAdapter().create_sketch(
+        "TestDoc",
+        "MainBody",
+        "BaseSketch",
+        None,
+        support_plane=OriginPlane.XY,
+    )
+    assert result.attachment is not None
+
+
+def test_verify_attachment_empty_support_collection_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+    import types
+
+    def _custom_newObject(self: Any, type_id: str, name: str) -> DocumentObjectStub:
+        self.newObject_calls.append((type_id, name))
+        obj = DocumentObjectStub(
+            name=name,
+            type_id=type_id,
+            parent_geo=self,
+            map_mode="FlatFace",
+            attachment_support_error=RuntimeError("cannot set support"),
+        )
+        if self.Group is None:
+            self.Group = [obj]
+        else:
+            self.Group.append(obj)
+        doc = getattr(self, "Document", None)
+        if doc is not None:
+            if hasattr(doc, "Objects"):
+                doc.Objects.append(obj)
+            if hasattr(doc, "_pending_transaction_objects"):
+                doc._pending_transaction_objects.append(obj)
+        return obj
+
+    body.newObject = types.MethodType(_custom_newObject, body)  # type: ignore[method-assign]
+    with pytest.raises(SketchCreationError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "MainBody",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+
+
+def test_verify_attachment_empty_tuple_entry_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+    import types
+
+    def _custom_newObject(self: Any, type_id: str, name: str) -> DocumentObjectStub:
+        self.newObject_calls.append((type_id, name))
+        obj = DocumentObjectStub(
+            name=name,
+            type_id=type_id,
+            parent_geo=self,
+            map_mode="FlatFace",
+            attachment_support_error=RuntimeError("cannot set support"),
+        )
+        if self.Group is None:
+            self.Group = [obj]
+        else:
+            self.Group.append(obj)
+        doc = getattr(self, "Document", None)
+        if doc is not None:
+            if hasattr(doc, "Objects"):
+                doc.Objects.append(obj)
+            if hasattr(doc, "_pending_transaction_objects"):
+                doc._pending_transaction_objects.append(obj)
+        return obj
+
+    body.newObject = types.MethodType(_custom_newObject, body)  # type: ignore[method-assign]
+    with pytest.raises(SketchCreationError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "MainBody",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+def test_verify_attachment_none_entry_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+    import types
+
+    def _custom_newObject(self: Any, type_id: str, name: str) -> DocumentObjectStub:
+        self.newObject_calls.append((type_id, name))
+        obj = DocumentObjectStub(
+            name=name,
+            type_id=type_id,
+            parent_geo=self,
+            map_mode="FlatFace",
+            attachment_support_error=RuntimeError("cannot set support"),
+        )
+        if self.Group is None:
+            self.Group = [obj]
+        else:
+            self.Group.append(obj)
+        doc = getattr(self, "Document", None)
+        if doc is not None:
+            if hasattr(doc, "Objects"):
+                doc.Objects.append(obj)
+            if hasattr(doc, "_pending_transaction_objects"):
+                doc._pending_transaction_objects.append(obj)
+        return obj
+
+    body.newObject = types.MethodType(_custom_newObject, body)  # type: ignore[method-assign]
+    with pytest.raises(SketchCreationError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "MainBody",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+def test_verify_attachment_target_without_role_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+    import types
+
+    def _custom_newObject(self: Any, type_id: str, name: str) -> DocumentObjectStub:
+        self.newObject_calls.append((type_id, name))
+        obj = DocumentObjectStub(
+            name=name,
+            type_id=type_id,
+            parent_geo=self,
+            map_mode="FlatFace",
+            attachment_support_error=RuntimeError("cannot set support"),
+        )
+        if self.Group is None:
+            self.Group = [obj]
+        else:
+            self.Group.append(obj)
+        doc = getattr(self, "Document", None)
+        if doc is not None:
+            if hasattr(doc, "Objects"):
+                doc.Objects.append(obj)
+            if hasattr(doc, "_pending_transaction_objects"):
+                doc._pending_transaction_objects.append(obj)
+        return obj
+
+    body.newObject = types.MethodType(_custom_newObject, body)  # type: ignore[method-assign]
+    with pytest.raises(SketchCreationError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "MainBody",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+def test_verify_attachment_target_without_name_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+    import types
+
+    def _custom_newObject(self: Any, type_id: str, name: str) -> DocumentObjectStub:
+        self.newObject_calls.append((type_id, name))
+        obj = DocumentObjectStub(
+            name=name,
+            type_id=type_id,
+            parent_geo=self,
+            map_mode="FlatFace",
+            attachment_support_error=RuntimeError("cannot set support"),
+        )
+        if self.Group is None:
+            self.Group = [obj]
+        else:
+            self.Group.append(obj)
+        doc = getattr(self, "Document", None)
+        if doc is not None:
+            if hasattr(doc, "Objects"):
+                doc.Objects.append(obj)
+            if hasattr(doc, "_pending_transaction_objects"):
+                doc._pending_transaction_objects.append(obj)
+        return obj
+
+    body.newObject = types.MethodType(_custom_newObject, body)  # type: ignore[method-assign]
+    with pytest.raises(SketchCreationError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "MainBody",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+    assert doc_stub.abort_transaction_calls >= 1
+
+
+# ---------------------------------------------------------------------------
+# Stage 2 adapter tests - sketch support plane
+# ---------------------------------------------------------------------------
+
+
+def test_create_sketch_with_xy_plane_attaches_correctly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    result = FreeCADDocumentAdapter().create_sketch(
+        "TestDoc",
+        "MainBody",
+        "BaseSketch",
+        None,
+        support_plane=OriginPlane.XY,
+    )
+    assert result.attachment is not None
+    assert result.attachment.kind == "body_origin_plane"
+    assert result.attachment.plane == OriginPlane.XY
+    assert result.attachment.map_mode == "flat_face"
+
+
+def test_create_sketch_with_xz_plane_attaches_correctly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    result = FreeCADDocumentAdapter().create_sketch(
+        "TestDoc",
+        "MainBody",
+        "BaseSketch",
+        None,
+        support_plane=OriginPlane.XZ,
+    )
+    assert result.attachment is not None
+    assert result.attachment.plane == OriginPlane.XZ
+
+
+def test_create_sketch_with_yz_plane_attaches_correctly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    result = FreeCADDocumentAdapter().create_sketch(
+        "TestDoc",
+        "MainBody",
+        "BaseSketch",
+        None,
+        support_plane=OriginPlane.YZ,
+    )
+    assert result.attachment is not None
+    assert result.attachment.plane == OriginPlane.YZ
+
+
+def test_create_sketch_omitted_support_plane_leaves_unattached(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    result = FreeCADDocumentAdapter().create_sketch(
+        "TestDoc",
+        "MainBody",
+        "BaseSketch",
+        "Base Sketch",
+    )
+    assert result.attachment is None
+
+
+def test_create_sketch_explicit_none_support_plane_is_unattached(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    result = FreeCADDocumentAdapter().create_sketch(
+        "TestDoc",
+        "MainBody",
+        "BaseSketch",
+        "Base Sketch",
+        support_plane=None,
+    )
+    assert result.attachment is None
+
+
+def test_create_sketch_unattached_result_has_null_attachment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_object_stub("Body", type_id="PartDesign::Body")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    result = FreeCADDocumentAdapter().create_sketch(
+        "TestDoc",
+        "Body",
+        "BaseSketch",
+        None,
+    )
+    assert result.attachment is None
+
+
+def test_create_sketch_origin_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_object_stub("Body", type_id="PartDesign::Body")
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    with pytest.raises(OriginPlaneNotFoundError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "Body",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+
+
+def test_create_sketch_body_without_origin_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_object_stub("Body", type_id="PartDesign::Body")
+    body.Origin = None
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    with pytest.raises(OriginPlaneNotFoundError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "Body",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+
+
+def test_create_sketch_origin_without_features_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_object_stub("Body", type_id="PartDesign::Body")
+    origin = DocumentObjectStub(name="Origin")
+    origin.OriginFeatures = []
+    body.Origin = origin
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body, origin])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    with pytest.raises(OriginPlaneNotFoundError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "Body",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+
+
+def test_create_sketch_requested_role_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(
+        body_name="MainBody",
+        xy_name="XY_Plane",
+        xz_name="XZ_Plane",
+        yz_name="YZ_Plane",
+    )
+    # remove the XY plane feature so the role XY_Plane is missing
+    for feature in body.OriginFeatures:
+        if feature.Role == "XY_Plane":
+            feature.Role = "Other"
+    doc_stub, gui_stub = make_document("TestDoc", modified=False, objects=[body])
+    _ = install_freecad_stubs(
+        monkeypatch, {"TestDoc": doc_stub}, {"TestDoc": gui_stub}, active_name="TestDoc"
+    )
+
+    with pytest.raises(OriginPlaneNotFoundError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "MainBody",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+
+
+def test_create_sketch_rollback_removes_support(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = _make_body_with_origin(body_name="MainBody")
+    doc_stub, _ = make_document("TestDoc", modified=False, objects=[body])
+    doc_stub._commit_error = SketchCreationError("commit rejected")
+    _ = install_freecad_stubs(
+        monkeypatch,
+        {"TestDoc": doc_stub},
+        {"TestDoc": GuiDocumentStub(False)},
+        active_name="TestDoc",
+    )
+
+    with pytest.raises(SketchCreationError):
+        FreeCADDocumentAdapter().create_sketch(
+            "TestDoc",
+            "MainBody",
+            "BaseSketch",
+            None,
+            support_plane=OriginPlane.XY,
+        )
+
+    # After abort, no sketch should remain in the document
+    obj_names = [obj.Name for obj in doc_stub.Objects]  # type: ignore[attr-defined]
+    assert "BaseSketch" not in obj_names
+
+    # After abort, body's Group should not contain the sketch
+    resolved = doc_stub.getObject("MainBody")
     assert resolved is not None
     group_names = [obj.Name for obj in (resolved.Group or [])]
     assert "BaseSketch" not in group_names

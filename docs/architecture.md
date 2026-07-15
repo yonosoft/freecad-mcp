@@ -474,26 +474,51 @@ and verifies that the computed ``parent`` field equals the requested body's
 internal name. If it does not, the transaction is aborted and
 ``SketchCreationError`` is raised.
 
-#### Unattached Sketch
+#### Attachment
 
-Stage 1 creates an empty, unattached sketch. The implementation does not set
-``Support``, ``MapMode``, or ``AttachmentOffset``. No geometry, constraints, or
-edit mode operations are performed.
+`create_sketch` accepts an optional `support_plane` parameter. When `null` or
+omitted, the sketch is created unattached (Stage 1 behaviour). When one of
+`xy_plane`, `xz_plane`, or `yz_plane` is supplied, the adapter resolves the
+plane from the target body's `Origin.OriginFeatures` by semantic `Role`
+(`"XY_Plane"`, `"XZ_Plane"`, `"YZ_Plane"`) rather than by document-level name,
+supporting multiple bodies with suffixed origin feature names such as
+`XY_Plane001`.
+
+The resolved origin feature is assigned through the sketch's
+`AttachmentSupport` property (with `Support` fallback) and `MapMode` is set to
+`FlatFace`. `AttachmentOffset` is never modified and remains at its default.
+
+#### Attachment Verification
+
+After recomputation the adapter verifies the sketch still belongs to the
+requested body, the support references the selected origin feature with the
+correct `Role`, `MapMode` is `FlatFace`, and `AttachmentOffset` has not changed.
+Any mismatch aborts the transaction and returns `sketch_creation_failed`.
+
+#### Attachment Result
+
+The public result includes an `attachment` field: `null` for unattached sketches,
+or `{"kind": "body_origin_plane", "plane": "<plane>", "map_mode": "flat_face"}`
+for attached sketches. Raw FreeCAD support tuples and origin feature objects are
+never exposed.
 
 #### Error Codes
 
 - ``validation_error``: invalid or missing document name, body name, sketch
-  name, or label;
+  name, label, or support_plane;
 - ``document_not_found``: the document does not exist;
 - ``body_not_found``: no object with the requested body internal name exists;
 - ``body_type_mismatch``: an object with the body name exists but is not a
   PartDesign::Body;
+- ``origin_plane_not_found``: the requested origin plane could not be resolved
+  from the target body's Origin (missing Origin, unusable OriginFeatures,
+  or requested role absent);
 - ``object_already_exists``: an object with the requested sketch internal
   name already exists (detected before transaction start);
-- ``sketch_creation_failed``: FreeCAD could not create the sketch, including
-  newObject returning null, unexpected renaming, wrong returned type,
-  missing body ownership, label assignment failure, recompute failure, or
-  commit failure;
+- ``sketch_creation_failed``: FreeCAD could not create or attach the sketch,
+  including newObject returning null, unexpected renaming, wrong type,
+  missing body ownership, support/map-mode assignment failure, recompute
+  failure, attachment verification failure, or commit failure;
 - ``freecad_error``: main-thread dispatch failure or FreeCAD document
   inspection failure;
 - ``internal_error``: unexpected exceptions.

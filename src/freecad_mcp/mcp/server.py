@@ -129,12 +129,14 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     @server.tool(
         name=CREATE_SKETCH_TOOL,
         description=(
-            "Create one empty, unattached sketch inside an existing Part Design Body. "
-            "Use exact internal document, body and sketch names, not labels. "
-            "The tool recomputes the document but does not save it, attach the sketch "
-            "to a plane, add geometry, add constraints or open sketch edit mode. "
-            "Use list_documents, list_objects and get_object first when internal "
-            "names are unknown."
+            "Create one empty sketch inside an existing Part Design Body. "
+            "Optionally attach it to that body's XY, XZ or YZ origin plane "
+            "using the support_plane selector. Use exact internal document, "
+            "body and sketch names, not labels. The tool recomputes the "
+            "document but does not save it, add geometry or constraints, "
+            "use arbitrary faces, apply attachment offsets or open sketch "
+            "edit mode. Use list_documents, list_objects and get_object "
+            "first when internal names are unknown."
         ),
         structured_output=True,
     )
@@ -143,12 +145,14 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
         body_name: str,
         name: str,
         label: str | None = None,
+        support_plane: str | None = None,
     ) -> dict[str, object]:
         return handlers.create_sketch.execute(
             document_name=document_name,
             body_name=body_name,
             name=name,
             label=label,
+            support_plane=support_plane,
         ).to_dict()
 
     return server
