@@ -5,20 +5,21 @@ from typing import TypeVar, cast
 
 import pytest
 
-from freecad_mcp.commands.document import (
-    Dispatcher,
-    DocumentAdapter,
+from freecad_mcp.commands.object_query import GetObjectHandler
+from freecad_mcp.exceptions import (
+    DispatchError,
     DocumentNotFoundError,
     FreeCADDocumentError,
-    ObjectDetail,
     ObjectNotFoundError,
+)
+from freecad_mcp.models import (
+    ObjectDetail,
     PlacementData,
     PlacementPosition,
     PlacementRotation,
-    validate_object_reference,
 )
-from freecad_mcp.commands.object_query import GetObjectHandler
-from freecad_mcp.core.dispatch import DispatchError
+from freecad_mcp.protocols import Dispatcher, DocumentAdapter
+from freecad_mcp.validation import validate_object_reference
 
 T = TypeVar("T")
 

@@ -8,18 +8,20 @@ from typing import TypeVar, cast
 import pytest
 
 from freecad_mcp.commands.body import CreateBodyHandler
-from freecad_mcp.commands.document import (
+from freecad_mcp.exceptions import (
     BodyCreationError,
-    DocumentAdapter,
+    DispatchError,
     DocumentNotFoundError,
     FreeCADDocumentError,
     ObjectAlreadyExistsError,
+)
+from freecad_mcp.models import (
     ObjectDetail,
     PlacementData,
     PlacementPosition,
     PlacementRotation,
 )
-from freecad_mcp.core.dispatch import DispatchError
+from freecad_mcp.protocols import DocumentAdapter
 
 T = TypeVar("T")
 

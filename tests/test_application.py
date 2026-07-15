@@ -16,7 +16,8 @@ from freecad_mcp.commands import (
     RecomputeDocumentHandler,
     SaveDocumentHandler,
 )
-from freecad_mcp.commands.document import (
+from freecad_mcp.commands.sketch import CreateSketchHandler
+from freecad_mcp.models import (
     AttachmentInfo,
     DocumentCollection,
     DocumentSummary,
@@ -27,7 +28,6 @@ from freecad_mcp.commands.document import (
     PlacementRotation,
     SketchCreationResult,
 )
-from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService
 

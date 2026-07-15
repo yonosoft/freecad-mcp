@@ -170,6 +170,40 @@ inspect Report View
 start or stop the MCP server
 ```
 
+### Test Suite Organization
+
+Add tests beside the responsibility they exercise:
+
+- command-handler behavior belongs in the existing operation-focused modules,
+  such as `test_create_document.py`, `test_save_document.py`,
+  `test_get_object.py`, `test_create_body.py`, and `test_create_sketch.py`;
+- FreeCAD document lifecycle and persistence belong in
+  `test_freecad_document_operations.py`;
+- object hierarchy, visibility, lookup, and placement extraction belong in
+  `test_freecad_object_inspection.py`;
+- transactional body and sketch creation belong in
+  `test_freecad_body_creation.py` and `test_freecad_sketch_creation.py`;
+- origin-plane resolution, support parsing and fallback, MapMode, attachment
+  results, and attachment rollback belong in `test_freecad_sketch_attachment.py`;
+- MCP schemas, descriptions, and delegation belong in
+  `test_mcp_document_tools.py`, `test_mcp_object_tools.py`, or
+  `test_mcp_creation_tools.py`; server composition, inventory agreement,
+  lifecycle reporting, and HTTP transport belong in `test_mcp_server.py`;
+- compatibility identity belongs in `test_module_compatibility.py`, and stable
+  dependency-direction safeguards belong in `test_architecture.py`.
+
+The non-collectable `freecad_adapter_stubs.py` and `mcp_server_stubs.py` modules
+contain only test fakes shared across several responsibility files. Keep small
+dispatchers, builders, and mutable state local when only one test module needs
+them; do not grow a global `conftest.py` for convenience.
+
+Both `scripts/ci.py` and `scripts/test.ps1` run the ordinary pure-Python suite.
+That suite uses stubs and clean subprocess imports and never requires a running
+FreeCAD process. Changes limited to tests and documentation therefore do not
+require live acceptance. Changes to FreeCAD adapters, runtime composition, Qt
+dispatch, bootstrap modules, GUI code, resources, or package metadata still
+require the relevant live checks below.
+
 ## Report View Verification
 
 In FreeCAD, enable **View -> Panels -> Report View**. Also enable redirection of

@@ -7,13 +7,10 @@ from typing import TypeVar, cast
 
 import pytest
 
-from freecad_mcp.commands.document import (
-    DocumentAdapter,
-    DocumentNotFoundError,
-    DocumentSaveError,
-    DocumentSummary,
-)
 from freecad_mcp.commands.document_save import SaveDocumentHandler
+from freecad_mcp.exceptions import DocumentNotFoundError, DocumentSaveError
+from freecad_mcp.models import DocumentSummary
+from freecad_mcp.protocols import DocumentAdapter
 
 T = TypeVar("T")
 

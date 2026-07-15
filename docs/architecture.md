@@ -514,7 +514,7 @@ internal name. If it does not, the transaction is aborted and
 #### Attachment
 
 `create_sketch` accepts an optional `support_plane` parameter. When `null` or
-omitted, the sketch is created unattached (Stage 1 behaviour). When one of
+omitted, the sketch is created unattached. When one of
 `xy_plane`, `xz_plane`, or `yz_plane` is supplied, the adapter resolves the
 plane from the target body's `Origin.OriginFeatures` by semantic `Role`
 (`"XY_Plane"`, `"XZ_Plane"`, `"YZ_Plane"`) rather than by document-level name,
@@ -522,15 +522,19 @@ supporting multiple bodies with suffixed origin feature names such as
 `XY_Plane001`.
 
 The resolved origin feature is assigned through the sketch's
-`AttachmentSupport` property (with `Support` fallback) and `MapMode` is set to
-`FlatFace`. `AttachmentOffset` is never modified and remains at its default.
+`AttachmentSupport` property and `MapMode` is set to `FlatFace`.
+`AttachmentOffset` is not modified and therefore remains at FreeCAD's default
+under the supported creation path.
 
 #### Attachment Verification
 
 After recomputation the adapter verifies the sketch still belongs to the
 requested body, the support references the selected origin feature with the
-correct `Role`, `MapMode` is `FlatFace`, and `AttachmentOffset` has not changed.
-Any mismatch aborts the transaction and returns `sketch_creation_failed`.
+correct `Role`, and `MapMode` is `FlatFace`. Verification reads
+`AttachmentSupport` first and uses the existing `Support` property only when
+`AttachmentSupport` cannot be read. The adapter does not explicitly inspect or
+verify `AttachmentOffset`; that remains a live FreeCAD acceptance check. Any
+verified mismatch aborts the transaction and returns `sketch_creation_failed`.
 
 #### Attachment Result
 
@@ -559,6 +563,30 @@ never exposed.
 - ``freecad_error``: main-thread dispatch failure or FreeCAD document
   inspection failure;
 - ``internal_error``: unexpected exceptions.
+
+## Test Ownership
+
+The pure-Python suite mirrors the production responsibilities rather than
+collecting all adapter or transport behavior in single modules:
+
+- handler tests remain grouped by application operation under `tests/test_*.py`;
+- FreeCAD adapter tests are split into document operations, object inspection,
+  body creation, sketch creation, and sketch attachment modules;
+- MCP tests are split into document, object, and creation registrations, while
+  server composition, authoritative inventory, lifecycle agreement, and HTTP
+  transport remain together;
+- `tests/test_module_compatibility.py` exclusively owns legacy/canonical identity
+  promises;
+- `tests/test_architecture.py` owns stable import-direction, explicit-registration,
+  canonical-definition, and clean-process import safeguards.
+
+`freecad_adapter_stubs.py` and `mcp_server_stubs.py` are non-collectable,
+test-only support modules. They provide only stateful fakes genuinely shared by
+multiple responsibility files; each test constructs fresh mutable state.
+
+These tests run under standalone Python 3.11 and do not import a running FreeCAD
+process. FreeCAD API behavior, Qt integration, workbench startup, and GUI state
+remain live acceptance responsibilities documented in `docs/development.md`.
 
 ## Tool Levels
 

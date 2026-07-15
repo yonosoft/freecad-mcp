@@ -7,24 +7,27 @@ from typing import TypeVar, cast
 
 import pytest
 
-from freecad_mcp.commands.document import (
-    AttachmentInfo,
+from freecad_mcp.commands.sketch import CreateSketchHandler
+from freecad_mcp.exceptions import (
     BodyNotFoundError,
     BodyTypeMismatchError,
-    DocumentAdapter,
+    DispatchError,
     DocumentNotFoundError,
     FreeCADDocumentError,
     ObjectAlreadyExistsError,
+    OriginPlaneNotFoundError,
+    SketchCreationError,
+)
+from freecad_mcp.models import (
+    AttachmentInfo,
     ObjectDetail,
     OriginPlane,
     PlacementData,
     PlacementPosition,
     PlacementRotation,
-    SketchCreationError,
     SketchCreationResult,
 )
-from freecad_mcp.commands.sketch import CreateSketchHandler
-from freecad_mcp.core.dispatch import DispatchError
+from freecad_mcp.protocols import DocumentAdapter
 
 T = TypeVar("T")
 
@@ -327,8 +330,6 @@ def test_attached_sketch_result_contains_attachment() -> None:
 
 
 def test_origin_plane_not_found_returns_expected_code() -> None:
-    from freecad_mcp.commands.document import OriginPlaneNotFoundError
-
     adapter = SketchAdapterStub(error=OriginPlaneNotFoundError("plane missing"))
     handler, _, _ = make_handler(adapter=cast(DocumentAdapter, adapter))
     result = handler.execute("Doc", "Body", "Sketch", None, support_plane="xy_plane")

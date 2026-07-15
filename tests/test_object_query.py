@@ -5,15 +5,14 @@ from typing import TypeVar, cast
 
 import pytest
 
-from freecad_mcp.commands.document import (
-    Dispatcher,
-    DocumentAdapter,
+from freecad_mcp.commands.object_query import ListObjectsHandler
+from freecad_mcp.exceptions import (
+    DispatchError,
     DocumentNotFoundError,
     FreeCADDocumentError,
-    ObjectSummary,
 )
-from freecad_mcp.commands.object_query import ListObjectsHandler
-from freecad_mcp.core.dispatch import DispatchError
+from freecad_mcp.models import ObjectSummary
+from freecad_mcp.protocols import Dispatcher, DocumentAdapter
 
 T = TypeVar("T")
 
@@ -174,11 +173,7 @@ def test_list_objects_orders_multiple_objects_by_internal_name() -> None:
     result = make_handler(adapter=adapter)[0].execute("TestDoc")
 
     names = [obj["name"] for obj in cast(list[dict[str, object]], result.data["objects"])]
-    # Adapter returns objects already sorted; handler receives sorted order
-    # Test that the objects appear as returned by adapter (handler itself re-sorts)
-    # Actually, handler does NOT sort - the adapter is responsible for sorting
-    # The adapter stub returns them in the order given, so test that they
-    # appear in the same order as returned by the adapter
+    # The adapter owns deterministic ordering; the handler preserves its return order.
     assert names == ["Zulu", "Alpha", "Middle"]
     assert result.message == "3 objects found."
 

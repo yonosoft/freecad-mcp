@@ -7,7 +7,17 @@ from weakref import WeakMethod
 import pytest
 
 from freecad_mcp.application import Application
-from freecad_mcp.commands.sketch import CreateSketchHandler
+from freecad_mcp.commands import (
+    CreateBodyHandler,
+    CreateDocumentHandler,
+    CreateSketchHandler,
+    GetDocumentHandler,
+    GetObjectHandler,
+    ListDocumentsHandler,
+    ListObjectsHandler,
+    RecomputeDocumentHandler,
+    SaveDocumentHandler,
+)
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.runtime import Runtime, _build_runtime
 
@@ -22,19 +32,23 @@ class DispatcherStub:
 def test_build_runtime_wires_create_sketch_handler(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Call _build_runtime with patched FreeCAD boundary dependencies and
-    verify the resulting runtime includes a CreateSketchHandler."""
+    """Verify runtime owns one adapter and dispatcher shared by every handler."""
 
-    # Prevent creation of real FreeCAD adapter.
+    created_adapters: list[object] = []
+
     class AdapterStub:
-        pass
+        def __init__(self) -> None:
+            created_adapters.append(self)
 
     monkeypatch.setattr("freecad_mcp.runtime.FreeCADDocumentAdapter", AdapterStub)
 
     # Prevent real Qt dispatcher creation.
     dispatcher_stub = DispatcherStub()
+    dispatcher_factory_calls = 0
 
     def _fake_dispatcher() -> DispatcherStub:
+        nonlocal dispatcher_factory_calls
+        dispatcher_factory_calls += 1
         return dispatcher_stub
 
     monkeypatch.setattr("freecad_mcp.runtime.create_qt_main_thread_dispatcher", _fake_dispatcher)
@@ -52,8 +66,25 @@ def test_build_runtime_wires_create_sketch_handler(
     runtime = _build_runtime()
 
     handlers = runtime.application.documents
-    assert isinstance(handlers.create_sketch, CreateSketchHandler)
-    assert handlers.create_sketch is not None
+    expected_handler_types = {
+        "create": CreateDocumentHandler,
+        "list": ListDocumentsHandler,
+        "get": GetDocumentHandler,
+        "save": SaveDocumentHandler,
+        "object_query": ListObjectsHandler,
+        "get_object": GetObjectHandler,
+        "create_body": CreateBodyHandler,
+        "create_sketch": CreateSketchHandler,
+        "recompute": RecomputeDocumentHandler,
+    }
+
+    assert len(created_adapters) == 1
+    assert dispatcher_factory_calls == 1
+    for name, expected_type in expected_handler_types.items():
+        handler = getattr(handlers, name)
+        assert isinstance(handler, expected_type)
+        assert cast(Any, handler).adapter is created_adapters[0]
+        assert cast(Any, handler).dispatcher is dispatcher_stub
 
 
 def test_runtime_supports_weak_bound_method_used_by_qt_signals() -> None:

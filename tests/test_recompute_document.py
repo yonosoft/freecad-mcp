@@ -5,16 +5,15 @@ from typing import TypeVar, cast
 
 import pytest
 
-from freecad_mcp.commands.document import (
-    Dispatcher,
-    DocumentAdapter,
+from freecad_mcp.commands.document_query import RecomputeDocumentHandler
+from freecad_mcp.exceptions import (
+    DispatchError,
     DocumentNotFoundError,
     DocumentRecomputeError,
-    DocumentSummary,
     FreeCADDocumentError,
 )
-from freecad_mcp.commands.document_query import RecomputeDocumentHandler
-from freecad_mcp.core.dispatch import DispatchError
+from freecad_mcp.models import DocumentSummary
+from freecad_mcp.protocols import Dispatcher, DocumentAdapter
 
 T = TypeVar("T")
 

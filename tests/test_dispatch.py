@@ -5,11 +5,8 @@ from concurrent.futures import Future
 
 import pytest
 
-from freecad_mcp.core.dispatch import (
-    DispatchError,
-    DispatchTimeoutError,
-    MainThreadDispatcher,
-)
+from freecad_mcp.core.dispatch import MainThreadDispatcher
+from freecad_mcp.exceptions import DispatchError, DispatchTimeoutError
 
 
 class FakeExecutor:
