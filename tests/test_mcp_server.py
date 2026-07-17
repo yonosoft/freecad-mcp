@@ -54,6 +54,11 @@ def test_mcp_server_composes_explicit_registration_groups(
         "register_creation_tools",
         recorder("creation_tools"),
     )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_get_sketch_tool",
+        recorder("get_sketch_tool"),
+    )
 
     server = mcp_server_module.build_mcp_server(handlers, ServerConfig())
 
@@ -62,6 +67,7 @@ def test_mcp_server_composes_explicit_registration_groups(
         "object_tools",
         "recompute_document_tool",
         "creation_tools",
+        "get_sketch_tool",
     ]
     assert asyncio.run(server.list_tools()) == []
 
@@ -82,6 +88,7 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
     assert "create_body" in actual_tools
     assert "create_sketch" in actual_tools
     assert "recompute_document" in actual_tools
+    assert "get_sketch" in actual_tools
 
 
 def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:

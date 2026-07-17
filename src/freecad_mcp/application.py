@@ -94,6 +94,13 @@ class Application:
             support_plane=support_plane,
         )
 
+    def get_sketch(self, document_name: object, sketch_name: object) -> CommandResult:
+        """Inspect a Sketcher::SketchObject through the shared application handler."""
+        return self.documents.get_sketch.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

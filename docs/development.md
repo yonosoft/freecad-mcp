@@ -176,7 +176,8 @@ Add tests beside the responsibility they exercise:
 
 - command-handler behavior belongs in the existing operation-focused modules,
   such as `test_create_document.py`, `test_save_document.py`,
-  `test_get_object.py`, `test_create_body.py`, and `test_create_sketch.py`;
+  `test_get_object.py`, `test_get_sketch.py`, `test_create_body.py`, and
+  `test_create_sketch.py`;
 - FreeCAD document lifecycle and persistence belong in
   `test_freecad_document_operations.py`;
 - object hierarchy, visibility, lookup, and placement extraction belong in
@@ -185,6 +186,8 @@ Add tests beside the responsibility they exercise:
   `test_freecad_body_creation.py` and `test_freecad_sketch_creation.py`;
 - origin-plane resolution, support parsing and fallback, MapMode, attachment
   results, and attachment rollback belong in `test_freecad_sketch_attachment.py`;
+- read-only sketch geometry, constraints, cached solver facts, malformed data,
+  and non-mutation safeguards belong in `test_freecad_sketch_inspection.py`;
 - MCP schemas, descriptions, and delegation belong in
   `test_mcp_document_tools.py`, `test_mcp_object_tools.py`, or
   `test_mcp_creation_tools.py`; server composition, inventory agreement,
@@ -203,6 +206,18 @@ FreeCAD process. Changes limited to tests and documentation therefore do not
 require live acceptance. Changes to FreeCAD adapters, runtime composition, Qt
 dispatch, bootstrap modules, GUI code, resources, or package metadata still
 require the relevant live checks below.
+
+### get_sketch Automated Coverage
+
+The completed `get_sketch` milestone covers the exact tenth-tool inventory and
+MCP schema, application and runtime wiring, explicit registration, architecture
+boundaries, and adapter inspection. Focused tests cover supported and
+construction geometry, supported constraints, controlled unsupported geometry
+and constraints, standalone sketches, exact internal-name lookup, attachment
+and second-body isolation, stale and fresh cached solver facts, malformed data,
+controlled errors, and non-mutation safeguards. This coverage is deliberately
+limited to the implemented types and does not imply support for every FreeCAD
+geometry or constraint.
 
 ## Report View Verification
 
@@ -255,11 +270,12 @@ get_object
 recompute_document
 create_body
 create_sketch
+get_sketch
 ```
 
-These document and object-inspection tools are MCP-only; the workbench has no
-matching document toolbar or menu commands. Connect the dedicated Aider MCP test
-project and confirm
+These document, object, and sketch-inspection tools are MCP-only; the workbench
+has no matching document toolbar or menu commands. Connect the dedicated Aider
+MCP test project and confirm
 `create_document` remains discoverable, then run this disposable acceptance
 sequence through the MCP client:
 
@@ -370,8 +386,8 @@ sequence through the MCP client:
     count did not increase from a failed mutation.
 12. Confirm no `create_body` toolbar button, menu item, or FreeCAD GUI
     command was added.
-13. In the MCP client, confirm exactly nine tools are listed, including
-    `create_body` and `create_sketch`.
+13. In the MCP client, confirm exactly ten tools are listed, including
+    `create_body`, `create_sketch`, and `get_sketch`.
 
 ### create_sketch live acceptance
 
@@ -409,8 +425,8 @@ sequence through the MCP client:
     count did not increase from a failed mutation.
 16. Confirm no `MCP_CreateSketch` GUI command, toolbar button, or menu entry
     exists in the MCP workbench.
-17. In the MCP client, confirm exactly nine tools are listed, including
-    `create_sketch`.
+17. In the MCP client, confirm exactly ten tools are listed, including
+    `create_sketch` and `get_sketch`.
 18. Call `create_sketch` with `support_plane: xy_plane` and confirm
     `attachment.kind: body_origin_plane`, `attachment.plane: xy_plane`,
     `attachment.map_mode: flat_face`.
@@ -426,6 +442,35 @@ sequence through the MCP client:
     `AttachmentOffset` is identity for attached sketches.
 24. Undo an attached sketch creation and verify the sketch and support are
     removed together. Redo restores both.
+
+### get_sketch live acceptance
+
+FreeCAD API behavior must be accepted through the complete production path:
+
+```text
+MCP client
+→ live MCP endpoint
+→ handler
+→ Qt dispatcher
+→ FreeCAD adapter
+→ serialized response
+```
+
+Python-console commands may create controlled live fixtures, but all inspection
+assertions must use `get_sketch` through the MCP endpoint. The completed live
+acceptance covered line, circle, arc-of-circle, point, and construction
+geometry; geometric and dimensional constraints; a valid unsupported B-spline;
+standalone sketch ownership; rejection of a label used as an internal-name
+alias; stale cached solver state; fresh solver state after an explicit external
+recompute; and a complete before/after non-mutation comparison.
+
+### Sketch index semantics
+
+Geometry and constraint indices describe the current sketch state. Future add
+or delete operations may renumber them, so clients must call `get_sketch` after
+each future mutation before issuing another index-based request. Geometry tags
+are not exposed as permanent public identity, and the project does not add UUID
+properties to sketch geometry.
 
 The original create-only smoke prompt remains useful:
 

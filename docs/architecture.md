@@ -40,6 +40,8 @@ summaries, persistence, creation, and recomputation;
 `freecad.object_inspection` owns controlled object hierarchy, visibility, and
 placement extraction; and `freecad.body_creation` and
 `freecad.sketch_creation` own their respective transactional mutations.
+Read-only sketch state belongs to `freecad.sketch_inspection`, kept separate
+from sketch creation while remaining behind the same public adapter facade.
 
 ## Component Model
 
@@ -184,11 +186,14 @@ containing CAD implementation logic.
 
 FastMCP registrations are explicit and grouped by contract:
 `mcp.document_tools` registers document creation, listing, lookup, saving, and
-recomputation; `mcp.object_tools` registers object listing and lookup; and
-`mcp.creation_tools` registers body and sketch creation. `mcp.server` is the
-small composition module that constructs FastMCP and invokes those registration
-functions in authoritative tool-registry order. Registration modules depend on
-handlers and the tool registry, never on the concrete FreeCAD adapter.
+recomputation; `mcp.object_tools` registers object listing and lookup and owns
+the separate `get_sketch` registration; and `mcp.creation_tools` registers body
+and sketch creation. `mcp.server` is the small composition module that
+constructs FastMCP and invokes those registration functions in authoritative
+tool-registry order. `get_sketch` is explicitly registered after the original
+nine tools, so it is exactly tool ten; no registration loop is used.
+Registration modules depend on handlers and the tool registry, never on the
+concrete FreeCAD adapter.
 
 A dependency-free tool registry is the authoritative source for tool names and
 ordering. FastMCP registration and lifecycle status both consume that registry,
@@ -196,7 +201,8 @@ so reported capabilities cannot drift from the registered set.
 
 The registry currently exposes `create_document`, `list_documents`,
 `get_document`, `save_document`, `list_objects`, `get_object`,
-`recompute_document`, `create_body`, and `create_sketch`.
+`recompute_document`, `create_body`, `create_sketch`, and `get_sketch`, in that
+order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -564,14 +570,91 @@ never exposed.
   inspection failure;
 - ``internal_error``: unexpected exceptions.
 
+## Sketch Inspection
+
+### get_sketch
+
+`get_sketch` is the controlled read-only path for a `Sketcher::SketchObject`.
+It accepts required `document_name` and `sketch_name` inputs and resolves both
+by exact internal name. Its responsibility flow is:
+
+```text
+MCP object-tool registration
+→ get-sketch command handler
+→ application facade
+→ sketch document protocol
+→ FreeCADDocumentAdapter facade
+→ focused sketch-inspection module
+→ Qt main-thread dispatcher
+→ FreeCAD Sketcher API
+```
+
+The handler lives in `src/freecad_mcp/commands/sketch_query.py`; the focused
+adapter responsibility lives in
+`src/freecad_mcp/freecad/sketch_inspection.py`. The shared `DocumentAdapter`
+protocol and application facade expose the operation without importing
+FreeCAD. `FreeCADDocumentAdapter` remains publicly importable from
+`freecad_mcp.freecad.document` and delegates inspection to the focused module,
+while `sketch_creation.py` remains responsible only for transactional creation.
+
+The result uses controlled models for identity, owning body, visibility,
+placement, map mode, attachment, geometry, constraints, units, and cached
+solver facts. Placement and attachment offset reuse the existing
+`PlacementData` representation. A recognized body-origin attachment contains
+`kind: body_origin_plane`, its semantic `plane`, and a controlled `offset`;
+support objects and raw FreeCAD tuples are not exposed. Raw FreeCAD objects and
+arbitrary property maps never cross the adapter boundary.
+
+Success uses code `sketch_retrieved` and the normal `CommandResult` envelope:
+`ok`, `code`, `document_name`, controlled `sketch`, and `message`. Lengths are
+normalized to `millimeter` and angles to `degree`. The `solver` object contains
+`available`, `fresh`, `degrees_of_freedom`, `fully_constrained`, and the
+conflicting, redundant, partially redundant, and malformed constraint-index
+lists. When FreeCAD's cached sketch state is stale, `available` remains true
+but the cached facts are null; inspection does not recompute them.
+
+#### Unsupported and Malformed Data
+
+Valid but unsupported FreeCAD geometry or constraints are successful
+`unsupported` records with a sanitized FreeCAD type name. A recognized geometry
+or constraint whose required data is malformed fails with
+`sketch_geometry_malformed` or `sketch_constraint_malformed`, respectively.
+Unexpected controlled adapter or dispatch failures use
+`sketch_inspection_failed`.
+
+The complete expected public error set is:
+
+- `validation_error`: invalid document or sketch internal-name input;
+- `document_not_found`: the document does not exist;
+- `sketch_not_found`: no object has the requested sketch internal name;
+- `sketch_type_mismatch`: the named object is not a Sketcher sketch;
+- `sketch_geometry_malformed`: supported geometry lacks valid required data;
+- `sketch_constraint_malformed`: a supported constraint lacks valid required data;
+- `sketch_inspection_failed`: controlled FreeCAD or dispatch inspection failure;
+- `internal_error`: unexpected exceptions.
+
+#### Non-Mutation Contract
+
+The inspection path does not call `openTransaction`, `commitTransaction`,
+`abortTransaction`, `solve`, `recompute`, `save`, `saveAs`, `addProperty`,
+`setDriving`, or `setVirtualSpace`. It only reads current state and never
+refreshes stale solver data implicitly.
+
+Live acceptance confirmed that inspection preserves the active document,
+modified state, file name, transaction state, undo and redo counts, sketch
+state, geometry and constraint counts, visibility, selection, edit mode, map
+mode, attachment, placement, and attachment offset.
+
 ## Test Ownership
 
 The pure-Python suite mirrors the production responsibilities rather than
 collecting all adapter or transport behavior in single modules:
 
-- handler tests remain grouped by application operation under `tests/test_*.py`;
+- handler tests remain grouped by application operation under `tests/test_*.py`,
+  including `tests/test_get_sketch.py`;
 - FreeCAD adapter tests are split into document operations, object inspection,
-  body creation, sketch creation, and sketch attachment modules;
+  body creation, sketch creation, sketch attachment, and read-only sketch
+  inspection modules;
 - MCP tests are split into document, object, and creation registrations, while
   server composition, authoritative inventory, lifecycle agreement, and HTTP
   transport remain together;

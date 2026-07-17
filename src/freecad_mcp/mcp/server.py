@@ -12,7 +12,7 @@ from freecad_mcp.mcp.document_tools import (
     register_document_tools,
     register_recompute_document_tool,
 )
-from freecad_mcp.mcp.object_tools import register_object_tools
+from freecad_mcp.mcp.object_tools import register_get_sketch_tool, register_object_tools
 from freecad_mcp.server.config import ServerConfig
 
 
@@ -33,5 +33,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_object_tools(server, handlers)
     register_recompute_document_tool(server, handlers)
     register_creation_tools(server, handlers)
+    register_get_sketch_tool(server, handlers)
 
     return server

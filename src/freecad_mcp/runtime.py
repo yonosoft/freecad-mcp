@@ -10,6 +10,7 @@ from freecad_mcp.commands import (
     DocumentHandlers,
     GetDocumentHandler,
     GetObjectHandler,
+    GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
     RecomputeDocumentHandler,
@@ -64,6 +65,7 @@ def _build_runtime() -> Runtime:
         get_object=GetObjectHandler(adapter=adapter, dispatcher=dispatcher),
         create_body=CreateBodyHandler(adapter=adapter, dispatcher=dispatcher),
         create_sketch=CreateSketchHandler(adapter=adapter, dispatcher=dispatcher),
+        get_sketch=GetSketchHandler(adapter=adapter, dispatcher=dispatcher),
         recompute=RecomputeDocumentHandler(adapter=adapter, dispatcher=dispatcher),
     )
     lifecycle = LifecycleService(

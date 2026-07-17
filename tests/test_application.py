@@ -11,6 +11,7 @@ from freecad_mcp.commands import (
     DocumentHandlers,
     GetDocumentHandler,
     GetObjectHandler,
+    GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
     RecomputeDocumentHandler,
@@ -27,6 +28,8 @@ from freecad_mcp.models import (
     PlacementPosition,
     PlacementRotation,
     SketchCreationResult,
+    SketchInspectionResult,
+    SketchSolverData,
 )
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService
@@ -138,6 +141,32 @@ class AdapterStub:
     def recompute_document(self, document_name: str) -> DocumentSummary:
         return self.document
 
+    def get_sketch(self, document_name: str, sketch_name: str) -> SketchInspectionResult:
+        return SketchInspectionResult(
+            name=sketch_name,
+            label="Base Sketch",
+            body_name="Body",
+            visibility=True,
+            map_mode="deactivated",
+            attachment=None,
+            placement=None,
+            geometry_count=0,
+            external_geometry_count=0,
+            constraint_count=0,
+            geometry=(),
+            constraints=(),
+            solver=SketchSolverData(
+                available=True,
+                fresh=False,
+                degrees_of_freedom=None,
+                fully_constrained=None,
+                conflicting_constraint_indices=None,
+                redundant_constraint_indices=None,
+                partially_redundant_constraint_indices=None,
+                malformed_constraint_indices=None,
+            ),
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -165,6 +194,7 @@ def make_application() -> Application:
         get_object=GetObjectHandler(adapter, dispatcher),
         create_body=CreateBodyHandler(adapter, dispatcher),
         create_sketch=CreateSketchHandler(adapter, dispatcher),
+        get_sketch=GetSketchHandler(adapter, dispatcher),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
@@ -226,3 +256,12 @@ def test_application_dispatches_create_sketch_with_support_plane() -> None:
     assert attachment["kind"] == "body_origin_plane"  # type: ignore[index]
     assert attachment["plane"] == "xy_plane"  # type: ignore[index]
     assert attachment["map_mode"] == "flat_face"  # type: ignore[index]
+
+
+def test_application_dispatches_get_sketch_command() -> None:
+    result = make_application().get_sketch("TestDocument", "BaseSketch")
+
+    assert result.ok is True
+    assert result.code == "sketch_retrieved"
+    assert result.data["document_name"] == "TestDocument"
+    assert result.data["sketch"]["name"] == "BaseSketch"  # type: ignore[index]

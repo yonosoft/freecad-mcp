@@ -12,6 +12,7 @@ from freecad_mcp.commands import (
     DocumentHandlers,
     GetDocumentHandler,
     GetObjectHandler,
+    GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
     RecomputeDocumentHandler,
@@ -28,6 +29,8 @@ from freecad_mcp.models import (
     PlacementPosition,
     PlacementRotation,
     SketchCreationResult,
+    SketchInspectionResult,
+    SketchSolverData,
 )
 
 T = TypeVar("T")
@@ -52,6 +55,7 @@ class AdapterStub:
         self.recompute_calls: list[str] = []
         self.create_body_calls: list[tuple[str, str, str | None]] = []
         self.create_sketch_calls: list[tuple[str, str, str, str | None, OriginPlane | None]] = []
+        self.get_sketch_calls: list[tuple[str, str]] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -155,6 +159,33 @@ class AdapterStub:
         self.recompute_calls.append(document_name)
         return self.document
 
+    def get_sketch(self, document_name: str, sketch_name: str) -> SketchInspectionResult:
+        self.get_sketch_calls.append((document_name, sketch_name))
+        return SketchInspectionResult(
+            name=sketch_name,
+            label=sketch_name,
+            body_name="Body",
+            visibility=True,
+            map_mode="deactivated",
+            attachment=None,
+            placement=None,
+            geometry_count=0,
+            external_geometry_count=0,
+            constraint_count=0,
+            geometry=(),
+            constraints=(),
+            solver=SketchSolverData(
+                available=True,
+                fresh=False,
+                degrees_of_freedom=None,
+                fully_constrained=None,
+                conflicting_constraint_indices=None,
+                redundant_constraint_indices=None,
+                partially_redundant_constraint_indices=None,
+                malformed_constraint_indices=None,
+            ),
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -174,6 +205,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             get_object=GetObjectHandler(actual_adapter, dispatcher),
             create_body=CreateBodyHandler(actual_adapter, dispatcher),
             create_sketch=CreateSketchHandler(actual_adapter, dispatcher),
+            get_sketch=GetSketchHandler(actual_adapter, dispatcher),
             recompute=RecomputeDocumentHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,

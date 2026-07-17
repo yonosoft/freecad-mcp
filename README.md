@@ -15,7 +15,8 @@ Current capabilities include:
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
 - typed MCP tools for document creation, inspection, saving, recomputation, and
-  controlled Part Design body and sketch creation;
+  controlled Part Design body and sketch creation, plus read-only sketch
+  inspection;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -111,6 +112,7 @@ get_object
 recompute_document
 create_body
 create_sketch
+get_sketch
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -127,10 +129,36 @@ does not accept arbitrary faces or datum planes, alter attachment offsets, add
 geometry or constraints, enter sketch edit mode, save automatically, or add a
 toolbar/menu command.
 
-These document and object-inspection tools are MCP-only capabilities. They do not
-add workbench commands or toolbar icons. `get_object` performs exact internal-name
-lookup only; labels are not used as lookup keys. If placement is unavailable the
-``placement`` field returns ``null`` rather than failing the entire tool.
+### get_sketch
+
+`get_sketch` performs controlled, read-only inspection using the required
+`document_name` and `sketch_name` inputs. Both are exact internal names; visible
+labels are not lookup aliases. The result contains sketch identity, owning body
+when present, visibility, placement, controlled attachment data, geometry,
+constraints, and cached solver facts. Raw FreeCAD objects and arbitrary
+property maps are never returned.
+
+Version-one geometry support is `line_segment`, `circle`, `arc_of_circle`, and
+`point`. Geometry remains in current sketch-index order and includes its
+construction state. The supported constraint discriminators are `coincident`,
+`horizontal`, `vertical`, `parallel`, `perpendicular`, `equal`, `distance`,
+`distance_x`, `distance_y`, `radius`, `diameter`, and `angle`. Valid geometry or
+constraints outside those sets are returned as controlled `unsupported`
+records rather than failing the entire sketch.
+
+Lengths use `millimeter` and angles use `degree`. Solver facts come only from
+FreeCAD's cached properties: they are populated when the sketch state is up to
+date and nullable when that cache is stale. Inspection creates no transaction,
+performs no save, and does not implicitly solve or recompute the sketch.
+Geometry and constraint indices describe only the current sketch state; they
+are not permanent identifiers and clients must inspect again after later
+mutations.
+
+These document, object, and sketch-inspection tools are MCP-only capabilities.
+They do not add workbench commands or toolbar icons. `get_object` performs exact
+internal-name lookup only; labels are not used as lookup keys. If placement is
+unavailable the ``placement`` field returns ``null`` rather than failing the
+entire tool.
 
 ## Documentation
 

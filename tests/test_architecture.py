@@ -77,6 +77,7 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         "freecad/object_inspection.py",
         "freecad/body_creation.py",
         "freecad/sketch_creation.py",
+        "freecad/sketch_inspection.py",
         "freecad/qt_dispatcher.py",
     )
     for relative_path in helpers:
@@ -147,6 +148,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "RECOMPUTE_DOCUMENT_TOOL",
         "LIST_OBJECTS_TOOL",
         "GET_OBJECT_TOOL",
+        "GET_SKETCH_TOOL",
         "CREATE_BODY_TOOL",
         "CREATE_SKETCH_TOOL",
     ]
@@ -166,6 +168,8 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "PlacementPosition",
             "PlacementRotation",
             "SketchCreationResult",
+            "SketchInspectionResult",
+            "SketchSolverData",
         },
         "protocols.py": {
             "Dispatcher",
@@ -195,6 +199,10 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "OriginPlaneNotFoundError",
             "ParentDirectoryNotFoundError",
             "SketchCreationError",
+            "SketchConstraintMalformedError",
+            "SketchGeometryMalformedError",
+            "SketchInspectionError",
+            "SketchTypeMismatchError",
         },
         "validation.py": {
             "validate_create_body_request",

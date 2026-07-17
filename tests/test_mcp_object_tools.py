@@ -4,7 +4,7 @@ import asyncio
 
 from freecad_mcp.mcp.server import build_mcp_server
 from freecad_mcp.server.config import ServerConfig
-from freecad_mcp.tool_registry import GET_OBJECT_TOOL, LIST_OBJECTS_TOOL
+from freecad_mcp.tool_registry import GET_OBJECT_TOOL, GET_SKETCH_TOOL, LIST_OBJECTS_TOOL
 from mcp_server_stubs import make_handlers
 
 
@@ -23,13 +23,22 @@ def test_mcp_object_tools_preserve_descriptions_and_exact_schemas() -> None:
         for tool in asyncio.run(build_mcp_server(handlers, ServerConfig()).list_tools())
     }
 
-    assert {name: tools[name].description for name in (LIST_OBJECTS_TOOL, GET_OBJECT_TOOL)} == {
+    assert {
+        name: tools[name].description
+        for name in (LIST_OBJECTS_TOOL, GET_OBJECT_TOOL, GET_SKETCH_TOOL)
+    } == {
         LIST_OBJECTS_TOOL: (
             "List controlled summaries of all objects in an open FreeCAD document."
         ),
         GET_OBJECT_TOOL: (
             "Retrieve one FreeCAD object by exact internal document and object name "
             "with controlled placement."
+        ),
+        GET_SKETCH_TOOL: (
+            "Retrieve a read-only, controlled snapshot of one sketch by exact internal "
+            "document and sketch name. Supports line segments, circles, circular arcs, "
+            "points, and a focused constraint subset; other valid items are reported "
+            "as unsupported records. Does not solve, recompute, save, or modify the document."
         ),
     }
 
@@ -49,6 +58,15 @@ def test_mcp_object_tools_preserve_descriptions_and_exact_schemas() -> None:
             "title": "get_objectArguments",
             "type": "object",
         },
+        GET_SKETCH_TOOL: {
+            "properties": {
+                "document_name": {"title": "Document Name", "type": "string"},
+                "sketch_name": {"title": "Sketch Name", "type": "string"},
+            },
+            "required": ["document_name", "sketch_name"],
+            "title": "get_sketchArguments",
+            "type": "object",
+        },
     }
     for name, expected_input in expected_inputs.items():
         assert tools[name].inputSchema == expected_input
@@ -65,8 +83,13 @@ def test_mcp_object_tools_call_shared_handlers() -> None:
             GET_OBJECT_TOOL,
             {"document_name": "TestDocument", "object_name": "Body"},
         )
+        await server.call_tool(
+            GET_SKETCH_TOOL,
+            {"document_name": "TestDocument", "sketch_name": "BaseSketch"},
+        )
 
     asyncio.run(call_tools())
 
     assert adapter.list_objects_calls == ["TestDocument"]
     assert adapter.get_object_calls == [("TestDocument", "Body")]
+    assert adapter.get_sketch_calls == [("TestDocument", "BaseSketch")]

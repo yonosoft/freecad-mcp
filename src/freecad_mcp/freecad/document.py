@@ -7,6 +7,7 @@ from freecad_mcp.freecad import (
     document_operations,
     object_inspection,
     sketch_creation,
+    sketch_inspection,
 )
 from freecad_mcp.freecad.document_operations import (
     _active_document_name as _active_document_name,
@@ -27,6 +28,9 @@ from freecad_mcp.freecad.object_inspection import (
     _extract_placement as _extract_placement,
 )
 from freecad_mcp.freecad.object_inspection import (
+    _extract_placement_value as _extract_placement_value,
+)
+from freecad_mcp.freecad.object_inspection import (
     _object_children as _object_children,
 )
 from freecad_mcp.freecad.object_inspection import _object_parent as _object_parent
@@ -44,6 +48,7 @@ from freecad_mcp.models import (
     ObjectSummary,
     OriginPlane,
     SketchCreationResult,
+    SketchInspectionResult,
 )
 
 
@@ -96,3 +101,7 @@ class FreeCADDocumentAdapter:
             label,
             support_plane,
         )
+
+    def get_sketch(self, document_name: str, sketch_name: str) -> SketchInspectionResult:
+        """Return a controlled read-only snapshot of one sketch."""
+        return sketch_inspection.get_sketch(document_name, sketch_name)

@@ -147,6 +147,14 @@ def _extract_placement(obj: Any) -> PlacementData | None:
     """
     try:
         placement = getattr(obj, "Placement", None)
+    except Exception:
+        return None
+    return _extract_placement_value(placement)
+
+
+def _extract_placement_value(placement: Any) -> PlacementData | None:
+    """Convert a FreeCAD Placement value into the controlled placement model."""
+    try:
         if placement is None:
             return None
         base = getattr(placement, "Base", None)

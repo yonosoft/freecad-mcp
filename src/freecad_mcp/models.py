@@ -188,6 +188,299 @@ class SketchCreationResult:
     attachment: AttachmentInfo | None
 
 
+@dataclass(frozen=True, slots=True)
+class SketchPoint2D:
+    """Serializable two-dimensional point in sketch coordinates."""
+
+    x: float
+    y: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {"x": self.x, "y": self.y}
+
+
+@dataclass(frozen=True, slots=True)
+class SketchLineGeometry:
+    """Controlled line-segment geometry."""
+
+    index: int
+    construction: bool
+    start: SketchPoint2D
+    end: SketchPoint2D
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "line_segment",
+            "construction": self.construction,
+            "start": self.start.to_dict(),
+            "end": self.end.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchCircleGeometry:
+    """Controlled circle geometry."""
+
+    index: int
+    construction: bool
+    center: SketchPoint2D
+    radius: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "circle",
+            "construction": self.construction,
+            "center": self.center.to_dict(),
+            "radius": self.radius,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchArcGeometry:
+    """Controlled circular-arc geometry with native parameter angles."""
+
+    index: int
+    construction: bool
+    center: SketchPoint2D
+    radius: float
+    start: SketchPoint2D
+    end: SketchPoint2D
+    start_angle_degrees: float
+    end_angle_degrees: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "arc_of_circle",
+            "construction": self.construction,
+            "center": self.center.to_dict(),
+            "radius": self.radius,
+            "start": self.start.to_dict(),
+            "end": self.end.to_dict(),
+            "start_angle_degrees": self.start_angle_degrees,
+            "end_angle_degrees": self.end_angle_degrees,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchPointGeometry:
+    """Controlled point geometry."""
+
+    index: int
+    construction: bool
+    point: SketchPoint2D
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "point",
+            "construction": self.construction,
+            "point": self.point.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class UnsupportedSketchGeometry:
+    """A valid FreeCAD geometry item outside the v1 public schema."""
+
+    index: int
+    construction: bool
+    freecad_type: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "unsupported",
+            "construction": self.construction,
+            "freecad_type": self.freecad_type,
+        }
+
+
+SketchGeometry = (
+    SketchLineGeometry
+    | SketchCircleGeometry
+    | SketchArcGeometry
+    | SketchPointGeometry
+    | UnsupportedSketchGeometry
+)
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintReference:
+    """Controlled reference to sketch geometry or a built-in sketch axis."""
+
+    kind: str
+    position: str
+    geometry_index: int | None = None
+    axis: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        result: dict[str, object] = {
+            "kind": self.kind,
+            "position": self.position,
+        }
+        if self.geometry_index is not None:
+            result["geometry_index"] = self.geometry_index
+        if self.axis is not None:
+            result["axis"] = self.axis
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintValue:
+    """Dimensional constraint value with an explicit public unit."""
+
+    value: float
+    unit: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {"value": self.value, "unit": self.unit}
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintData:
+    """A supported sketch constraint in the v1 public schema."""
+
+    index: int
+    type: str
+    name: str | None
+    active: bool
+    virtual_space: bool
+    driving: bool | None
+    references: tuple[SketchConstraintReference, ...]
+    value: SketchConstraintValue | None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": self.type,
+            "name": self.name,
+            "active": self.active,
+            "virtual_space": self.virtual_space,
+            "driving": self.driving,
+            "references": [reference.to_dict() for reference in self.references],
+            "value": None if self.value is None else self.value.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class UnsupportedSketchConstraint:
+    """A valid constraint outside the v1 public schema."""
+
+    index: int
+    freecad_type: str
+    name: str | None
+    active: bool
+    virtual_space: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "unsupported",
+            "freecad_type": self.freecad_type,
+            "name": self.name,
+            "active": self.active,
+            "virtual_space": self.virtual_space,
+        }
+
+
+SketchConstraint = SketchConstraintData | UnsupportedSketchConstraint
+
+
+@dataclass(frozen=True, slots=True)
+class SketchSolverData:
+    """Cached FreeCAD solver facts, never a derived health assessment."""
+
+    available: bool
+    fresh: bool
+    degrees_of_freedom: int | None
+    fully_constrained: bool | None
+    conflicting_constraint_indices: tuple[int, ...] | None
+    redundant_constraint_indices: tuple[int, ...] | None
+    partially_redundant_constraint_indices: tuple[int, ...] | None
+    malformed_constraint_indices: tuple[int, ...] | None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "available": self.available,
+            "fresh": self.fresh,
+            "degrees_of_freedom": self.degrees_of_freedom,
+            "fully_constrained": self.fully_constrained,
+            "conflicting_constraint_indices": self._indices(self.conflicting_constraint_indices),
+            "redundant_constraint_indices": self._indices(self.redundant_constraint_indices),
+            "partially_redundant_constraint_indices": self._indices(
+                self.partially_redundant_constraint_indices
+            ),
+            "malformed_constraint_indices": self._indices(self.malformed_constraint_indices),
+        }
+
+    @staticmethod
+    def _indices(value: tuple[int, ...] | None) -> list[int] | None:
+        return None if value is None else list(value)
+
+
+@dataclass(frozen=True, slots=True)
+class SketchAttachmentData:
+    """Recognized body-origin-plane attachment and its sketch offset."""
+
+    plane: OriginPlane
+    offset: PlacementData
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "kind": "body_origin_plane",
+            "plane": self.plane.value,
+            "offset": self.offset.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchInspectionResult:
+    """Complete controlled snapshot returned by the read-only sketch inspector."""
+
+    name: str
+    label: str
+    body_name: str | None
+    visibility: bool
+    map_mode: str
+    attachment: SketchAttachmentData | None
+    placement: PlacementData | None
+    geometry_count: int
+    external_geometry_count: int
+    constraint_count: int
+    geometry: tuple[SketchGeometry, ...]
+    constraints: tuple[SketchConstraint, ...]
+    solver: SketchSolverData
+
+    def to_dict(self) -> dict[str, object]:
+        unsupported_geometry_count = sum(
+            isinstance(item, UnsupportedSketchGeometry) for item in self.geometry
+        )
+        unsupported_constraint_count = sum(
+            isinstance(item, UnsupportedSketchConstraint) for item in self.constraints
+        )
+        return {
+            "name": self.name,
+            "label": self.label,
+            "body_name": self.body_name,
+            "visibility": self.visibility,
+            "units": {"length": "millimeter", "angle": "degree"},
+            "map_mode": self.map_mode,
+            "attachment": None if self.attachment is None else self.attachment.to_dict(),
+            "placement": None if self.placement is None else self.placement.to_dict(),
+            "geometry_count": self.geometry_count,
+            "external_geometry_count": self.external_geometry_count,
+            "unsupported_geometry_count": unsupported_geometry_count,
+            "constraint_count": self.constraint_count,
+            "unsupported_constraint_count": unsupported_constraint_count,
+            "geometry": [item.to_dict() for item in self.geometry],
+            "constraints": [item.to_dict() for item in self.constraints],
+            "solver": self.solver.to_dict(),
+        }
+
+
 __all__ = [
     "AttachmentInfo",
     "DocumentCollection",
@@ -198,5 +491,20 @@ __all__ = [
     "PlacementData",
     "PlacementPosition",
     "PlacementRotation",
+    "SketchArcGeometry",
+    "SketchAttachmentData",
+    "SketchCircleGeometry",
+    "SketchConstraint",
+    "SketchConstraintData",
+    "SketchConstraintReference",
+    "SketchConstraintValue",
     "SketchCreationResult",
+    "SketchGeometry",
+    "SketchInspectionResult",
+    "SketchLineGeometry",
+    "SketchPoint2D",
+    "SketchPointGeometry",
+    "SketchSolverData",
+    "UnsupportedSketchConstraint",
+    "UnsupportedSketchGeometry",
 ]

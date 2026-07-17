@@ -76,6 +76,36 @@ class SketchCreationError(RuntimeError):
     """Raised when FreeCAD cannot create or initialize a Sketcher::SketchObject."""
 
 
+class SketchTypeMismatchError(RuntimeError):
+    """Raised when an object exists but is not a Sketcher::SketchObject."""
+
+
+class SketchGeometryMalformedError(RuntimeError):
+    """Raised when required geometry data cannot satisfy the public schema."""
+
+    def __init__(self, *, index: int | None, reason: str) -> None:
+        self.index = index
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SketchConstraintMalformedError(RuntimeError):
+    """Raised when required constraint data cannot satisfy the public schema."""
+
+    def __init__(self, *, index: int | None, reason: str) -> None:
+        self.index = index
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SketchInspectionError(RuntimeError):
+    """Raised when FreeCAD cannot provide a controlled sketch snapshot."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class BodyNotFoundError(RuntimeError):
     """Raised when a requested PartDesign::Body is not found in a document."""
 
@@ -128,5 +158,9 @@ __all__ = [
     "ObjectNotFoundError",
     "OriginPlaneNotFoundError",
     "ParentDirectoryNotFoundError",
+    "SketchConstraintMalformedError",
     "SketchCreationError",
+    "SketchGeometryMalformedError",
+    "SketchInspectionError",
+    "SketchTypeMismatchError",
 ]

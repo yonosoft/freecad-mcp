@@ -13,6 +13,7 @@ from freecad_mcp.models import (
     ObjectSummary,
     OriginPlane,
     SketchCreationResult,
+    SketchInspectionResult,
 )
 
 T = TypeVar("T")
@@ -57,6 +58,9 @@ class DocumentAdapter(Protocol):
         support_plane: OriginPlane | None = None,
     ) -> SketchCreationResult:
         """Create a Sketcher::SketchObject in a PartDesign::Body and return its detail."""
+
+    def get_sketch(self, document_name: str, sketch_name: str) -> SketchInspectionResult:
+        """Inspect one sketch by exact internal document and object name."""
 
 
 class Dispatcher(Protocol):
