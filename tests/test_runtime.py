@@ -8,6 +8,7 @@ import pytest
 
 from freecad_mcp.application import Application
 from freecad_mcp.commands import (
+    AddSketchGeometryHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
     CreateSketchHandler,
@@ -77,6 +78,7 @@ def test_build_runtime_wires_create_sketch_handler(
         "create_body": CreateBodyHandler,
         "create_sketch": CreateSketchHandler,
         "get_sketch": GetSketchHandler,
+        "add_sketch_geometry": AddSketchGeometryHandler,
         "recompute": RecomputeDocumentHandler,
     }
 

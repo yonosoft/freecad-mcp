@@ -177,7 +177,8 @@ Add tests beside the responsibility they exercise:
 - command-handler behavior belongs in the existing operation-focused modules,
   such as `test_create_document.py`, `test_save_document.py`,
   `test_get_object.py`, `test_get_sketch.py`, `test_create_body.py`, and
-  `test_create_sketch.py`;
+  `test_create_sketch.py`; `test_add_sketch_geometry.py` owns the geometry
+  input models, validation, result serialization, and handler behavior;
 - FreeCAD document lifecycle and persistence belong in
   `test_freecad_document_operations.py`;
 - object hierarchy, visibility, lookup, and placement extraction belong in
@@ -188,10 +189,15 @@ Add tests beside the responsibility they exercise:
   results, and attachment rollback belong in `test_freecad_sketch_attachment.py`;
 - read-only sketch geometry, constraints, cached solver facts, malformed data,
   and non-mutation safeguards belong in `test_freecad_sketch_inspection.py`;
+- atomic insertion, ordered indices, construction state, transaction ownership,
+  injected failures, and verified rollback belong in
+  `test_freecad_sketch_geometry_creation.py`;
 - MCP schemas, descriptions, and delegation belong in
   `test_mcp_document_tools.py`, `test_mcp_object_tools.py`, or
-  `test_mcp_creation_tools.py`; server composition, inventory agreement,
-  lifecycle reporting, and HTTP transport belong in `test_mcp_server.py`;
+  `test_mcp_creation_tools.py`; the exact geometry union and tool-eleven
+  contract belong in `test_mcp_sketch_geometry_tools.py`; server composition,
+  inventory agreement, lifecycle reporting, and HTTP transport belong in
+  `test_mcp_server.py`;
 - compatibility identity belongs in `test_module_compatibility.py`, and stable
   dependency-direction safeguards belong in `test_architecture.py`.
 
@@ -218,6 +224,31 @@ and second-body isolation, stale and fresh cached solver facts, malformed data,
 controlled errors, and non-mutation safeguards. This coverage is deliberately
 limited to the implemented types and does not imply support for every FreeCAD
 geometry or constraint.
+
+### add_sketch_geometry Automated Coverage
+
+The `add_sketch_geometry` milestone covers exact tool-eleven ordering without
+changing the first ten tools, the strict discriminated MCP schema, application
+and runtime wiring, focused adapter delegation, and architecture boundaries.
+Pure-Python tests exercise all four supported types in mixed request order,
+standalone and attached sketches, existing-index continuation, construction
+state, exact success serialization, the 1-to-100 batch limit, malformed and
+unsupported input, finite numeric rules, positive radius, zero-length lines,
+arc normalization, exact assigned indices, no recompute/save/solve, and
+transaction ownership.
+
+Failure injection covers the first, middle, and final item; constructor,
+insertion, index, construction, and commit failures; appended geometry that
+appears before an exception; pre-existing construction restoration; explicit
+tail deletion when abort cannot undo geometry; abort failure; rollback
+verification failure; closed transaction state; and absence of partial success
+or partial index results.
+
+Point geometry has a public two-direction regression rule: do not rename
+`PointGeometryInput.position` or `SketchPointGeometry.point` without treating
+the change as an explicit public schema change. Schema tests and live MCP
+acceptance must verify mutation input and controlled inspection output
+independently rather than assuming their field names are symmetrical.
 
 ## Report View Verification
 
@@ -271,6 +302,7 @@ recompute_document
 create_body
 create_sketch
 get_sketch
+add_sketch_geometry
 ```
 
 These document, object, and sketch-inspection tools are MCP-only; the workbench
@@ -386,8 +418,8 @@ sequence through the MCP client:
     count did not increase from a failed mutation.
 12. Confirm no `create_body` toolbar button, menu item, or FreeCAD GUI
     command was added.
-13. In the MCP client, confirm exactly ten tools are listed, including
-    `create_body`, `create_sketch`, and `get_sketch`.
+13. In the MCP client, confirm exactly eleven tools are listed, including
+    `create_body`, `create_sketch`, `get_sketch`, and `add_sketch_geometry`.
 
 ### create_sketch live acceptance
 
@@ -425,8 +457,8 @@ sequence through the MCP client:
     count did not increase from a failed mutation.
 16. Confirm no `MCP_CreateSketch` GUI command, toolbar button, or menu entry
     exists in the MCP workbench.
-17. In the MCP client, confirm exactly ten tools are listed, including
-    `create_sketch` and `get_sketch`.
+17. In the MCP client, confirm exactly eleven tools are listed, including
+    `create_sketch`, `get_sketch`, and `add_sketch_geometry`.
 18. Call `create_sketch` with `support_plane: xy_plane` and confirm
     `attachment.kind: body_origin_plane`, `attachment.plane: xy_plane`,
     `attachment.map_mode: flat_face`.
@@ -464,13 +496,90 @@ standalone sketch ownership; rejection of a label used as an internal-name
 alias; stale cached solver state; fresh solver state after an explicit external
 recompute; and a complete before/after non-mutation comparison.
 
+### add_sketch_geometry AiderDesk live acceptance plan
+
+This milestone is not fully accepted until the separate AiderDesk run uses the
+live endpoint for every mutation and `get_sketch` for every geometry readback.
+FreeCAD's Python console may create disposable fixtures and record transaction,
+undo, save, or timestamp state that is not exposed by an MCP inspection tool.
+
+1. Start a fresh FreeCAD 1.1.1 session, install the development junction,
+   start MCP, connect AiderDesk only to `http://127.0.0.1:8765/mcp`, and record
+   Report View from server start through completion.
+2. Discover tools and confirm the exact eleven-name order. Confirm
+   `get_sketch` is tenth and `add_sketch_geometry` is eleventh, with the first
+   ten names and schemas unchanged.
+3. Inspect the eleventh tool schema. Confirm exactly three required top-level
+   fields, a 1-to-100 array, the four discriminator mappings, every required
+   item field, explicit Boolean construction, strict two-coordinate points,
+   positive radii, degree angle fields, and forbidden extra item fields.
+4. Create a disposable unsaved document and an empty standalone sketch.
+   Snapshot `FileName`, modified state, transaction/undo/redo state, geometry
+   and constraint counts, construction flags, and solver cache.
+5. Through MCP, add one non-construction line to the empty sketch. Confirm code
+   `sketch_geometry_added`, index `[0]`, counts, no file path, and no save.
+   Read back only with `get_sketch` and compare every line coordinate and flag.
+6. Through MCP, add one mixed ordered batch containing line, circle,
+   circular arc, and point, with at least one construction item. Confirm
+   contiguous indices, request order, geometry count, exact numeric readback,
+   and construction parity through `get_sketch`.
+7. Add another batch to the now-populated sketch and confirm returned indices
+   continue from the previous geometry count. Treat them as temporary and use a
+   fresh `get_sketch` response before any later index assertion.
+8. Create a Part Design Body and an origin-plane-attached sketch. Repeat empty
+   and mixed-batch mutation through MCP and confirm body ownership, attachment,
+   placement, geometry order, and construction state remain intact.
+9. Send empty and 101-item batches; malformed coordinates; missing required
+   fields; nonnumeric and non-finite values; a zero-length line; zero and
+   negative radii; equal, full-turn, and non-finite arc angles; unknown
+   discriminator `ellipse`; and extra fields. Confirm controlled request errors,
+   no mutation, and unchanged `get_sketch` output after every case.
+10. Confirm negative and over-360 finite arc inputs normalize to the documented
+    counter-clockwise span. Confirm 350→10 reads back as a 20-degree wraparound
+    arc and 90→0 as a 270-degree arc.
+11. Confirm duplicate and coincident valid geometry is accepted rather than
+    rejected by speculative overlap checks.
+12. For deterministic middle-item rollback, use the FreeCAD console only to
+    install a temporary test patch around the focused `_build_geometry` helper
+    that raises controlled `SketchGeometryCreationError` on the second item;
+    restore the original helper in `finally`. Invoke a three-item batch through
+    the MCP endpoint while the patch is active.
+13. Confirm the injected call returns no partial success or index list. Use
+    `get_sketch` plus the console snapshot to verify original geometry values,
+    count, construction flags, constraints, transaction state, undo/redo state,
+    and document save state are restored. Confirm no recompute, solve, save, or
+    save-as call occurred.
+14. Recompute explicitly before a successful mutation and record fresh solver
+    data. Add geometry through MCP without recomputing, then call `get_sketch`;
+    confirm the new geometry is present while solver facts are stale/null.
+15. Call `recompute_document`, then `get_sketch`, and confirm the solver cache is
+    fresh again. This establishes that mutation itself did not recompute.
+16. Repeat a successful mutation on an unsaved document and confirm it remains
+    unsaved. For a separately saved disposable document, record its path and
+    disk timestamp, mutate, and confirm the path and timestamp are unchanged.
+17. Compare complete before/after state for document transaction ownership,
+    modified/file state, sketch geometry and construction, constraints,
+    attachment, visibility, selection, edit mode, and solver cache. Only the
+    requested appended geometry and expected dirty/stale state may differ.
+18. Confirm none of `ellipse`, `arc_of_ellipse`, `arc_of_hyperbola`,
+    `arc_of_parabola`, or `b_spline` is mutation-supported. Add one valid
+    unsupported geometry fixture externally and confirm `get_sketch` still
+    returns its controlled `unsupported` inspection record.
+19. Close disposable documents without saving, remove the temporary failure
+    patch if it was not already restored, stop the MCP server, and preserve the
+    AiderDesk transcript plus Report View output as the acceptance evidence.
+
+Do not claim live milestone acceptance from the automated or direct-adapter
+smoke tests. The AiderDesk transcript must show endpoint mutation and
+`get_sketch` readback for the successful, invalid, and rollback cases.
+
 ### Sketch index semantics
 
-Geometry and constraint indices describe the current sketch state. Future add
-or delete operations may renumber them, so clients must call `get_sketch` after
-each future mutation before issuing another index-based request. Geometry tags
-are not exposed as permanent public identity, and the project does not add UUID
-properties to sketch geometry.
+Geometry and constraint indices describe the current sketch state. Current add
+operations and future editing or deletion operations may renumber them, so
+clients must call `get_sketch` after each mutation before issuing another
+index-based request. Geometry tags are not exposed as permanent public identity,
+and the project does not add UUID properties to sketch geometry.
 
 The original create-only smoke prompt remains useful:
 

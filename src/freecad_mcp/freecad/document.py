@@ -7,6 +7,7 @@ from freecad_mcp.freecad import (
     document_operations,
     object_inspection,
     sketch_creation,
+    sketch_geometry_creation,
     sketch_inspection,
 )
 from freecad_mcp.freecad.document_operations import (
@@ -48,6 +49,8 @@ from freecad_mcp.models import (
     ObjectSummary,
     OriginPlane,
     SketchCreationResult,
+    SketchGeometryAdditionResult,
+    SketchGeometryInput,
     SketchInspectionResult,
 )
 
@@ -105,3 +108,16 @@ class FreeCADDocumentAdapter:
     def get_sketch(self, document_name: str, sketch_name: str) -> SketchInspectionResult:
         """Return a controlled read-only snapshot of one sketch."""
         return sketch_inspection.get_sketch(document_name, sketch_name)
+
+    def add_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry: tuple[SketchGeometryInput, ...],
+    ) -> SketchGeometryAdditionResult:
+        """Atomically append controlled geometry without recomputing or saving."""
+        return sketch_geometry_creation.add_sketch_geometry(
+            document_name,
+            sketch_name,
+            geometry,
+        )

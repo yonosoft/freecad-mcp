@@ -40,8 +40,9 @@ summaries, persistence, creation, and recomputation;
 `freecad.object_inspection` owns controlled object hierarchy, visibility, and
 placement extraction; and `freecad.body_creation` and
 `freecad.sketch_creation` own their respective transactional mutations.
-Read-only sketch state belongs to `freecad.sketch_inspection`, kept separate
-from sketch creation while remaining behind the same public adapter facade.
+Atomic geometry addition belongs to `freecad.sketch_geometry_creation`, while
+read-only sketch state belongs to `freecad.sketch_inspection`. Both remain
+separate from sketch creation and behind the same public adapter facade.
 
 ## Component Model
 
@@ -130,7 +131,7 @@ FreeCAD document changes must:
 2. open a named document transaction where the operation supports one;
 3. validate inputs before mutation where practical;
 4. apply changes;
-5. recompute the document;
+5. recompute only when the operation's public contract requires it;
 6. inspect the result;
 7. commit on success or abort/roll back on failure where supported;
 8. return structured results.
@@ -188,10 +189,12 @@ FastMCP registrations are explicit and grouped by contract:
 `mcp.document_tools` registers document creation, listing, lookup, saving, and
 recomputation; `mcp.object_tools` registers object listing and lookup and owns
 the separate `get_sketch` registration; and `mcp.creation_tools` registers body
-and sketch creation. `mcp.server` is the small composition module that
+and sketch creation. `mcp.sketch_geometry_tools` explicitly registers the
+atomic geometry mutation. `mcp.server` is the small composition module that
 constructs FastMCP and invokes those registration functions in authoritative
-tool-registry order. `get_sketch` is explicitly registered after the original
-nine tools, so it is exactly tool ten; no registration loop is used.
+tool-registry order. `get_sketch` remains exactly tool ten and
+`add_sketch_geometry` is registered after it as exactly tool eleven; no
+registration loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
 
@@ -201,8 +204,8 @@ so reported capabilities cannot drift from the registered set.
 
 The registry currently exposes `create_document`, `list_documents`,
 `get_document`, `save_document`, `list_objects`, `get_object`,
-`recompute_document`, `create_body`, `create_sketch`, and `get_sketch`, in that
-order.
+`recompute_document`, `create_body`, `create_sketch`, `get_sketch`, and
+`add_sketch_geometry`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -570,6 +573,153 @@ never exposed.
   inspection failure;
 - ``internal_error``: unexpected exceptions.
 
+## Sketch Geometry Mutation
+
+### add_sketch_geometry
+
+`add_sketch_geometry` is the controlled atomic mutation path for geometry in a
+`Sketcher::SketchObject`. It accepts exact internal `document_name` and
+`sketch_name` values plus a required ordered `geometry` array. Its
+responsibility flow is:
+
+```text
+MCP sketch-geometry registration
+→ add-sketch-geometry command handler
+→ application facade
+→ document adapter protocol
+→ FreeCADDocumentAdapter facade
+→ focused sketch-geometry-creation module
+→ Qt main-thread dispatcher
+→ FreeCAD Sketcher API
+```
+
+The handler lives in `src/freecad_mcp/commands/sketch_geometry.py`; the focused
+adapter operation lives in
+`src/freecad_mcp/freecad/sketch_geometry_creation.py`. Models and validation do
+not import FreeCAD. The concrete adapter remains publicly importable from
+`freecad_mcp.freecad.document` and only delegates to the focused operation.
+
+#### Input Contract
+
+The shared model layer defines an explicit Pydantic-discriminated union. Every
+model forbids extra fields, uses finite strict numbers, and requires an
+explicit strict Boolean `construction` field:
+
+```text
+LineSegmentGeometryInput
+  type: "line_segment"
+  start: {x: number, y: number}
+  end: {x: number, y: number}
+  construction: boolean
+
+CircleGeometryInput
+  type: "circle"
+  center: {x: number, y: number}
+  radius: number > 0
+  construction: boolean
+
+ArcOfCircleGeometryInput
+  type: "arc_of_circle"
+  center: {x: number, y: number}
+  radius: number > 0
+  start_angle_degrees: number
+  end_angle_degrees: number
+  construction: boolean
+
+PointGeometryInput
+  type: "point"
+  position: {x: number, y: number}
+  construction: boolean
+```
+
+Point mutation and inspection use distinct typed models:
+`PointGeometryInput.position` represents mutation input, while
+`SketchPointGeometry.point` represents controlled inspection output. This
+asymmetry is intentional and is covered independently by schema, adapter, and
+serialization tests.
+
+The batch has `minItems: 1` and `maxItems: 100`. The handler repeats these
+limits for non-transport callers and validates exact internal-name policy,
+unknown discriminators, missing or extra fields, numeric types, finite values,
+positive radii, exactly equal line endpoints, and collapsing arc angles before
+dispatch. Duplicate or coincident geometry is not rejected.
+
+The input union is intentionally additive: later controlled geometry input
+models can join it without changing handler dispatch or transaction handling.
+Ellipse, conic, and B-spline input models are not present in this milestone.
+
+#### Arc Parameter Policy
+
+FreeCAD 1.1.1 accepts negative and over-360-degree-equivalent parameters,
+normalizes each parameter, converts a wraparound endpoint to a positive
+counter-clockwise span, and accepts a complete circle as `ArcOfCircle`. It
+throws `Part.OCCError` for exactly equal raw parameters, while non-finite
+parameters can construct malformed objects instead of failing immediately.
+
+The public contract therefore accepts any finite degree values, normalizes each
+modulo 360, and makes the end the next counter-clockwise parameter after the
+start. Equal normalized endpoints are rejected, including 360-degree and
+multi-turn spans. The canonical finite angles are converted to radians only in
+the focused FreeCAD module. This prevents constructor-dependent ambiguity and
+keeps full circles represented by the `circle` discriminator.
+
+#### Transaction, Construction, and Rollback
+
+After validation, the adapter locates the exact document and object, confirms
+`isDerivedFrom("Sketcher::SketchObject")`, and captures the original geometry
+count and every pre-existing construction flag. It opens one transaction named
+`MCP Add Sketch Geometry`, then constructs and inserts each item in request
+order using `Sketch.addGeometry(geometry, construction)`. The returned index,
+incremental geometry count, construction flag, final count, and number of
+indices are verified. Success commits once.
+
+The operation follows the existing mutation ownership policy: it opens,
+commits, or aborts exactly its own transaction call, preserving an outer
+transaction in runtimes that support nesting. It never opens one transaction
+per item.
+
+FreeCAD 1.1.1 with `UndoMode == 0` does not remove `addGeometry` changes when
+`abortTransaction()` is called. Rollback therefore deletes every appended tail
+index in reverse before abort, aborts the transaction, repeats safe tail
+cleanup for compensation, restores any changed pre-existing construction
+flags, and verifies the original count and construction tuple. Any failed
+verification or abort becomes `sketch_geometry_rollback_failed`; partial index
+lists are never returned.
+
+The mutation deliberately does not call `Document.recompute()`, `Sketch.solve()`,
+`save()`, or `saveAs()`. Clients use explicit `recompute_document` when wanted
+and then call `get_sketch` for authoritative geometry and solver-cache readback.
+
+#### Success and Index Semantics
+
+Success uses code `sketch_geometry_added` and contains `document_name`,
+`sketch_name`, ordered `added_indices`, derived `added_count`, final
+`geometry_count`, and message `Sketch geometry added.`. Raw FreeCAD objects are
+never returned.
+
+Indices describe the immediate post-operation sketch state and are not
+permanent identities. Later geometry mutations can renumber them; clients must
+call `get_sketch` after mutation. FreeCAD geometry tags and synthetic UUID
+properties are not exposed.
+
+#### Error Codes
+
+- `validation_error`: invalid names, malformed input, unsupported
+  discriminator, invalid number, empty or over-limit batch, zero-length line,
+  invalid radius, or collapsing arc;
+- `document_not_found`: the document does not exist;
+- `sketch_not_found`: no object has the exact requested sketch name;
+- `sketch_type_mismatch`: the object is not derived from a Sketcher sketch;
+- `sketch_geometry_creation_failed`: controlled constructor, insertion,
+  construction verification, index/count, transaction, document-access, or
+  dispatch failure;
+- `sketch_geometry_rollback_failed`: abort or controlled state restoration
+  could not be verified;
+- `internal_error`: an unexpected non-FreeCAD implementation failure.
+
+FreeCAD exception text, traceback data, object representations, and memory
+addresses are not included in these results.
+
 ## Sketch Inspection
 
 ### get_sketch
@@ -650,14 +800,16 @@ mode, attachment, placement, and attachment offset.
 The pure-Python suite mirrors the production responsibilities rather than
 collecting all adapter or transport behavior in single modules:
 
-- handler tests remain grouped by application operation under `tests/test_*.py`,
-  including `tests/test_get_sketch.py`;
+- handler and validation tests remain grouped by application operation under
+  `tests/test_*.py`, including `tests/test_get_sketch.py` and
+  `tests/test_add_sketch_geometry.py`;
 - FreeCAD adapter tests are split into document operations, object inspection,
   body creation, sketch creation, sketch attachment, and read-only sketch
-  inspection modules;
-- MCP tests are split into document, object, and creation registrations, while
-  server composition, authoritative inventory, lifecycle agreement, and HTTP
-  transport remain together;
+  inspection modules; atomic geometry mutation and rollback belong in
+  `tests/test_freecad_sketch_geometry_creation.py`;
+- MCP tests are split into document, object, creation, and sketch-geometry
+  registrations, while server composition, authoritative inventory, lifecycle
+  agreement, and HTTP transport remain together;
 - `tests/test_module_compatibility.py` exclusively owns legacy/canonical identity
   promises;
 - `tests/test_architecture.py` owns stable import-direction, explicit-registration,

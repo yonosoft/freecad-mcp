@@ -76,6 +76,23 @@ class SketchCreationError(RuntimeError):
     """Raised when FreeCAD cannot create or initialize a Sketcher::SketchObject."""
 
 
+class SketchGeometryCreationError(RuntimeError):
+    """Raised when an atomic sketch-geometry batch cannot be created."""
+
+    def __init__(self, *, index: int | None, reason: str) -> None:
+        self.index = index
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SketchGeometryRollbackError(RuntimeError):
+    """Raised when a failed sketch-geometry batch cannot be fully restored."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SketchTypeMismatchError(RuntimeError):
     """Raised when an object exists but is not a Sketcher::SketchObject."""
 
@@ -160,7 +177,9 @@ __all__ = [
     "ParentDirectoryNotFoundError",
     "SketchConstraintMalformedError",
     "SketchCreationError",
+    "SketchGeometryCreationError",
     "SketchGeometryMalformedError",
+    "SketchGeometryRollbackError",
     "SketchInspectionError",
     "SketchTypeMismatchError",
 ]

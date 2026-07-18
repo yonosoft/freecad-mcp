@@ -6,6 +6,7 @@ from typing import Any, TypeVar
 
 from freecad_mcp.application import Application, create_application
 from freecad_mcp.commands import (
+    AddSketchGeometryHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
     DocumentHandlers,
@@ -28,6 +29,8 @@ from freecad_mcp.models import (
     PlacementPosition,
     PlacementRotation,
     SketchCreationResult,
+    SketchGeometryAdditionResult,
+    SketchGeometryInput,
     SketchInspectionResult,
     SketchSolverData,
 )
@@ -167,6 +170,19 @@ class AdapterStub:
             ),
         )
 
+    def add_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry: tuple[SketchGeometryInput, ...],
+    ) -> SketchGeometryAdditionResult:
+        return SketchGeometryAdditionResult(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            added_indices=tuple(range(len(geometry))),
+            geometry_count=len(geometry),
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -195,6 +211,7 @@ def make_application() -> Application:
         create_body=CreateBodyHandler(adapter, dispatcher),
         create_sketch=CreateSketchHandler(adapter, dispatcher),
         get_sketch=GetSketchHandler(adapter, dispatcher),
+        add_sketch_geometry=AddSketchGeometryHandler(adapter, dispatcher),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
@@ -265,3 +282,28 @@ def test_application_dispatches_get_sketch_command() -> None:
     assert result.code == "sketch_retrieved"
     assert result.data["document_name"] == "TestDocument"
     assert result.data["sketch"]["name"] == "BaseSketch"  # type: ignore[index]
+
+
+def test_application_dispatches_add_sketch_geometry_command() -> None:
+    result = make_application().add_sketch_geometry(
+        "TestDocument",
+        "BaseSketch",
+        [
+            {
+                "type": "point",
+                "position": {"x": 5.0, "y": 7.0},
+                "construction": True,
+            }
+        ],
+    )
+
+    assert result.to_dict() == {
+        "ok": True,
+        "code": "sketch_geometry_added",
+        "document_name": "TestDocument",
+        "sketch_name": "BaseSketch",
+        "added_indices": [0],
+        "added_count": 1,
+        "geometry_count": 1,
+        "message": "Sketch geometry added.",
+    }

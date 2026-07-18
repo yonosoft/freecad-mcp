@@ -7,6 +7,7 @@ from dataclasses import replace
 from typing import Any, TypeVar
 
 from freecad_mcp.commands import (
+    AddSketchGeometryHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
     DocumentHandlers,
@@ -29,6 +30,8 @@ from freecad_mcp.models import (
     PlacementPosition,
     PlacementRotation,
     SketchCreationResult,
+    SketchGeometryAdditionResult,
+    SketchGeometryInput,
     SketchInspectionResult,
     SketchSolverData,
 )
@@ -56,6 +59,7 @@ class AdapterStub:
         self.create_body_calls: list[tuple[str, str, str | None]] = []
         self.create_sketch_calls: list[tuple[str, str, str, str | None, OriginPlane | None]] = []
         self.get_sketch_calls: list[tuple[str, str]] = []
+        self.add_sketch_geometry_calls: list[tuple[str, str, tuple[SketchGeometryInput, ...]]] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -186,6 +190,20 @@ class AdapterStub:
             ),
         )
 
+    def add_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry: tuple[SketchGeometryInput, ...],
+    ) -> SketchGeometryAdditionResult:
+        self.add_sketch_geometry_calls.append((document_name, sketch_name, geometry))
+        return SketchGeometryAdditionResult(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            added_indices=tuple(range(len(geometry))),
+            geometry_count=len(geometry),
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -206,6 +224,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             create_body=CreateBodyHandler(actual_adapter, dispatcher),
             create_sketch=CreateSketchHandler(actual_adapter, dispatcher),
             get_sketch=GetSketchHandler(actual_adapter, dispatcher),
+            add_sketch_geometry=AddSketchGeometryHandler(actual_adapter, dispatcher),
             recompute=RecomputeDocumentHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,

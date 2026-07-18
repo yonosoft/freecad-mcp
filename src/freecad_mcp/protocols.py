@@ -13,6 +13,8 @@ from freecad_mcp.models import (
     ObjectSummary,
     OriginPlane,
     SketchCreationResult,
+    SketchGeometryAdditionResult,
+    SketchGeometryInput,
     SketchInspectionResult,
 )
 
@@ -61,6 +63,14 @@ class DocumentAdapter(Protocol):
 
     def get_sketch(self, document_name: str, sketch_name: str) -> SketchInspectionResult:
         """Inspect one sketch by exact internal document and object name."""
+
+    def add_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry: tuple[SketchGeometryInput, ...],
+    ) -> SketchGeometryAdditionResult:
+        """Atomically append one controlled ordered geometry batch to a sketch."""
 
 
 class Dispatcher(Protocol):

@@ -14,9 +14,9 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- typed MCP tools for document creation, inspection, saving, recomputation, and
-  controlled Part Design body and sketch creation, plus read-only sketch
-  inspection;
+- eleven typed MCP tools for document creation, inspection, saving,
+  recomputation, controlled Part Design body and sketch creation, read-only
+  sketch inspection, and atomic controlled sketch-geometry addition;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -113,6 +113,7 @@ recompute_document
 create_body
 create_sketch
 get_sketch
+add_sketch_geometry
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -153,6 +154,106 @@ performs no save, and does not implicitly solve or recompute the sketch.
 Geometry and constraint indices describe only the current sketch state; they
 are not permanent identifiers and clients must inspect again after later
 mutations.
+
+### add_sketch_geometry
+
+`add_sketch_geometry` is an atomic ordered batch mutation. Its required inputs
+are `document_name`, `sketch_name`, and `geometry`; both names are exact
+internal names, never visible-label aliases. `geometry` must contain between 1
+and 100 items. Each item is one member of a strict discriminated union and must
+include its `type` and an explicit Boolean `construction` field:
+
+- `line_segment`: finite `start` and `end` points; exactly equal endpoints are
+  rejected;
+- `circle`: finite `center` and a finite positive `radius`;
+- `arc_of_circle`: finite `center`, finite positive `radius`, and finite
+  `start_angle_degrees` and `end_angle_degrees`;
+- `point`: finite `position`.
+
+For circular arcs, each angle is normalized modulo 360 and the end is the next
+counter-clockwise parameter after the start. Equal normalized endpoints are
+rejected, including full-turn and multi-turn spans; use `circle` for a full
+circle. Negative angles and values greater than 360 degrees are accepted under
+that normalization policy. No clockwise or sweep field is inferred.
+
+For example:
+
+```json
+{
+  "document_name": "Bracket",
+  "sketch_name": "Sketch",
+  "geometry": [
+    {
+      "type": "line_segment",
+      "start": {"x": 0.0, "y": 0.0},
+      "end": {"x": 40.0, "y": 0.0},
+      "construction": false
+    }
+  ]
+}
+```
+
+Point coordinate field names intentionally differ by direction. Point creation
+input uses `position`:
+
+```json
+{
+  "type": "point",
+  "position": {
+    "x": 3.0,
+    "y": 4.0
+  },
+  "construction": false
+}
+```
+
+`get_sketch` returns the same point using `point`:
+
+```json
+{
+  "index": 0,
+  "type": "point",
+  "construction": false,
+  "point": {
+    "x": 3.0,
+    "y": 4.0
+  }
+}
+```
+
+The mutation input field is named `position`; the controlled inspection output
+field is named `point`. Clients must not assume input and output field names are
+symmetrical.
+
+The entire batch uses one document transaction and preserves request order.
+Geometry and construction state are added together with FreeCAD's indexed
+`addGeometry` API. On failure, appended tail geometry is removed in reverse,
+the transaction is aborted, and the original geometry count plus all
+pre-existing construction flags are verified. The tool never calls
+`recompute`, `solve`, `save`, or `saveAs`.
+
+Success has this exact shape:
+
+```json
+{
+  "ok": true,
+  "code": "sketch_geometry_added",
+  "document_name": "Bracket",
+  "sketch_name": "Sketch",
+  "added_indices": [2, 3],
+  "added_count": 2,
+  "geometry_count": 4,
+  "message": "Sketch geometry added."
+}
+```
+
+The returned indices describe the immediate post-operation state only. Later
+mutations can renumber them, so clients must call `get_sketch` after each
+mutation for authoritative readback. Ellipses, conics, B-splines, and any other
+unsupported creation discriminator are controlled request errors. Valid
+unsupported geometry already present in a sketch remains inspectable through
+`get_sketch`; mutation support intentionally does not exceed controlled
+inspection support.
 
 These document, object, and sketch-inspection tools are MCP-only capabilities.
 They do not add workbench commands or toolbar icons. `get_object` performs exact

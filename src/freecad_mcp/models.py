@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+MAX_SKETCH_GEOMETRY_BATCH_SIZE = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,6 +202,85 @@ class SketchPoint2D:
 
     def to_dict(self) -> dict[str, object]:
         return {"x": self.x, "y": self.y}
+
+
+class _SketchGeometryInputModel(BaseModel):
+    """Strict base for controlled sketch-geometry mutation inputs."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class SketchPoint2DInput(_SketchGeometryInputModel):
+    """Finite two-dimensional point accepted by sketch mutations."""
+
+    x: float = Field(strict=True, allow_inf_nan=False)
+    y: float = Field(strict=True, allow_inf_nan=False)
+
+
+class LineSegmentGeometryInput(_SketchGeometryInputModel):
+    """Controlled line-segment creation input."""
+
+    type: Literal["line_segment"]
+    start: SketchPoint2DInput
+    end: SketchPoint2DInput
+    construction: bool = Field(strict=True)
+
+
+class CircleGeometryInput(_SketchGeometryInputModel):
+    """Controlled circle creation input."""
+
+    type: Literal["circle"]
+    center: SketchPoint2DInput
+    radius: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+    construction: bool = Field(strict=True)
+
+
+class ArcOfCircleGeometryInput(_SketchGeometryInputModel):
+    """Controlled counter-clockwise circular-arc creation input in degrees."""
+
+    type: Literal["arc_of_circle"]
+    center: SketchPoint2DInput
+    radius: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+    start_angle_degrees: float = Field(strict=True, allow_inf_nan=False)
+    end_angle_degrees: float = Field(strict=True, allow_inf_nan=False)
+    construction: bool = Field(strict=True)
+
+
+class PointGeometryInput(_SketchGeometryInputModel):
+    """Controlled point-geometry creation input."""
+
+    type: Literal["point"]
+    position: SketchPoint2DInput
+    construction: bool = Field(strict=True)
+
+
+SketchGeometryInput = Annotated[
+    LineSegmentGeometryInput | CircleGeometryInput | ArcOfCircleGeometryInput | PointGeometryInput,
+    Field(discriminator="type"),
+]
+SketchGeometryBatch = Annotated[
+    list[SketchGeometryInput],
+    Field(min_length=1, max_length=MAX_SKETCH_GEOMETRY_BATCH_SIZE),
+]
+
+
+@dataclass(frozen=True, slots=True)
+class SketchGeometryAdditionResult:
+    """Controlled result for one atomic sketch-geometry batch."""
+
+    document_name: str
+    sketch_name: str
+    added_indices: tuple[int, ...]
+    geometry_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "document_name": self.document_name,
+            "sketch_name": self.sketch_name,
+            "added_indices": list(self.added_indices),
+            "added_count": len(self.added_indices),
+            "geometry_count": self.geometry_count,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -482,15 +566,20 @@ class SketchInspectionResult:
 
 
 __all__ = [
+    "MAX_SKETCH_GEOMETRY_BATCH_SIZE",
+    "ArcOfCircleGeometryInput",
     "AttachmentInfo",
+    "CircleGeometryInput",
     "DocumentCollection",
     "DocumentSummary",
+    "LineSegmentGeometryInput",
     "ObjectDetail",
     "ObjectSummary",
     "OriginPlane",
     "PlacementData",
     "PlacementPosition",
     "PlacementRotation",
+    "PointGeometryInput",
     "SketchArcGeometry",
     "SketchAttachmentData",
     "SketchCircleGeometry",
@@ -500,9 +589,13 @@ __all__ = [
     "SketchConstraintValue",
     "SketchCreationResult",
     "SketchGeometry",
+    "SketchGeometryAdditionResult",
+    "SketchGeometryBatch",
+    "SketchGeometryInput",
     "SketchInspectionResult",
     "SketchLineGeometry",
     "SketchPoint2D",
+    "SketchPoint2DInput",
     "SketchPointGeometry",
     "SketchSolverData",
     "UnsupportedSketchConstraint",
