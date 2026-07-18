@@ -103,7 +103,7 @@ def get_sketch(document_name: str, sketch_name: str) -> SketchInspectionResult:
 
         body = _owning_body(sketch)
         geometry = _inspect_geometry(sketch, Part)
-        constraints = _inspect_constraints(sketch, len(geometry))
+        constraints = _inspect_constraints(sketch, geometry)
         map_mode, attachment = _inspect_attachment(sketch, body)
 
         return SketchInspectionResult(
@@ -228,7 +228,10 @@ def _inspect_geometry(sketch: Any, part: Any) -> tuple[SketchGeometry, ...]:
     return tuple(result)
 
 
-def _inspect_constraints(sketch: Any, geometry_count: int) -> tuple[SketchConstraint, ...]:
+def _inspect_constraints(
+    sketch: Any,
+    geometry: tuple[SketchGeometry, ...],
+) -> tuple[SketchConstraint, ...]:
     try:
         raw_constraints = tuple(sketch.Constraints)
         reported_count = _required_integer(sketch.ConstraintCount)
@@ -260,7 +263,7 @@ def _inspect_constraints(sketch: Any, geometry_count: int) -> tuple[SketchConstr
             )
             continue
 
-        references, unsupported_reference = _constraint_references(item, index, geometry_count)
+        references, unsupported_reference = _constraint_references(item, index, geometry)
         if unsupported_reference:
             result.append(
                 UnsupportedSketchConstraint(
@@ -301,8 +304,14 @@ def _inspect_constraints(sketch: Any, geometry_count: int) -> tuple[SketchConstr
 
 
 def _constraint_references(
-    constraint: Any, constraint_index: int, geometry_count: int
+    constraint: Any,
+    constraint_index: int,
+    geometry: tuple[SketchGeometry, ...],
 ) -> tuple[tuple[SketchConstraintReference, ...], bool]:
+    origin_distance = _distance_to_origin_reference(constraint, constraint_index, geometry)
+    if origin_distance is not None:
+        return origin_distance
+
     references: list[SketchConstraintReference] = []
     for geometry_field, position_field in (
         ("First", "FirstPos"),
@@ -334,18 +343,74 @@ def _constraint_references(
             continue
         if geometry_index < 0 or position_index not in _POSITION_NAMES:
             return (), True
-        if geometry_index >= geometry_count:
+        if geometry_index >= len(geometry):
             raise SketchConstraintMalformedError(
                 index=constraint_index, reason="geometry_reference_out_of_range"
             )
+        position = _controlled_position(geometry[geometry_index], position_index)
+        if position is None:
+            return (), True
         references.append(
             SketchConstraintReference(
                 kind="geometry",
                 geometry_index=geometry_index,
-                position=_POSITION_NAMES[position_index],
+                position=position,
             )
         )
     return tuple(references), False
+
+
+def _distance_to_origin_reference(
+    constraint: Any,
+    constraint_index: int,
+    geometry: tuple[SketchGeometry, ...],
+) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
+    try:
+        if constraint.Type != "Distance":
+            return None
+        first = _required_integer(constraint.First)
+        first_pos = _required_integer(constraint.FirstPos)
+        second = _required_integer(constraint.Second)
+        second_pos = _required_integer(constraint.SecondPos)
+    except Exception as exc:
+        raise SketchConstraintMalformedError(
+            index=constraint_index,
+            reason="reference_unreadable",
+        ) from exc
+
+    if (first, first_pos) == (-1, 1):
+        geometry_index, position_index = second, second_pos
+    elif (second, second_pos) == (-1, 1):
+        geometry_index, position_index = first, first_pos
+    else:
+        return None
+
+    if geometry_index < 0:
+        return (), True
+    if geometry_index >= len(geometry):
+        raise SketchConstraintMalformedError(
+            index=constraint_index,
+            reason="geometry_reference_out_of_range",
+        )
+    position = _controlled_position(geometry[geometry_index], position_index)
+    if position is None or position == "edge":
+        return (), True
+    return (
+        (
+            SketchConstraintReference(
+                kind="geometry",
+                geometry_index=geometry_index,
+                position=position,
+            ),
+        ),
+        False,
+    )
+
+
+def _controlled_position(item: SketchGeometry, position_index: int) -> str | None:
+    if isinstance(item, SketchPointGeometry):
+        return "point" if position_index == 1 else None
+    return _POSITION_NAMES.get(position_index)
 
 
 def _inspect_attachment(sketch: Any, body: Any | None) -> tuple[str, SketchAttachmentData | None]:

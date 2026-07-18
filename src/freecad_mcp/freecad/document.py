@@ -6,6 +6,7 @@ from freecad_mcp.freecad import (
     body_creation,
     document_operations,
     object_inspection,
+    sketch_constraint_creation,
     sketch_creation,
     sketch_geometry_creation,
     sketch_inspection,
@@ -48,6 +49,8 @@ from freecad_mcp.models import (
     ObjectDetail,
     ObjectSummary,
     OriginPlane,
+    SketchConstraintAdditionResult,
+    SketchConstraintInput,
     SketchCreationResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
@@ -120,4 +123,17 @@ class FreeCADDocumentAdapter:
             document_name,
             sketch_name,
             geometry,
+        )
+
+    def add_sketch_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraints: tuple[SketchConstraintInput, ...],
+    ) -> SketchConstraintAdditionResult:
+        """Atomically append controlled constraints without recomputing or saving."""
+        return sketch_constraint_creation.add_sketch_constraints(
+            document_name,
+            sketch_name,
+            constraints,
         )

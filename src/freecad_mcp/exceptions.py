@@ -93,6 +93,23 @@ class SketchGeometryRollbackError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchConstraintCreationError(RuntimeError):
+    """Raised when an atomic sketch-constraint batch cannot be created."""
+
+    def __init__(self, *, index: int | None, reason: str) -> None:
+        self.index = index
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SketchConstraintRollbackError(RuntimeError):
+    """Raised when a failed sketch-constraint batch cannot be fully restored."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SketchTypeMismatchError(RuntimeError):
     """Raised when an object exists but is not a Sketcher::SketchObject."""
 
@@ -175,7 +192,9 @@ __all__ = [
     "ObjectNotFoundError",
     "OriginPlaneNotFoundError",
     "ParentDirectoryNotFoundError",
+    "SketchConstraintCreationError",
     "SketchConstraintMalformedError",
+    "SketchConstraintRollbackError",
     "SketchCreationError",
     "SketchGeometryCreationError",
     "SketchGeometryMalformedError",

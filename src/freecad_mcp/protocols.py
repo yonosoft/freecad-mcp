@@ -12,6 +12,8 @@ from freecad_mcp.models import (
     ObjectDetail,
     ObjectSummary,
     OriginPlane,
+    SketchConstraintAdditionResult,
+    SketchConstraintInput,
     SketchCreationResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
@@ -71,6 +73,14 @@ class DocumentAdapter(Protocol):
         geometry: tuple[SketchGeometryInput, ...],
     ) -> SketchGeometryAdditionResult:
         """Atomically append one controlled ordered geometry batch to a sketch."""
+
+    def add_sketch_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraints: tuple[SketchConstraintInput, ...],
+    ) -> SketchConstraintAdditionResult:
+        """Atomically append one controlled ordered constraint batch to a sketch."""
 
 
 class Dispatcher(Protocol):

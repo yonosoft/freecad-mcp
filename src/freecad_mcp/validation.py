@@ -9,12 +9,22 @@ from pydantic import TypeAdapter, ValidationError
 
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.models import (
+    MAX_SKETCH_CONSTRAINT_BATCH_SIZE,
     MAX_SKETCH_GEOMETRY_BATCH_SIZE,
+    AngleBetweenLinesConstraintInput,
     ArcOfCircleGeometryInput,
     CircleGeometryInput,
+    CoincidentConstraintInput,
+    DistanceBetweenPointsConstraintInput,
+    DistanceXBetweenPointsConstraintInput,
+    DistanceYBetweenPointsConstraintInput,
+    EqualConstraintInput,
     LineSegmentGeometryInput,
     OriginPlane,
+    ParallelConstraintInput,
+    PerpendicularConstraintInput,
     PointGeometryInput,
+    SketchConstraintInput,
     SketchGeometryInput,
 )
 
@@ -26,7 +36,24 @@ _SUPPORTED_SKETCH_GEOMETRY_INPUT_TYPES = {
     "line_segment",
     "point",
 }
+_SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES = {
+    "angle",
+    "coincident",
+    "diameter",
+    "distance",
+    "distance_x",
+    "distance_y",
+    "equal",
+    "horizontal",
+    "parallel",
+    "perpendicular",
+    "radius",
+    "vertical",
+}
 _SKETCH_GEOMETRY_INPUT_ADAPTER: TypeAdapter[SketchGeometryInput] = TypeAdapter(SketchGeometryInput)
+_SKETCH_CONSTRAINT_INPUT_ADAPTER: TypeAdapter[SketchConstraintInput] = TypeAdapter(
+    SketchConstraintInput
+)
 
 
 def _validate_object_name(value: object, *, field: str, subject: str) -> CommandResult | None:
@@ -248,6 +275,85 @@ def validate_add_sketch_geometry_request(
     return tuple(parsed_items)
 
 
+def validate_add_sketch_constraints_request(
+    document_name: object,
+    sketch_name: object,
+    constraints: object,
+) -> CommandResult | tuple[SketchConstraintInput, ...]:
+    """Validate and parse one ordered controlled constraint batch."""
+    document_error = validate_document_reference(document_name)
+    if document_error is not None:
+        return document_error
+    sketch_error = _validate_object_name(
+        sketch_name,
+        field="sketch_name",
+        subject="Sketch",
+    )
+    if sketch_error is not None:
+        return sketch_error
+
+    if not isinstance(constraints, list):
+        return CommandResult.failure(
+            code="validation_error",
+            message="Constraints must be a non-empty array.",
+            data={"field": "constraints", "actual_type": type(constraints).__name__},
+        )
+    if not constraints:
+        return CommandResult.failure(
+            code="validation_error",
+            message="Constraints must contain at least one item.",
+            data={
+                "field": "constraints",
+                "minimum_items": 1,
+                "reason": "empty_constraint_batch",
+            },
+        )
+    if len(constraints) > MAX_SKETCH_CONSTRAINT_BATCH_SIZE:
+        return CommandResult.failure(
+            code="validation_error",
+            message=(
+                "Constraint batch exceeds the maximum supported size of "
+                f"{MAX_SKETCH_CONSTRAINT_BATCH_SIZE} items."
+            ),
+            data={
+                "field": "constraints",
+                "maximum_items": MAX_SKETCH_CONSTRAINT_BATCH_SIZE,
+                "actual_items": len(constraints),
+                "reason": "constraint_batch_too_large",
+            },
+        )
+
+    parsed_items: list[SketchConstraintInput] = []
+    for index, item in enumerate(constraints):
+        if isinstance(item, Mapping):
+            discriminator = item.get("type")
+            if isinstance(discriminator, str) and (
+                discriminator not in _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES
+            ):
+                return CommandResult.failure(
+                    code="validation_error",
+                    message=f"Constraint item {index} uses an unsupported type.",
+                    data={
+                        "field": f"constraints[{index}].type",
+                        "constraint_index": index,
+                        "actual_value": discriminator,
+                        "allowed": sorted(_SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES),
+                        "reason": "unsupported_constraint_type",
+                    },
+                )
+        try:
+            parsed = _SKETCH_CONSTRAINT_INPUT_ADAPTER.validate_python(item)
+        except ValidationError as exc:
+            return _constraint_model_validation_error(index, exc)
+
+        semantic_error = _validate_constraint_semantics(index, parsed)
+        if semantic_error is not None:
+            return semantic_error
+        parsed_items.append(parsed)
+
+    return tuple(parsed_items)
+
+
 def normalize_arc_angles_degrees(start: float, end: float) -> tuple[float, float]:
     """Return one canonical counter-clockwise arc span shorter than 360 degrees."""
     normalized_start = start % 360.0
@@ -276,6 +382,84 @@ def _geometry_model_validation_error(index: int, exc: ValidationError) -> Comman
             "reason": str(error.get("type", "invalid_geometry_input")),
         },
     )
+
+
+def _constraint_model_validation_error(index: int, exc: ValidationError) -> CommandResult:
+    error = exc.errors(include_url=False, include_context=False, include_input=False)[0]
+    raw_location = [str(part) for part in error.get("loc", ())]
+    location = [
+        part
+        for part in raw_location
+        if part not in _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES
+        and part
+        not in {"line_length", "point_to_origin", "between_points", "line_angle", "between_lines"}
+    ]
+    field = f"constraints[{index}]"
+    if location:
+        field = f"{field}." + ".".join(location)
+
+    leaf = location[-1] if location else ""
+    validation_type = str(error.get("type", "invalid_constraint_input"))
+    if validation_type == "missing":
+        reason = "invalid_constraint_input"
+    elif leaf == "position":
+        reason = "invalid_position_reference"
+    elif leaf in {"value", "value_degrees"}:
+        reason = "invalid_constraint_value"
+    elif leaf.endswith("geometry_index"):
+        reason = "invalid_geometry_reference"
+    else:
+        reason = "invalid_constraint_input"
+    return CommandResult.failure(
+        code="validation_error",
+        message=f"Constraint item {index} is malformed.",
+        data={
+            "field": field,
+            "constraint_index": index,
+            "reason": reason,
+            "validation_type": validation_type,
+        },
+    )
+
+
+def _validate_constraint_semantics(
+    index: int,
+    item: SketchConstraintInput,
+) -> CommandResult | None:
+    pair: tuple[int, int] | None = None
+    if isinstance(
+        item,
+        (
+            ParallelConstraintInput,
+            PerpendicularConstraintInput,
+            EqualConstraintInput,
+            AngleBetweenLinesConstraintInput,
+        ),
+    ):
+        pair = (item.first_geometry_index, item.second_geometry_index)
+    elif isinstance(
+        item,
+        (
+            CoincidentConstraintInput,
+            DistanceBetweenPointsConstraintInput,
+            DistanceXBetweenPointsConstraintInput,
+            DistanceYBetweenPointsConstraintInput,
+        ),
+    ):
+        pair = (item.first.geometry_index, item.second.geometry_index)
+
+    if pair is not None and pair[0] == pair[1]:
+        return CommandResult.failure(
+            code="validation_error",
+            message=f"Constraint item {index} must reference distinct geometry.",
+            data={
+                "field": f"constraints[{index}]",
+                "constraint_index": index,
+                "geometry_index": pair[0],
+                "reason": "same_geometry_reference",
+            },
+        )
+    return None
 
 
 def _validate_geometry_semantics(
@@ -329,6 +513,7 @@ def _validate_geometry_semantics(
 
 __all__ = [
     "normalize_arc_angles_degrees",
+    "validate_add_sketch_constraints_request",
     "validate_add_sketch_geometry_request",
     "validate_create_body_request",
     "validate_create_document_request",

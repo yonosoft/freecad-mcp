@@ -6,6 +6,7 @@ from typing import Any, TypeVar
 
 from freecad_mcp.application import Application, create_application
 from freecad_mcp.commands import (
+    AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
@@ -28,6 +29,8 @@ from freecad_mcp.models import (
     PlacementData,
     PlacementPosition,
     PlacementRotation,
+    SketchConstraintAdditionResult,
+    SketchConstraintInput,
     SketchCreationResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
@@ -183,6 +186,19 @@ class AdapterStub:
             geometry_count=len(geometry),
         )
 
+    def add_sketch_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraints: tuple[SketchConstraintInput, ...],
+    ) -> SketchConstraintAdditionResult:
+        return SketchConstraintAdditionResult(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            added_indices=tuple(range(len(constraints))),
+            constraint_count=len(constraints),
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -212,6 +228,7 @@ def make_application() -> Application:
         create_sketch=CreateSketchHandler(adapter, dispatcher),
         get_sketch=GetSketchHandler(adapter, dispatcher),
         add_sketch_geometry=AddSketchGeometryHandler(adapter, dispatcher),
+        add_sketch_constraints=AddSketchConstraintsHandler(adapter, dispatcher),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)

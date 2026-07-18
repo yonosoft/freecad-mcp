@@ -190,11 +190,13 @@ FastMCP registrations are explicit and grouped by contract:
 recomputation; `mcp.object_tools` registers object listing and lookup and owns
 the separate `get_sketch` registration; and `mcp.creation_tools` registers body
 and sketch creation. `mcp.sketch_geometry_tools` explicitly registers the
-atomic geometry mutation. `mcp.server` is the small composition module that
-constructs FastMCP and invokes those registration functions in authoritative
-tool-registry order. `get_sketch` remains exactly tool ten and
-`add_sketch_geometry` is registered after it as exactly tool eleven; no
-registration loop is used.
+atomic geometry mutation, and `mcp.sketch_constraint_tools` explicitly
+registers atomic constraint mutation. `mcp.server` is the small composition
+module that constructs FastMCP and invokes those registration functions in
+authoritative tool-registry order. `get_sketch` remains exactly tool ten,
+`add_sketch_geometry` follows as exactly tool eleven, and
+`add_sketch_constraints` follows as exactly tool twelve; no registration loop
+is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
 
@@ -204,8 +206,8 @@ so reported capabilities cannot drift from the registered set.
 
 The registry currently exposes `create_document`, `list_documents`,
 `get_document`, `save_document`, `list_objects`, `get_object`,
-`recompute_document`, `create_body`, `create_sketch`, `get_sketch`, and
-`add_sketch_geometry`, in that order.
+`recompute_document`, `create_body`, `create_sketch`, `get_sketch`,
+`add_sketch_geometry`, and `add_sketch_constraints`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -719,6 +721,156 @@ properties are not exposed.
 
 FreeCAD exception text, traceback data, object representations, and memory
 addresses are not included in these results.
+
+## Sketch Constraint Mutation
+
+### add_sketch_constraints
+
+`add_sketch_constraints` is the controlled atomic constraint-creation path for
+an existing `Sketcher::SketchObject`. Its dependency flow is:
+
+```text
+MCP sketch-constraint registration
+→ add-sketch-constraints command handler
+→ protocols, models, exceptions and validation
+→ FreeCADDocumentAdapter facade
+→ focused sketch-constraint-creation module
+→ Qt main-thread dispatcher
+→ FreeCAD Sketcher API
+```
+
+The focused responsibilities live in
+`commands/sketch_constraints.py`, `freecad/sketch_constraint_creation.py`, and
+`mcp/sketch_constraint_tools.py`. Models, validation, commands, and transport
+do not import FreeCAD. `FreeCADDocumentAdapter` remains publicly importable from
+`freecad_mcp.freecad.document`; there is no generic constraint registry,
+registration loop, arbitrary property mutation, or raw constructor passthrough.
+
+#### Input Models and Units
+
+The top-level schema requires exactly `document_name`, `sketch_name`, and a
+`constraints` array with 1 to 100 items. Both names use exact internal-name
+lookup. The strict nested discriminated union supports:
+
+```text
+horizontal / vertical
+  geometry_index
+
+parallel / perpendicular / equal
+  first_geometry_index, second_geometry_index
+
+coincident
+  first, second point references
+
+distance
+  line_length: geometry_index, value
+  point_to_origin: point, value
+  between_points: first, second, value
+
+distance_x / distance_y
+  point_to_origin: point, value
+  between_points: first, second, value
+
+radius / diameter
+  geometry_index, value
+
+angle
+  line_angle: geometry_index, value_degrees
+  between_lines: first_geometry_index, second_geometry_index, value_degrees
+```
+
+A point reference is `{geometry_index, position}`. Public position tokens map
+to verified FreeCAD point-position integers as `start → 1`, `end → 2`,
+`center → 3`, and `point → 1` for `Part.Point`. The adapter admits
+`start`/`end` for lines, `start`/`end`/`center` for circular arcs, `center` for
+circles, and `point` for point geometry. Negative, axis, external, internal,
+and free-form origin references are rejected. The explicit Euclidean
+`point_to_origin` mode uses FreeCAD's internal root point `(-1, 1)` without
+exposing it; sketch inspection recognizes that encoding and returns only the
+controlled geometry-point reference.
+
+Lengths are public millimetres. Euclidean distances, radii, and diameters are
+strict finite positive values. Signed and zero `distance_x`/`distance_y` values
+are preserved. Angles are strict finite degrees converted directly to radians.
+FreeCAD 1.1.1 stores the supplied radians without normalization and accepts
+zero, ±180°, full turns, and values beyond a full turn. The public contract
+therefore performs no normalization; line direction controls absolute and
+between-line orientation semantics.
+
+#### Geometry Compatibility and Validation Boundary
+
+Pure request validation rejects malformed unions, missing/additional fields,
+unsupported discriminators or modes, non-integer or negative indices, invalid
+position tokens, same-geometry pairs, nonnumeric/non-finite values, nonpositive
+unsigned dimensions, empty batches, and batches above 100. Before opening a
+transaction, the FreeCAD adapter resolves every current index and enforces:
+
+- horizontal, vertical, parallel, perpendicular, line length, and angles:
+  `Part.LineSegment` only;
+- equal: line-to-line or any circle/circular-arc pair;
+- coincident and point distances: only point tokens valid for the runtime
+  geometry type;
+- radius and diameter: `Part.Circle` or `Part.ArcOfCircle` only.
+
+Construction geometry is valid under the same rules. Standalone and attached
+sketches share the same path. FreeCAD constructor acceptance is not treated as
+validation: the 1.1.1 binding can append incompatible or malformed constraints
+and report them only through solver state.
+
+#### Transaction, Rollback, and Solver Policy
+
+The adapter snapshots geometry and construction state plus every existing
+constraint's type, three geometry/position pairs, dimensional value, name,
+driving flag, active flag, and virtual-space flag. It observes
+`Document.HasPendingTransaction`: with no pending transaction it opens exactly
+one `MCP Add Sketch Constraints` transaction and owns the matching commit or
+abort; with a pending caller transaction it does not open, commit, or abort it.
+
+Each constraint is constructed and added in request order. Assigned indices,
+incremental counts, final count, and returned-index count are verified. Success
+commits once only when the transaction is owned. With undo enabled, that owned
+batch is expected to be one undo/redo step; caller-owned grouping remains the
+caller's responsibility.
+
+On any post-open failure, appended tail constraints are deleted in reverse,
+the owned transaction is aborted, safe tail cleanup is repeated, and existing
+constraint flags are restored where needed. Because FreeCAD's Python
+`addConstraint` binding internally sets up and solves the sketch and may move
+geometry immediately, rollback compares and, only when required, restores the
+captured geometry property and construction flags. It then verifies constraint
+count and complete constraint state, geometry and construction state, and
+transaction ownership. A failure of any restoration or verification becomes
+`sketch_constraint_rollback_failed`; no partial index list is returned.
+
+The tool itself never calls `Sketch.solve()`, `Document.recompute()`,
+`evaluateConstraints()`, `validateConstraints()`, `save()`, or `saveAs()`.
+FreeCAD's internal add-binding solve is distinguished from an explicit tool
+solve. The document remains touched and `get_sketch` treats solver facts as
+stale until the client explicitly calls `recompute_document`. Redundancy and
+conflicts are not speculative request failures.
+
+#### Result, Errors, and Non-Goals
+
+Success code `sketch_constraints_added` returns `document_name`, `sketch_name`,
+ordered `added_indices`, derived `added_count`, final `constraint_count`, and
+`Sketch constraints added.`. Indices are immediate state only and clients must
+call `get_sketch` after mutation.
+
+Public error codes are `validation_error`, `document_not_found`,
+`sketch_not_found`, `sketch_type_mismatch`,
+`sketch_constraint_creation_failed`, `sketch_constraint_rollback_failed`, and
+`internal_error`. Controlled reasons include `empty_constraint_batch`,
+`constraint_batch_too_large`, `unsupported_constraint_type`,
+`invalid_constraint_input`, `invalid_geometry_reference`,
+`geometry_reference_out_of_range`, `invalid_position_reference`,
+`same_geometry_reference`, `invalid_constraint_value`, and
+`incompatible_geometry_type`, plus focused transaction/index/count/rollback
+reasons. Raw FreeCAD exception text is never public.
+
+Version one creates only active driving dimensional constraints. Tangency,
+point-on-object, symmetry, block, internal alignment, angle-via-point,
+B-spline-specific and reference constraints; expressions, names, editing and
+deletion; and external/axis/internal geometry references remain unsupported.
 
 ## Sketch Inspection
 

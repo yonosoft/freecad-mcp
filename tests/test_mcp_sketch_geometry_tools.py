@@ -175,6 +175,7 @@ def test_add_sketch_geometry_is_exactly_tool_eleven_without_changing_first_ten()
         "create_sketch",
         "get_sketch",
         "add_sketch_geometry",
+        "add_sketch_constraints",
     ]
     assert actual == list(REGISTERED_TOOL_NAMES)
     assert actual[9] == "get_sketch"

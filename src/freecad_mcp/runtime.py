@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from freecad_mcp.application import Application, create_application
 from freecad_mcp.commands import (
+    AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
     CreateDocumentHandler,
     DocumentHandlers,
@@ -68,6 +69,7 @@ def _build_runtime() -> Runtime:
         create_sketch=CreateSketchHandler(adapter=adapter, dispatcher=dispatcher),
         get_sketch=GetSketchHandler(adapter=adapter, dispatcher=dispatcher),
         add_sketch_geometry=AddSketchGeometryHandler(adapter=adapter, dispatcher=dispatcher),
+        add_sketch_constraints=AddSketchConstraintsHandler(adapter=adapter, dispatcher=dispatcher),
         recompute=RecomputeDocumentHandler(adapter=adapter, dispatcher=dispatcher),
     )
     lifecycle = LifecycleService(

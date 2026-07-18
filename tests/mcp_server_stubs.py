@@ -7,6 +7,7 @@ from dataclasses import replace
 from typing import Any, TypeVar
 
 from freecad_mcp.commands import (
+    AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
@@ -29,6 +30,8 @@ from freecad_mcp.models import (
     PlacementData,
     PlacementPosition,
     PlacementRotation,
+    SketchConstraintAdditionResult,
+    SketchConstraintInput,
     SketchCreationResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
@@ -60,6 +63,9 @@ class AdapterStub:
         self.create_sketch_calls: list[tuple[str, str, str, str | None, OriginPlane | None]] = []
         self.get_sketch_calls: list[tuple[str, str]] = []
         self.add_sketch_geometry_calls: list[tuple[str, str, tuple[SketchGeometryInput, ...]]] = []
+        self.add_sketch_constraints_calls: list[
+            tuple[str, str, tuple[SketchConstraintInput, ...]]
+        ] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -204,6 +210,20 @@ class AdapterStub:
             geometry_count=len(geometry),
         )
 
+    def add_sketch_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraints: tuple[SketchConstraintInput, ...],
+    ) -> SketchConstraintAdditionResult:
+        self.add_sketch_constraints_calls.append((document_name, sketch_name, constraints))
+        return SketchConstraintAdditionResult(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            added_indices=tuple(range(len(constraints))),
+            constraint_count=len(constraints),
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -225,6 +245,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             create_sketch=CreateSketchHandler(actual_adapter, dispatcher),
             get_sketch=GetSketchHandler(actual_adapter, dispatcher),
             add_sketch_geometry=AddSketchGeometryHandler(actual_adapter, dispatcher),
+            add_sketch_constraints=AddSketchConstraintsHandler(actual_adapter, dispatcher),
             recompute=RecomputeDocumentHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,

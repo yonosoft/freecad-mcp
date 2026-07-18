@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 MAX_SKETCH_GEOMETRY_BATCH_SIZE = 100
+MAX_SKETCH_CONSTRAINT_BATCH_SIZE = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,6 +265,222 @@ SketchGeometryBatch = Annotated[
 ]
 
 
+class SketchPointPosition(StrEnum):
+    """Controlled public sketch-point selectors."""
+
+    START = "start"
+    END = "end"
+    CENTER = "center"
+    POINT = "point"
+
+
+class _SketchConstraintInputModel(BaseModel):
+    """Strict base for controlled sketch-constraint mutation inputs."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class SketchConstraintPointReferenceInput(_SketchConstraintInputModel):
+    """Non-negative current sketch geometry and one semantic point selector."""
+
+    geometry_index: int = Field(strict=True, ge=0)
+    position: SketchPointPosition
+
+
+class HorizontalConstraintInput(_SketchConstraintInputModel):
+    """Make one line segment horizontal."""
+
+    type: Literal["horizontal"]
+    geometry_index: int = Field(strict=True, ge=0)
+
+
+class VerticalConstraintInput(_SketchConstraintInputModel):
+    """Make one line segment vertical."""
+
+    type: Literal["vertical"]
+    geometry_index: int = Field(strict=True, ge=0)
+
+
+class ParallelConstraintInput(_SketchConstraintInputModel):
+    """Make two distinct line segments parallel."""
+
+    type: Literal["parallel"]
+    first_geometry_index: int = Field(strict=True, ge=0)
+    second_geometry_index: int = Field(strict=True, ge=0)
+
+
+class PerpendicularConstraintInput(_SketchConstraintInputModel):
+    """Make two distinct line segments perpendicular."""
+
+    type: Literal["perpendicular"]
+    first_geometry_index: int = Field(strict=True, ge=0)
+    second_geometry_index: int = Field(strict=True, ge=0)
+
+
+class EqualConstraintInput(_SketchConstraintInputModel):
+    """Make two compatible distinct geometries equal."""
+
+    type: Literal["equal"]
+    first_geometry_index: int = Field(strict=True, ge=0)
+    second_geometry_index: int = Field(strict=True, ge=0)
+
+
+class CoincidentConstraintInput(_SketchConstraintInputModel):
+    """Make two controlled geometry points coincident."""
+
+    type: Literal["coincident"]
+    first: SketchConstraintPointReferenceInput
+    second: SketchConstraintPointReferenceInput
+
+
+class DistanceLineLengthConstraintInput(_SketchConstraintInputModel):
+    """Constrain one line segment's unsigned length in millimetres."""
+
+    type: Literal["distance"]
+    mode: Literal["line_length"]
+    geometry_index: int = Field(strict=True, ge=0)
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class DistancePointToOriginConstraintInput(_SketchConstraintInputModel):
+    """Constrain unsigned Euclidean distance from one point to the sketch origin."""
+
+    type: Literal["distance"]
+    mode: Literal["point_to_origin"]
+    point: SketchConstraintPointReferenceInput
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class DistanceBetweenPointsConstraintInput(_SketchConstraintInputModel):
+    """Constrain unsigned Euclidean distance between two points."""
+
+    type: Literal["distance"]
+    mode: Literal["between_points"]
+    first: SketchConstraintPointReferenceInput
+    second: SketchConstraintPointReferenceInput
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+DistanceConstraintInput = Annotated[
+    DistanceLineLengthConstraintInput
+    | DistancePointToOriginConstraintInput
+    | DistanceBetweenPointsConstraintInput,
+    Field(discriminator="mode"),
+]
+
+
+class DistanceXPointToOriginConstraintInput(_SketchConstraintInputModel):
+    """Constrain signed horizontal distance from a point to the sketch origin."""
+
+    type: Literal["distance_x"]
+    mode: Literal["point_to_origin"]
+    point: SketchConstraintPointReferenceInput
+    value: float = Field(strict=True, allow_inf_nan=False)
+
+
+class DistanceXBetweenPointsConstraintInput(_SketchConstraintInputModel):
+    """Constrain signed horizontal distance between two points."""
+
+    type: Literal["distance_x"]
+    mode: Literal["between_points"]
+    first: SketchConstraintPointReferenceInput
+    second: SketchConstraintPointReferenceInput
+    value: float = Field(strict=True, allow_inf_nan=False)
+
+
+DistanceXConstraintInput = Annotated[
+    DistanceXPointToOriginConstraintInput | DistanceXBetweenPointsConstraintInput,
+    Field(discriminator="mode"),
+]
+
+
+class DistanceYPointToOriginConstraintInput(_SketchConstraintInputModel):
+    """Constrain signed vertical distance from a point to the sketch origin."""
+
+    type: Literal["distance_y"]
+    mode: Literal["point_to_origin"]
+    point: SketchConstraintPointReferenceInput
+    value: float = Field(strict=True, allow_inf_nan=False)
+
+
+class DistanceYBetweenPointsConstraintInput(_SketchConstraintInputModel):
+    """Constrain signed vertical distance between two points."""
+
+    type: Literal["distance_y"]
+    mode: Literal["between_points"]
+    first: SketchConstraintPointReferenceInput
+    second: SketchConstraintPointReferenceInput
+    value: float = Field(strict=True, allow_inf_nan=False)
+
+
+DistanceYConstraintInput = Annotated[
+    DistanceYPointToOriginConstraintInput | DistanceYBetweenPointsConstraintInput,
+    Field(discriminator="mode"),
+]
+
+
+class RadiusConstraintInput(_SketchConstraintInputModel):
+    """Constrain a circle or circular arc radius in millimetres."""
+
+    type: Literal["radius"]
+    geometry_index: int = Field(strict=True, ge=0)
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class DiameterConstraintInput(_SketchConstraintInputModel):
+    """Constrain a circle or circular arc diameter in millimetres."""
+
+    type: Literal["diameter"]
+    geometry_index: int = Field(strict=True, ge=0)
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class AngleLineConstraintInput(_SketchConstraintInputModel):
+    """Constrain one oriented line angle in degrees without normalization."""
+
+    type: Literal["angle"]
+    mode: Literal["line_angle"]
+    geometry_index: int = Field(strict=True, ge=0)
+    value_degrees: float = Field(strict=True, allow_inf_nan=False)
+
+
+class AngleBetweenLinesConstraintInput(_SketchConstraintInputModel):
+    """Constrain the oriented angle between two distinct lines in degrees."""
+
+    type: Literal["angle"]
+    mode: Literal["between_lines"]
+    first_geometry_index: int = Field(strict=True, ge=0)
+    second_geometry_index: int = Field(strict=True, ge=0)
+    value_degrees: float = Field(strict=True, allow_inf_nan=False)
+
+
+AngleConstraintInput = Annotated[
+    AngleLineConstraintInput | AngleBetweenLinesConstraintInput,
+    Field(discriminator="mode"),
+]
+
+
+SketchConstraintInput = Annotated[
+    HorizontalConstraintInput
+    | VerticalConstraintInput
+    | ParallelConstraintInput
+    | PerpendicularConstraintInput
+    | EqualConstraintInput
+    | CoincidentConstraintInput
+    | DistanceConstraintInput
+    | DistanceXConstraintInput
+    | DistanceYConstraintInput
+    | RadiusConstraintInput
+    | DiameterConstraintInput
+    | AngleConstraintInput,
+    Field(discriminator="type"),
+]
+SketchConstraintBatch = Annotated[
+    list[SketchConstraintInput],
+    Field(min_length=1, max_length=MAX_SKETCH_CONSTRAINT_BATCH_SIZE),
+]
+
+
 @dataclass(frozen=True, slots=True)
 class SketchGeometryAdditionResult:
     """Controlled result for one atomic sketch-geometry batch."""
@@ -280,6 +497,25 @@ class SketchGeometryAdditionResult:
             "added_indices": list(self.added_indices),
             "added_count": len(self.added_indices),
             "geometry_count": self.geometry_count,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintAdditionResult:
+    """Controlled result for one atomic sketch-constraint batch."""
+
+    document_name: str
+    sketch_name: str
+    added_indices: tuple[int, ...]
+    constraint_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "document_name": self.document_name,
+            "sketch_name": self.sketch_name,
+            "added_indices": list(self.added_indices),
+            "added_count": len(self.added_indices),
+            "constraint_count": self.constraint_count,
         }
 
 
@@ -566,25 +802,50 @@ class SketchInspectionResult:
 
 
 __all__ = [
+    "MAX_SKETCH_CONSTRAINT_BATCH_SIZE",
     "MAX_SKETCH_GEOMETRY_BATCH_SIZE",
+    "AngleBetweenLinesConstraintInput",
+    "AngleConstraintInput",
+    "AngleLineConstraintInput",
     "ArcOfCircleGeometryInput",
     "AttachmentInfo",
     "CircleGeometryInput",
+    "CoincidentConstraintInput",
+    "DiameterConstraintInput",
+    "DistanceBetweenPointsConstraintInput",
+    "DistanceConstraintInput",
+    "DistanceLineLengthConstraintInput",
+    "DistancePointToOriginConstraintInput",
+    "DistanceXBetweenPointsConstraintInput",
+    "DistanceXConstraintInput",
+    "DistanceXPointToOriginConstraintInput",
+    "DistanceYBetweenPointsConstraintInput",
+    "DistanceYConstraintInput",
+    "DistanceYPointToOriginConstraintInput",
     "DocumentCollection",
     "DocumentSummary",
+    "EqualConstraintInput",
+    "HorizontalConstraintInput",
     "LineSegmentGeometryInput",
     "ObjectDetail",
     "ObjectSummary",
     "OriginPlane",
+    "ParallelConstraintInput",
+    "PerpendicularConstraintInput",
     "PlacementData",
     "PlacementPosition",
     "PlacementRotation",
     "PointGeometryInput",
+    "RadiusConstraintInput",
     "SketchArcGeometry",
     "SketchAttachmentData",
     "SketchCircleGeometry",
     "SketchConstraint",
+    "SketchConstraintAdditionResult",
+    "SketchConstraintBatch",
     "SketchConstraintData",
+    "SketchConstraintInput",
+    "SketchConstraintPointReferenceInput",
     "SketchConstraintReference",
     "SketchConstraintValue",
     "SketchCreationResult",
@@ -597,7 +858,9 @@ __all__ = [
     "SketchPoint2D",
     "SketchPoint2DInput",
     "SketchPointGeometry",
+    "SketchPointPosition",
     "SketchSolverData",
     "UnsupportedSketchConstraint",
     "UnsupportedSketchGeometry",
+    "VerticalConstraintInput",
 ]

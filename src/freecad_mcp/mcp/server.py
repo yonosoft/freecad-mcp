@@ -13,6 +13,7 @@ from freecad_mcp.mcp.document_tools import (
     register_recompute_document_tool,
 )
 from freecad_mcp.mcp.object_tools import register_get_sketch_tool, register_object_tools
+from freecad_mcp.mcp.sketch_constraint_tools import register_add_sketch_constraints_tool
 from freecad_mcp.mcp.sketch_geometry_tools import register_add_sketch_geometry_tool
 from freecad_mcp.server.config import ServerConfig
 
@@ -36,5 +37,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_creation_tools(server, handlers)
     register_get_sketch_tool(server, handlers)
     register_add_sketch_geometry_tool(server, handlers)
+    register_add_sketch_constraints_tool(server, handlers)
 
     return server

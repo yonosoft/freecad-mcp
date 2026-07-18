@@ -316,6 +316,33 @@ def test_get_sketch_serializes_supported_and_unsupported_items(
     ) == sketch_state_before
 
 
+def test_get_sketch_hides_internal_root_point_for_created_distance_to_origin(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[Point(3.0, 4.0)],
+        constraints=[
+            ConstraintStub(
+                "Distance",
+                first=0,
+                first_pos=1,
+                second=-1,
+                second_pos=1,
+                value=5.0,
+            )
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    result = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()
+
+    constraint = result["constraints"][0]  # type: ignore[index]
+    assert constraint["references"] == [
+        {"kind": "geometry", "geometry_index": 0, "position": "point"}
+    ]
+    assert constraint["value"] == {"value": 5.0, "unit": "millimeter"}
+
+
 def test_get_sketch_reports_stale_solver_cache_without_values(
     monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
 ) -> None:

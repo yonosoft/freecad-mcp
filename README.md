@@ -1,7 +1,7 @@
-# FreeCad MCP
+# FreeCAD MCP
 
-FreeCad Context Protocol server inside FreeCAD. It exposes explicit typed CAD tools and
-shared command handlers rather than arbitrary Python execution.
+A Model Context Protocol server embedded in FreeCAD. It exposes explicit, typed CAD tools and
+shared command handlers instead of arbitrary Python execution.
 
 ## Current Maturity
 
@@ -14,9 +14,10 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- eleven typed MCP tools for document creation, inspection, saving,
+- twelve typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
-  sketch inspection, and atomic controlled sketch-geometry addition;
+  sketch inspection, atomic controlled sketch-geometry addition, and atomic
+  controlled sketch-constraint addition;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -114,6 +115,7 @@ create_body
 create_sketch
 get_sketch
 add_sketch_geometry
+add_sketch_constraints
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -254,6 +256,101 @@ unsupported creation discriminator are controlled request errors. Valid
 unsupported geometry already present in a sketch remains inspectable through
 `get_sketch`; mutation support intentionally does not exceed controlled
 inspection support.
+
+### add_sketch_constraints
+
+`add_sketch_constraints` atomically appends an ordered batch of 1 to 100
+constraints to an existing sketch. Its required top-level inputs are exactly
+`document_name`, `sketch_name`, and `constraints`; lookup uses exact internal
+names and never visible-label aliases. Each constraint is a strict typed union
+member with no additional fields. Version one supports:
+
+- `horizontal` and `vertical` on line segments;
+- `parallel` and `perpendicular` between distinct line segments;
+- `equal` between distinct line segments, or between any distinct pair of
+  circles and circular arcs;
+- `coincident` between distinct controlled point references;
+- `distance` modes `line_length`, `point_to_origin`, and `between_points`;
+- `distance_x` and `distance_y` modes `point_to_origin` and `between_points`;
+- `radius` and `diameter` on circles or circular arcs;
+- `angle` modes `line_angle` and `between_lines` on line segments.
+
+For example:
+
+```json
+{
+  "document_name": "Bracket",
+  "sketch_name": "Sketch",
+  "constraints": [
+    {
+      "type": "horizontal",
+      "geometry_index": 0
+    },
+    {
+      "type": "distance",
+      "mode": "between_points",
+      "first": {"geometry_index": 0, "position": "end"},
+      "second": {"geometry_index": 1, "position": "start"},
+      "value": 15.0
+    }
+  ]
+}
+```
+
+Point references use semantic tokens rather than FreeCAD integers:
+`start → 1`, `end → 2`, `center → 3`, and `point → 1` for `Part.Point`
+geometry. Lines allow `start`/`end`, arcs allow `start`/`end`/`center`, circles
+allow `center`, and point geometry allows `point`. Negative geometry indices,
+axes, external geometry, origin references as free-form references, and
+internal geometry are not accepted. The explicit `point_to_origin` modes do
+not expose FreeCAD's internal root-point encoding.
+
+Length values are millimetres. Euclidean `distance`, `radius`, and `diameter`
+values must be finite and positive. `distance_x` and `distance_y` preserve
+finite signed values, including zero. Angle inputs are finite degrees and are
+converted directly to radians without normalization; zero, ±180°, ±360°, and
+values beyond a full turn are preserved. Line direction therefore affects the
+meaning of both one-line and two-line angles.
+
+The batch uses one owned document transaction when no caller transaction is
+already pending. Constraints are added in request order and every assigned
+index and incremental/final count is verified. On failure, appended constraints
+are removed in reverse, the owned transaction is aborted, pre-existing
+constraint type/reference/value and driving/active/virtual flags are verified,
+and geometry plus construction state are restored if FreeCAD's internal solver
+moved them. A successful owned transaction is expected to be one undo step
+when FreeCAD undo is enabled; a caller-owned transaction retains its caller's
+grouping.
+
+The tool never calls `solve`, `recompute`, `save`, or `saveAs`. FreeCAD 1.1.1's
+`addConstraint` binding does internally set up and solve the sketch and may move
+geometry immediately; the document is still left touched and cached solver
+facts are treated as stale until an explicit `recompute_document`. Clients must
+call `get_sketch` after mutation.
+
+Success has this exact shape:
+
+```json
+{
+  "ok": true,
+  "code": "sketch_constraints_added",
+  "document_name": "Bracket",
+  "sketch_name": "Sketch",
+  "added_indices": [0, 1],
+  "added_count": 2,
+  "constraint_count": 2,
+  "message": "Sketch constraints added."
+}
+```
+
+Indices are temporary current-state indices. Only driving dimensional
+constraints are created. Tangent, point-on-object, symmetric, block, internal
+alignment, angle-via-point, B-spline-specific and reference constraints;
+constraint names, expressions, editing, and deletion; axis/external/internal
+geometry references; and arbitrary `Sketcher.Constraint` passthrough remain
+unsupported. Existing unsupported constraints remain inspectable through
+`get_sketch`; redundancy and conflicts are assessed only after explicit
+recompute.
 
 These document, object, and sketch-inspection tools are MCP-only capabilities.
 They do not add workbench commands or toolbar icons. `get_object` performs exact

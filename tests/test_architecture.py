@@ -78,6 +78,7 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         "freecad/body_creation.py",
         "freecad/sketch_creation.py",
         "freecad/sketch_geometry_creation.py",
+        "freecad/sketch_constraint_creation.py",
         "freecad/sketch_inspection.py",
         "freecad/qt_dispatcher.py",
     )
@@ -103,6 +104,7 @@ def test_mcp_registration_does_not_depend_on_freecad_implementation() -> None:
         "mcp/object_tools.py",
         "mcp/creation_tools.py",
         "mcp/sketch_geometry_tools.py",
+        "mcp/sketch_constraint_tools.py",
         "mcp/server.py",
     )
     for relative_path in registration_modules:
@@ -120,6 +122,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "mcp/object_tools.py",
         "mcp/creation_tools.py",
         "mcp/sketch_geometry_tools.py",
+        "mcp/sketch_constraint_tools.py",
     )
     registered_constants: list[str] = []
     for relative_path in registration_modules:
@@ -155,6 +158,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "CREATE_BODY_TOOL",
         "CREATE_SKETCH_TOOL",
         "ADD_SKETCH_GEOMETRY_TOOL",
+        "ADD_SKETCH_CONSTRAINTS_TOOL",
     ]
     assert _imported_modules("tool_registry.py") == set()
 
@@ -173,6 +177,7 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "PlacementRotation",
             "SketchCreationResult",
             "SketchGeometryAdditionResult",
+            "SketchConstraintAdditionResult",
             "SketchInspectionResult",
             "SketchSolverData",
         },
@@ -205,9 +210,11 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "ParentDirectoryNotFoundError",
             "SketchCreationError",
             "SketchGeometryCreationError",
+            "SketchConstraintCreationError",
             "SketchConstraintMalformedError",
             "SketchGeometryMalformedError",
             "SketchGeometryRollbackError",
+            "SketchConstraintRollbackError",
             "SketchInspectionError",
             "SketchTypeMismatchError",
         },
@@ -216,6 +223,7 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "validate_create_document_request",
             "validate_create_sketch_request",
             "validate_add_sketch_geometry_request",
+            "validate_add_sketch_constraints_request",
             "validate_document_reference",
             "validate_object_reference",
         },
@@ -238,6 +246,7 @@ def test_representative_modules_import_in_clean_processes() -> None:
         "freecad_mcp.mcp.object_tools",
         "freecad_mcp.mcp.creation_tools",
         "freecad_mcp.mcp.sketch_geometry_tools",
+        "freecad_mcp.mcp.sketch_constraint_tools",
         "freecad_mcp.mcp.server",
         "freecad_mcp.runtime",
     )
