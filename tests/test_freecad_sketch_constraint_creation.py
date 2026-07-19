@@ -418,7 +418,7 @@ def test_mixed_batch_adds_every_verified_constructor_in_order(
     assert sketch._constraints[7].SecondPos == 1
     assert sketch._constraints[9].Value == -5.0
     assert sketch._constraints[16].Value == pytest.approx(-math.pi / 2)
-    assert document.open_calls == ["MCP Add Sketch Constraints"]
+    assert document.open_calls == ["Add sketch constraints"]
     assert document.commit_calls == 1
     assert document.abort_calls == 0
     assert document.recompute_calls == 0
@@ -561,7 +561,7 @@ def test_general_point_relationships_use_exact_verified_native_constructors(
         ("Vertical", 4, 3, 5, 1),
     ]
     assert sketch._construction == construction
-    assert document.open_calls == ["MCP Add Sketch Constraints"]
+    assert document.open_calls == ["Add sketch constraints"]
     assert document.commit_calls == 1
     assert document.recompute_calls == 0
     assert document.save_calls == 0
@@ -664,7 +664,7 @@ def test_symmetric_uses_exact_verified_point_and_line_native_constructors(
         (0, 2, 3, 3, 5, 1),
         (0, 1, 4, 3, 2, 0),
     ]
-    assert document.open_calls == ["MCP Add Sketch Constraints"]
+    assert document.open_calls == ["Add sketch constraints"]
     assert document.commit_calls == 1
     assert document.recompute_calls == 0
     assert document.save_calls == 0
@@ -774,7 +774,7 @@ def test_centred_rectangle_regression_translates_one_natural_symmetric_batch(
         sketch._constraints[10].Third,
         sketch._constraints[10].ThirdPos,
     ) == (0, 1, 2, 1, -1, 1)
-    assert document.open_calls == ["MCP Add Sketch Constraints"]
+    assert document.open_calls == ["Add sketch constraints"]
     assert document.commit_calls == 1
     assert document.recompute_calls == 0
     assert document.save_calls == 0

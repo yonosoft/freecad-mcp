@@ -157,13 +157,13 @@ def test_add_sketch_geometry_has_exact_description_and_schema() -> None:
     }
 
 
-def test_add_sketch_geometry_is_exactly_tool_eleven_without_changing_first_ten() -> None:
+def test_add_sketch_geometry_remains_tool_eleven_without_changing_first_ten() -> None:
     handlers, _ = make_handlers()
     actual = [
         tool.name for tool in asyncio.run(build_mcp_server(handlers, ServerConfig()).list_tools())
     ]
 
-    assert actual == [
+    assert actual[:12] == [
         "create_document",
         "list_documents",
         "get_document",
@@ -177,6 +177,7 @@ def test_add_sketch_geometry_is_exactly_tool_eleven_without_changing_first_ten()
         "add_sketch_geometry",
         "add_sketch_constraints",
     ]
+    assert actual[12:] == ["get_document_history", "undo_document", "redo_document"]
     assert actual == list(REGISTERED_TOOL_NAMES)
     assert actual[9] == "get_sketch"
     assert actual[10] == ADD_SKETCH_GEOMETRY_TOOL

@@ -12,17 +12,24 @@ from freecad_mcp.commands import (
     CreateDocumentHandler,
     DocumentHandlers,
     GetDocumentHandler,
+    GetDocumentHistoryHandler,
     GetObjectHandler,
     GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
     RecomputeDocumentHandler,
+    RedoDocumentHandler,
     SaveDocumentHandler,
+    UndoDocumentHandler,
 )
 from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.models import (
     AttachmentInfo,
     DocumentCollection,
+    DocumentHistoryInspectionResult,
+    DocumentHistoryOperationResult,
+    DocumentHistorySnapshot,
+    DocumentHistoryTransaction,
     DocumentSummary,
     ObjectDetail,
     OriginPlane,
@@ -53,6 +60,8 @@ class AdapterStub:
             active=True,
             object_count=0,
         )
+        self.undo_names = ["Add sketch geometry"]
+        self.redo_names: list[str] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.document = replace(self.document, name=name, label=label or name)
@@ -63,6 +72,47 @@ class AdapterStub:
 
     def get_document(self, name: str) -> DocumentSummary:
         return self.document
+
+    def _history(self) -> DocumentHistorySnapshot:
+        return DocumentHistorySnapshot(
+            undo_count=len(self.undo_names),
+            redo_count=len(self.redo_names),
+            can_undo=bool(self.undo_names),
+            can_redo=bool(self.redo_names),
+            next_undo_name=self.undo_names[0] if self.undo_names else None,
+            next_redo_name=self.redo_names[0] if self.redo_names else None,
+            transaction_active=False,
+            history_available=True,
+        )
+
+    def get_document_history(self, name: str) -> DocumentHistoryInspectionResult:
+        return DocumentHistoryInspectionResult(self._history(), self.document)
+
+    def undo_document(
+        self, name: str, expected_transaction_name: str | None
+    ) -> DocumentHistoryOperationResult:
+        before = self._history()
+        transaction_name = self.undo_names.pop(0)
+        self.redo_names.insert(0, transaction_name)
+        return DocumentHistoryOperationResult(
+            DocumentHistoryTransaction(transaction_name, "undo"),
+            before,
+            self._history(),
+            self.document,
+        )
+
+    def redo_document(
+        self, name: str, expected_transaction_name: str | None
+    ) -> DocumentHistoryOperationResult:
+        before = self._history()
+        transaction_name = self.redo_names.pop(0)
+        self.undo_names.insert(0, transaction_name)
+        return DocumentHistoryOperationResult(
+            DocumentHistoryTransaction(transaction_name, "redo"),
+            before,
+            self._history(),
+            self.document,
+        )
 
     def save_document(self, name: str, file_path: str | None) -> DocumentSummary:
         self.document = replace(
@@ -221,6 +271,9 @@ def make_application() -> Application:
         create=CreateDocumentHandler(adapter, dispatcher),
         list=ListDocumentsHandler(adapter, dispatcher),
         get=GetDocumentHandler(adapter, dispatcher),
+        get_history=GetDocumentHistoryHandler(adapter, dispatcher),
+        undo=UndoDocumentHandler(adapter, dispatcher),
+        redo=RedoDocumentHandler(adapter, dispatcher),
         save=SaveDocumentHandler(adapter, dispatcher),
         object_query=ListObjectsHandler(adapter, dispatcher),
         get_object=GetObjectHandler(adapter, dispatcher),
@@ -254,6 +307,27 @@ def test_application_dispatches_lifecycle_and_document_commands() -> None:
     assert created.data["document"] == inspected.data["document"]
     assert listed.data["active_document"] == "TestDocument"
     assert listed.data["documents"] == [created.data["document"]]
+
+
+def test_application_dispatches_document_history_undo_and_redo() -> None:
+    application = make_application()
+
+    inspected = application.get_document_history("TestDocument")
+    undone = application.undo_document("TestDocument", "Add sketch geometry")
+    redone = application.redo_document("TestDocument", "Add sketch geometry")
+
+    assert inspected.code == "document_history_retrieved"
+    assert inspected.data["history"]["next_undo_name"] == "Add sketch geometry"  # type: ignore[index]
+    assert undone.code == "document_undone"
+    assert undone.data["transaction"] == {
+        "name": "Add sketch geometry",
+        "direction": "undo",
+    }
+    assert redone.code == "document_redone"
+    assert redone.data["transaction"] == {
+        "name": "Add sketch geometry",
+        "direction": "redo",
+    }
 
 
 def test_application_dispatches_create_body_command() -> None:

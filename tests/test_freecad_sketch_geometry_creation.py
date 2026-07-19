@@ -270,7 +270,7 @@ def test_adapter_adds_mixed_batch_in_order_to_standalone_or_attached_sketch(
     arc = sketch._geometry[2]
     assert math.degrees(arc.values[1]) == pytest.approx(350.0)
     assert math.degrees(arc.values[2]) == pytest.approx(370.0)
-    assert document.open_transaction_names == ["MCP Add Sketch Geometry"]
+    assert document.open_transaction_names == ["Add sketch geometry"]
     assert document.commit_transaction_calls == 1
     assert document.abort_transaction_calls == 0
     assert document.transaction_depth == 0
@@ -479,6 +479,6 @@ def test_adapter_preserves_preexisting_transaction_ownership_policy(
 
     FreeCADDocumentAdapter().add_sketch_geometry("Bracket", "Sketch", (_batch()[3],))
 
-    assert document.open_transaction_names == ["MCP Add Sketch Geometry"]
+    assert document.open_transaction_names == ["Add sketch geometry"]
     assert document.commit_transaction_calls == 1
     assert document.transaction_depth == 1

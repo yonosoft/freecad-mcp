@@ -43,6 +43,9 @@ placement extraction; and `freecad.body_creation` and
 Atomic geometry addition belongs to `freecad.sketch_geometry_creation`, while
 read-only sketch state belongs to `freecad.sketch_inspection`. Both remain
 separate from sketch creation and behind the same public adapter facade.
+Controlled history inspection and one-step mutation belong to
+`freecad.document_history`; `freecad.history_guard` makes MCP-owned undo, redo,
+and rollback visible to re-entrant calls without exposing that state publicly.
 
 ## Component Model
 
@@ -191,12 +194,15 @@ recomputation; `mcp.object_tools` registers object listing and lookup and owns
 the separate `get_sketch` registration; and `mcp.creation_tools` registers body
 and sketch creation. `mcp.sketch_geometry_tools` explicitly registers the
 atomic geometry mutation, and `mcp.sketch_constraint_tools` explicitly
-registers atomic constraint mutation. `mcp.server` is the small composition
+registers atomic constraint mutation. `mcp.document_history_tools` explicitly
+registers controlled history inspection, undo, and redo. `mcp.server` is the
+small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
 `add_sketch_geometry` follows as exactly tool eleven, and
-`add_sketch_constraints` follows as exactly tool twelve; no registration loop
-is used.
+`add_sketch_constraints` follows as exactly tool twelve. History inspection,
+undo, and redo are exactly tools thirteen through fifteen; no registration
+loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
 
@@ -207,7 +213,8 @@ so reported capabilities cannot drift from the registered set.
 The registry currently exposes `create_document`, `list_documents`,
 `get_document`, `save_document`, `list_objects`, `get_object`,
 `recompute_document`, `create_body`, `create_sketch`, `get_sketch`,
-`add_sketch_geometry`, and `add_sketch_constraints`, in that order.
+`add_sketch_geometry`, `add_sketch_constraints`, `get_document_history`,
+`undo_document`, and `redo_document`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -250,6 +257,78 @@ destinations return `file_already_exists` unless `overwrite` is explicitly true.
 This guard does not block a normal `save()` to a document's own backing file.
 Filesystem checks and the FreeCAD save execute inside the single dispatched
 operation, while transport threads never access a document directly.
+
+## Controlled Document History
+
+The history path preserves the normal dependency direction:
+
+```text
+MCP history tool
+→ Application / typed history handler
+→ DocumentAdapter protocol
+→ Qt main-thread dispatcher
+→ freecad.document_history
+→ exact named App::Document
+```
+
+The public models are `DocumentHistorySnapshot`,
+`DocumentHistoryInspectionResult`, `DocumentHistoryTransaction`, and
+`DocumentHistoryOperationResult`. A snapshot contains only counts, availability,
+the current top undo and redo names, pending-transaction state, and the existing
+controlled document summary. Native transaction objects, IDs, internal nodes,
+and complete stack entries never cross the adapter boundary. Top names are
+current-step safety labels and are not durable identifiers.
+
+FreeCAD 1.1.1 exposes the required Python state as `UndoMode`, `UndoCount`,
+`RedoCount`, `UndoNames`, `RedoNames`, and `HasPendingTransaction`. `UndoNames`
+and `RedoNames` are top-first. The Python-bound `undo()` and `redo()` methods
+return `None` on the normal path even though the underlying C++ methods return
+a Boolean, so the adapter accepts native `None` and treats an explicit injected
+`False` as failure. It never opens a transaction around native history
+movement: doing so would create unsafe grouping and could make undo itself
+user-visible history.
+
+Before mutation, the adapter requires the exact named document to remain open,
+enabled readable history, no pending transaction, no MCP-owned undo, redo, or
+rollback already in progress, an available entry in the requested direction,
+and a readable non-empty top name. When `expected_transaction_name` is supplied,
+matching is exact and case-sensitive; mismatch performs no native call. The
+request schema forbids extra fields, including multi-step counts and native IDs.
+
+After native undo, the adapter verifies the complete internal top-first name
+transition is exactly `undo[1:]` and `(moved_name, *redo)`. Redo verifies the
+inverse. It also verifies history remains enabled, no transaction remains
+pending, the same document object remains open under the requested name, and
+the controlled document summary is readable. The full names are used only for
+internal verification and are never returned. An inconsistent native result is
+reported as `document_history_verification_failed`; the adapter does not hide
+it with an automatic compensating history operation.
+
+Model mutations use the central safety labels `Create body`, `Create sketch`,
+`Add sketch geometry`, and `Add sketch constraints`. Document creation, saving,
+recomputation, and inspection do not create an MCP-owned undo transaction.
+Atomic-operation rollback remains separate from controlled undo: rollback
+removes a failed call's partial mutation, while undo removes one successful but
+unwanted transaction. Rollback paths enter the same process-local activity guard
+so a re-entrant history request is rejected.
+
+Undo and redo are deliberately in-memory, one-step operations. They never save,
+reverse a prior save, change an external file, clear history, or switch undo
+mode. They target the named document even when another document is active.
+An installed FreeCAD 1.1.1 full-GUI probe set a document clean, committed one
+transaction, and observed `FreeCADGui.Document.Modified` as true after the
+mutation, its undo, and its redo. The adapter reports that native GUI dirty flag
+without trying to infer equality with a prior saved state.
+FreeCAD leaves relevant sketches touched after undo/redo, so the adapter does
+not recompute and `get_sketch` reports cached solver data as stale. Clients must
+explicitly call `recompute_document` and inspect again. A new committed model
+mutation follows native FreeCAD semantics and invalidates the redo stack.
+
+Agent recovery should use this capability after a successful operation proves
+strategically wrong: recompute and inspect, inspect history, match and undo the
+known step, inspect the restored state, then correct the same sketch or model.
+It must not undo a failed call that already rolled back, or an unexpected GUI
+or user step whose ownership is unclear.
 
 ## Object Inspection
 

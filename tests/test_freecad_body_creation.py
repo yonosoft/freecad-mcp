@@ -81,6 +81,7 @@ def test_create_body_transaction_opens_once(monkeypatch: pytest.MonkeyPatch) -> 
     FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
 
     assert doc_stub.open_transaction_calls == 1
+    assert doc_stub.open_transaction_names == ["Create body"]
 
 
 def test_create_body_recompute_called_once(monkeypatch: pytest.MonkeyPatch) -> None:

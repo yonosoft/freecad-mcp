@@ -49,6 +49,16 @@ local MCP server inside FreeCAD.
 - Prefer high-level workflow tools for common operations while retaining focused
   mid-level tools for flexibility.
 - Provide inspection, validation, and recovery tools alongside mutating tools.
+- After a successful modelling mutation, recompute and inspect the result. If
+  it is technically valid but expresses the wrong design intent, inspect the
+  named document's history and undo the known top transaction before retrying
+  in the same sketch or model. Supply the expected transaction name when known.
+- Prefer controlled in-place recovery over abandoning a recoverable sketch,
+  duplicating geometry, or creating replacement sketches or documents.
+- Do not undo after a failed atomic MCP operation whose rollback restored zero
+  mutation. Do not undo an unexpected GUI or user transaction; reinspect and
+  ask for direction. Redo only to restore the most recently undone step, before
+  an intervening mutation invalidates it.
 - Use semantic names instead of exposing FreeCAD numeric enum conventions
   directly.
 - Avoid fragile face and edge indices where stable semantic references or
@@ -57,6 +67,9 @@ local MCP server inside FreeCAD.
   or response fields.
 - The first explicit MCP tool is `create_document`. It is MCP-only and must use
   the shared application handler rather than a visible workbench command.
+- Document-history tools are one-step-only, must run through the Qt dispatcher,
+  and must not expose native transaction IDs or objects, save implicitly, or
+  wrap native undo/redo in another transaction.
 
 ## Python Standards
 

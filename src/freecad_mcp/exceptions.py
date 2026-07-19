@@ -60,6 +60,54 @@ class DocumentRecomputeError(RuntimeError):
     """Raised when FreeCAD cannot complete document recomputation."""
 
 
+class DocumentHistoryUnavailableError(RuntimeError):
+    """Raised when controlled undo/redo state cannot be used safely."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
+class DocumentTransactionActiveError(RuntimeError):
+    """Raised when history mutation is requested during a pending transaction."""
+
+
+class UndoNotAvailableError(RuntimeError):
+    """Raised when the named document has no controlled undo step."""
+
+
+class RedoNotAvailableError(RuntimeError):
+    """Raised when the named document has no controlled redo step."""
+
+
+class DocumentHistoryTransactionMismatchError(RuntimeError):
+    """Raised when a caller's expected top transaction does not match."""
+
+    def __init__(self, *, direction: str, expected: str, actual: str) -> None:
+        self.direction = direction
+        self.expected = expected
+        self.actual = actual
+        super().__init__(f"Expected {expected!r}, found {actual!r}.")
+
+
+class DocumentHistoryOperationError(RuntimeError):
+    """Raised when FreeCAD cannot complete one native history operation."""
+
+    def __init__(self, *, direction: str, reason: str) -> None:
+        self.direction = direction
+        self.reason = reason
+        super().__init__(reason)
+
+
+class DocumentHistoryVerificationError(RuntimeError):
+    """Raised when native history state does not make the required transition."""
+
+    def __init__(self, *, direction: str, reason: str) -> None:
+        self.direction = direction
+        self.reason = reason
+        super().__init__(reason)
+
+
 class ObjectNotFoundError(RuntimeError):
     """Raised when an internal object name is not found in an open document."""
 
@@ -180,9 +228,14 @@ __all__ = [
     "DispatchTimeoutError",
     "DocumentAlreadyExistsError",
     "DocumentCreationError",
+    "DocumentHistoryOperationError",
+    "DocumentHistoryTransactionMismatchError",
+    "DocumentHistoryUnavailableError",
+    "DocumentHistoryVerificationError",
     "DocumentNotFoundError",
     "DocumentRecomputeError",
     "DocumentSaveError",
+    "DocumentTransactionActiveError",
     "FileAlreadyExistsError",
     "FilePathRequiredError",
     "FileSystemCheckError",
@@ -192,6 +245,7 @@ __all__ = [
     "ObjectNotFoundError",
     "OriginPlaneNotFoundError",
     "ParentDirectoryNotFoundError",
+    "RedoNotAvailableError",
     "SketchConstraintCreationError",
     "SketchConstraintMalformedError",
     "SketchConstraintRollbackError",
@@ -201,4 +255,5 @@ __all__ = [
     "SketchGeometryRollbackError",
     "SketchInspectionError",
     "SketchTypeMismatchError",
+    "UndoNotAvailableError",
 ]

@@ -14,8 +14,10 @@ from freecad_mcp.exceptions import (
     OriginPlaneNotFoundError,
     SketchCreationError,
 )
+from freecad_mcp.freecad.history_guard import history_activity
 from freecad_mcp.freecad.object_inspection import _build_object_detail
 from freecad_mcp.models import AttachmentInfo, OriginPlane, SketchCreationResult
+from freecad_mcp.transaction_names import CREATE_SKETCH_TRANSACTION_NAME
 
 
 def create_sketch(
@@ -82,7 +84,7 @@ def create_sketch(
     opened_transaction = False
     created_obj: Any = None
     try:
-        document.openTransaction("MCP Create Sketch")
+        document.openTransaction(CREATE_SKETCH_TRANSACTION_NAME)
         opened_transaction = True
 
         created_obj = body.newObject("Sketcher::SketchObject", name)
@@ -144,12 +146,12 @@ def create_sketch(
         SketchCreationError,
     ):
         if opened_transaction:
-            with suppress(Exception):
+            with suppress(Exception), history_activity(document, "rollback"):
                 document.abortTransaction()
         raise
     except Exception as exc:
         if opened_transaction:
-            with suppress(Exception):
+            with suppress(Exception), history_activity(document, "rollback"):
                 document.abortTransaction()
         raise SketchCreationError(str(exc)) from exc
 

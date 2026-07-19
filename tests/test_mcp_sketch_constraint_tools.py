@@ -195,13 +195,13 @@ def test_add_sketch_constraints_schema_locks_all_types_modes_and_strict_models()
     assert geometry_reference["additionalProperties"] is False
 
 
-def test_add_sketch_constraints_is_exactly_tool_twelve() -> None:
+def test_add_sketch_constraints_remains_exactly_tool_twelve() -> None:
     handlers, _ = make_handlers()
     actual = [
         tool.name for tool in asyncio.run(build_mcp_server(handlers, ServerConfig()).list_tools())
     ]
 
-    assert actual == [
+    assert actual[:12] == [
         "create_document",
         "list_documents",
         "get_document",
@@ -215,6 +215,7 @@ def test_add_sketch_constraints_is_exactly_tool_twelve() -> None:
         "add_sketch_geometry",
         "add_sketch_constraints",
     ]
+    assert actual[12:] == ["get_document_history", "undo_document", "redo_document"]
     assert actual == list(REGISTERED_TOOL_NAMES)
     assert actual[:11] == list(REGISTERED_TOOL_NAMES[:11])
     assert actual[9] == "get_sketch"

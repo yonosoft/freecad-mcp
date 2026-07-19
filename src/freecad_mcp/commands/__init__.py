@@ -4,6 +4,11 @@ from dataclasses import dataclass
 
 from freecad_mcp.commands.body import CreateBodyHandler
 from freecad_mcp.commands.document import CreateDocumentHandler
+from freecad_mcp.commands.document_history import (
+    GetDocumentHistoryHandler,
+    RedoDocumentHandler,
+    UndoDocumentHandler,
+)
 from freecad_mcp.commands.document_query import (
     GetDocumentHandler,
     ListDocumentsHandler,
@@ -25,6 +30,9 @@ class DocumentHandlers:
     create: CreateDocumentHandler
     list: ListDocumentsHandler
     get: GetDocumentHandler
+    get_history: GetDocumentHistoryHandler
+    undo: UndoDocumentHandler
+    redo: RedoDocumentHandler
     save: SaveDocumentHandler
     object_query: ListObjectsHandler
     get_object: GetObjectHandler
@@ -44,11 +52,14 @@ __all__ = [
     "CreateSketchHandler",
     "DocumentHandlers",
     "GetDocumentHandler",
+    "GetDocumentHistoryHandler",
     "GetObjectHandler",
     "GetSketchHandler",
     "ListDocumentsHandler",
     "ListObjectsHandler",
     "RecomputeDocumentHandler",
+    "RedoDocumentHandler",
     "SaveDocumentHandler",
+    "UndoDocumentHandler",
     "report_status",
 ]

@@ -196,12 +196,18 @@ Add tests beside the responsibility they exercise:
 - atomic constraint construction, compatibility validation, ordered indices,
   transaction ownership, geometry/flag preservation, and rollback belong in
   `test_freecad_sketch_constraint_creation.py`;
+- history models, validation, handlers, and application delegation belong in
+  `test_document_history.py`; native stack transitions, preconditions,
+  verification, file state, and isolation belong in
+  `test_freecad_document_history.py`;
 - MCP schemas, descriptions, and delegation belong in
   `test_mcp_document_tools.py`, `test_mcp_object_tools.py`, or
   `test_mcp_creation_tools.py`; the exact geometry union and tool-eleven
   contract belong in `test_mcp_sketch_geometry_tools.py`, while the strict
   nested constraint union and tool-twelve contract belong in
-  `test_mcp_sketch_constraint_tools.py`; server composition,
+  `test_mcp_sketch_constraint_tools.py`; strict tool 13–15 schemas,
+  descriptions, recovery guidance, and MCP errors belong in
+  `test_mcp_document_history_tools.py`; server composition,
   inventory agreement, lifecycle reporting, and HTTP transport belong in
   `test_mcp_server.py`;
 - compatibility identity belongs in `test_module_compatibility.py`, and stable
@@ -339,6 +345,50 @@ temporary file. The product regression verifies a 10 mm origin-centred circle,
 two on-circle aligned points, zero DoF, clean solver diagnostics, no helper
 geometry, controlled references, one-step undo/redo, and unsaved state.
 
+### Controlled Document History Automated Coverage
+
+Milestone 14B-2 preserves the first twelve schemas, descriptions, behavior, and
+order, then registers `get_document_history`, `undo_document`, and
+`redo_document` as tools 13–15. Focused pure-Python tests cover exact strict
+schemas, rejected extra fields and wrong types, typed result serialization,
+handler delegation and error translation, runtime composition, explicit
+registration, and architecture boundaries.
+
+The FreeCAD adapter tests use realistic top-first stack transitions and cover
+empty, undo-only, redo-only, and two-sided history; one-step undo and redo;
+exact expected-name match and mismatch; disabled history; active transaction;
+re-entrant undo, redo, and rollback; native `False` and exceptions;
+post-operation transition mismatches; document closure; cross-document
+isolation; and saved/unsaved state without a save call. Existing transaction
+tests lock the public labels `Create body`, `Create sketch`, `Add sketch
+geometry`, and `Add sketch constraints`.
+
+Run the direct campaign with FreeCAD 1.1's embedded Python and the development
+environment's site-packages on `PYTHONPATH`:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_document_history.py
+```
+
+The script runs 27 isolated scenarios. It covers empty stacks; single and batch
+geometry/constraint undo/redo; symmetry and all Milestone 14B point
+relationships; mixed batches; body, sketch, and attached-sketch creation;
+expected-name mismatches; redo invalidation; cross-document isolation;
+saved-file timestamp and byte preservation; unsaved state; controlled readback;
+repeated inspection; active-transaction rejection; injected native false
+return; and solver freshness. Its product regression applies a valid but wrong
+symmetry to a four-edge rectangle, detects it, matches and undoes the controlled
+constraint transaction, proves exact geometry restoration in the same sketch,
+applies the corrected symmetry, creates no replacement sketch or helper, and
+proves the corrected mutation invalidates the prior redo entry.
+
+The installed-runtime probes use FreeCAD `1.1.1`, revision
+`0108fd4b4850cc46e625b60e53cea7a7bbe69f8d`, and embedded Python `3.11.14`.
+Headless probes establish the exact bound properties, top-first names, native
+`None` return, redo invalidation, and stale solver cache. A separate isolated
+full-GUI probe establishes that `FreeCADGui.Document.Modified` becomes true
+after a committed transaction and remains true after its undo and redo.
+
 ### Native Sketch Reference Live Acceptance Plan (Not Executed Here)
 
 Use a focused AiderDesk MCP profile only after automated checks and the direct
@@ -437,6 +487,9 @@ create_sketch
 get_sketch
 add_sketch_geometry
 add_sketch_constraints
+get_document_history
+undo_document
+redo_document
 ```
 
 These document, object, and sketch-inspection tools are MCP-only; the workbench
@@ -552,7 +605,7 @@ sequence through the MCP client:
     count did not increase from a failed mutation.
 12. Confirm no `create_body` toolbar button, menu item, or FreeCAD GUI
     command was added.
-13. In the MCP client, confirm exactly twelve tools are listed, including
+13. In the MCP client, confirm exactly fifteen tools are listed, including
     `create_body`, `create_sketch`, `get_sketch`, `add_sketch_geometry`, and
     `add_sketch_constraints`.
 
@@ -592,7 +645,7 @@ sequence through the MCP client:
     count did not increase from a failed mutation.
 16. Confirm no `MCP_CreateSketch` GUI command, toolbar button, or menu entry
     exists in the MCP workbench.
-17. In the MCP client, confirm exactly twelve tools are listed, including
+17. In the MCP client, confirm exactly fifteen tools are listed, including
     `create_sketch`, `get_sketch`, `add_sketch_geometry`, and
     `add_sketch_constraints`.
 18. Call `create_sketch` with `support_plane: xy_plane` and confirm
@@ -642,8 +695,8 @@ undo, save, or timestamp state that is not exposed by an MCP inspection tool.
 1. Start a fresh FreeCAD 1.1.1 session, install the development junction,
    start MCP, connect AiderDesk only to `http://127.0.0.1:8765/mcp`, and record
    Report View from server start through completion.
-2. Discover tools and confirm the exact twelve-name order. Confirm
-   `get_sketch` is tenth, `add_sketch_geometry` is eleventh, and
+2. Discover tools and confirm the exact fifteen-name order. Confirm the first
+   twelve remain unchanged, `get_sketch` is tenth, `add_sketch_geometry` is eleventh, and
    `add_sketch_constraints` is twelfth, with the first eleven names and schemas
    unchanged.
 3. Inspect the eleventh tool schema. Confirm exactly three required top-level
@@ -713,15 +766,16 @@ smoke tests. The AiderDesk transcript must show endpoint mutation and
 ### Controlled Symmetry AiderDesk live acceptance plan
 
 This Milestone 14A plan is prepared but is not executed by the implementation
-task. Use only natural-language CAD requests and the twelve exposed MCP tools.
+task. Use only natural-language CAD requests and the fifteen exposed MCP tools.
 The FreeCAD Python console may create clean disposable fixtures or record state
 that MCP cannot expose, but it must not perform the accepted mutations. Make no
 implementation edits, commit, or push.
 
 1. Start a fresh FreeCAD 1.1.1 session, start MCP, connect AiderDesk only to the
    live endpoint, and preserve Report View plus the AiderDesk transcript.
-2. Discover tools and confirm the exact twelve-name order, with `get_sketch`
-   tenth, `add_sketch_geometry` eleventh, and `add_sketch_constraints` twelfth.
+2. Discover tools and confirm the exact fifteen-name order, with `get_sketch`
+   tenth, `add_sketch_geometry` eleventh, `add_sketch_constraints` twelfth, and
+   the three history tools at positions 13–15.
    Compare the first eleven schemas with their compatibility snapshots.
 3. Inspect tool twelve: exactly three required top-level fields, a 1-to-100
    array, all 14 constraint mappings, strict point/whole-line/native references,
@@ -756,23 +810,21 @@ implementation edits, commit, or push.
     mutation remain unavailable. Confirm no GUI command, toolbar item, or menu
     action was added and the repository is unchanged.
 12. Stop MCP and close disposable documents without saving. Retain the schema,
-    transcript, Report View, and before/after snapshots. Because MCP exposes no
-    undo/redo tool, leave one-step GUI undo and redo as a clearly separate manual
-    check rather than claiming it from the MCP transcript.
+    transcript, Report View, and before/after snapshots. Use the controlled MCP
+    history tools, rather than manual GUI undo/redo, for covered checks.
 
 ### General Point Relationships AiderDesk live acceptance plan
 
 This Milestone 14B plan is prepared but was not executed by the implementation
-task. During acceptance, use only the twelve exposed MCP tools: do not use the
+task. During acceptance, use only the fifteen exposed MCP tools: do not use the
 FreeCAD Python console, edit implementation files, commit, or push. Because the
 public inventory can create only body-owned sketches, prepare any required
 standalone-sketch fixtures in the GUI before starting the recorded MCP session;
 all inspection and mutation of those fixtures must then occur through MCP.
-Leave GUI undo/redo as a separate manual check after the MCP transcript.
 
 1. Start a fresh FreeCAD 1.1.1 session, start MCP, connect AiderDesk, and retain
    the protocol transcript plus Report View output.
-2. Discover the raw tool inventory and confirm the exact twelve-name order,
+2. Discover the raw tool inventory and confirm the exact fifteen-name order,
    with `get_sketch` tenth, `add_sketch_geometry` eleventh, and
    `add_sketch_constraints` twelfth. Confirm there is no new GUI command.
 3. Inspect raw tool-twelve schema separately from modelling prompts: exactly
@@ -831,8 +883,126 @@ Leave GUI undo/redo as a separate manual check after the MCP transcript.
     arbitrary mutation, and arbitrary Python remain unavailable.
 17. Stop MCP and close disposable documents without saving. Confirm repository
     status is unchanged and retain the schema, transcript, state snapshots,
-    solver results, and the separately recorded manual one-step GUI undo/redo
-    check as acceptance evidence.
+    solver results, and MCP history results as acceptance evidence.
+
+### Controlled Document History AiderDesk Live Acceptance Prompt
+
+This Milestone 14B-2 campaign is prepared here but is not executed by the
+implementation task. Run it in a fresh FreeCAD 1.1.1 session with a dedicated
+AiderDesk profile connected only to the MCP endpoint. All FreeCAD inspection
+and mutation in the recorded campaign must use exposed MCP tools: do not use the
+Python console, GUI undo/redo, arbitrary Python, implementation edits, or
+unlisted tools. Before and after the campaign, the operator should record
+`git status --short --branch`; no repository file, commit, branch, or remote may
+change.
+
+Copy this prompt into AiderDesk:
+
+```text
+Perform the controlled document-history acceptance campaign entirely through
+the connected FreeCAD MCP server. Do not edit the repository, run Python, use
+GUI undo/redo, commit, push, or create unrequested files. Use disposable,
+uniquely named documents and report every raw tool result needed as evidence.
+
+First request the raw tool inventory. Require exactly these fifteen tools in
+this order:
+create_document, list_documents, get_document, save_document, list_objects,
+get_object, recompute_document, create_body, create_sketch, get_sketch,
+add_sketch_geometry, add_sketch_constraints, get_document_history,
+undo_document, redo_document.
+
+Capture the raw input schemas for tools 13–15. get_document_history must require
+only document_name. undo_document and redo_document must require document_name
+and allow optional expected_transaction_name. They must reject extra fields,
+including steps, count, history index, and transaction_id. Confirm none of the
+first twelve schemas or descriptions changed.
+
+Create a clean unsaved document and inspect its history before model mutation.
+Require available controlled history with empty undo and redo stacks. Create a
+Body and sketch, inspecting history after each successful operation. Require
+the controlled top labels Create body and Create sketch. Undo and redo one known
+creation step with expected_transaction_name and verify list_objects,
+get_object, get_document, and history before and after.
+
+In that same sketch, add one geometry item, then an ordered multi-geometry
+batch. For each successful call, inspect history, undo exactly one Add sketch
+geometry transaction, inspect the restored sketch, redo it, recompute, and
+inspect again. Prove a batch is one step and restores every item together.
+Repeat with one constraint and a mixed multi-constraint batch; require the top
+label Add sketch constraints and exact one-step restoration.
+
+Exercise expected-name safety in both directions. Call undo_document with a
+deliberately wrong expected name, then call redo_document with a deliberately
+wrong expected name after a valid undo. Require structured
+undo_transaction_mismatch and redo_transaction_mismatch failures. Compare
+history and sketch inspection before and after and prove both mismatches caused
+zero mutation.
+
+Create a second document with different geometry and history. Make document B
+active if normal tool use does so, then undo a named step in document A. Prove
+document B's geometry, constraints, object list, saved state, and history counts
+are unchanged. All calls must identify the intended internal document name.
+
+Create an origin-plane-attached sketch through create_sketch and exercise
+geometry and constraint undo/redo there. Prove Body ownership, attachment kind,
+plane, map mode, geometry, and controlled readback survive each history change.
+
+Exercise Milestone 14A symmetry and Milestone 14B ordinary point_on_object,
+horizontal_points, and vertical_points through successful operations followed
+by controlled undo/redo. Recompute before final solver assertions. Require
+controlled references only and reject any native negative ID, native point
+position integer, transaction ID, transaction object, or raw stack entry in
+every result.
+
+Run the primary recovery scenario in one new body-owned sketch. Construct a
+four-edge rectangle intended to be centred on the sketch origin. Deliberately
+apply a technically valid symmetry batch to the wrong pair of endpoints.
+Recompute and inspect; detect and explain why the result violates the intended
+centre or orientation. Call get_document_history and require Add sketch
+constraints at the top. Call undo_document with that exact expected name.
+Inspect and prove the same sketch returned to its exact prior four-edge geometry
+and constraint state. Before making a new mutation, prove redo refers to the
+undone wrong constraint batch. Apply the corrected symmetry strategy in the
+same sketch, recompute, and inspect the finished centred rectangle. Prove no
+replacement sketch, duplicate geometry, helper, hidden abandoned sketch, or
+second document was created. Prove the corrected new transaction invalidated
+the previous redo entry.
+
+This modelling-strategy scenario FAILS if you abandon or replace the original
+sketch after the recoverable mistake without a clearly evidenced reason that
+controlled in-place recovery was unsafe or unavailable.
+
+Prove redo invalidation separately: perform operation A, undo A, confirm redo A,
+perform new operation B, confirm redo count is zero, and require redo_document
+to return redo_not_available.
+
+For unsaved state, prove undo and redo keep file_path null and saved false. For
+a separately saved disposable document, record the returned path and saved
+state, make and undo/redo a later in-memory model transaction, and prove no
+history call performs save_document or changes the controlled path. Do not
+claim external file rollback; history does not reverse a save or overwritten
+filesystem content.
+
+After every undo or redo, inspect the affected document and sketch. Treat solver
+facts as stale until recompute_document; after explicit recompute require fresh
+solver diagnostics. Do not call undo after any failed atomic mutation that
+already rolled back. If history shows an unexpected GUI or user transaction,
+stop that scenario, report it, and ask for direction rather than undoing it.
+
+Finish with the raw fifteen-tool inventory, raw schemas, every structured
+success and expected failure code, document/sketch names, before/after history,
+same-sketch recovery evidence, redo invalidation evidence, saved/unsaved and
+cross-document evidence, confirmation that no native transaction IDs appeared,
+and confirmation that no repository edit, commit, or push was performed. Stop
+the MCP server and leave disposable documents clearly identified for cleanup.
+```
+
+The operator should retain the AiderDesk transcript, raw `tools/list`, raw
+schemas, Report View output, before/after state records, and unchanged repository
+status. Automated and direct-adapter smokes are supporting evidence, not a
+substitute for this endpoint campaign. Future acceptance campaigns should use
+these MCP history tools for covered undo/redo checks and should not require
+manual GUI history actions.
 
 ### Sketch index semantics
 

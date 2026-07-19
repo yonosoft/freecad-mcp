@@ -91,6 +91,7 @@ def test_create_sketch_transaction_opens_once(
     FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
 
     assert doc_stub.open_transaction_calls == 1
+    assert doc_stub.open_transaction_names == ["Create sketch"]
 
 
 def test_create_sketch_recompute_called_once(

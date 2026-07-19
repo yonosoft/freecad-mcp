@@ -57,6 +57,80 @@ class DocumentCollection:
 
 
 @dataclass(frozen=True, slots=True)
+class DocumentHistorySnapshot:
+    """Controlled current undo/redo availability for one open document.
+
+    Transaction names are current-step safety labels only. They are not durable
+    identifiers and deliberately expose no native transaction IDs or objects.
+    """
+
+    undo_count: int
+    redo_count: int
+    can_undo: bool
+    can_redo: bool
+    next_undo_name: str | None
+    next_redo_name: str | None
+    transaction_active: bool
+    history_available: bool
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the controlled history state without native metadata."""
+        return {
+            "undo_count": self.undo_count,
+            "redo_count": self.redo_count,
+            "can_undo": self.can_undo,
+            "can_redo": self.can_redo,
+            "next_undo_name": self.next_undo_name,
+            "next_redo_name": self.next_redo_name,
+            "transaction_active": self.transaction_active,
+            "history_available": self.history_available,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentHistoryInspectionResult:
+    """Controlled document history paired with the existing document summary."""
+
+    history: DocumentHistorySnapshot
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "history": self.history.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentHistoryTransaction:
+    """The one controlled history step moved by an undo or redo call."""
+
+    name: str
+    direction: Literal["undo", "redo"]
+
+    def to_dict(self) -> dict[str, object]:
+        return {"name": self.name, "direction": self.direction}
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentHistoryOperationResult:
+    """Verified before/after state for exactly one controlled history step."""
+
+    transaction: DocumentHistoryTransaction
+    history_before: DocumentHistorySnapshot
+    history_after: DocumentHistorySnapshot
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "transaction": self.transaction.to_dict(),
+            "history_before": self.history_before.to_dict(),
+            "history_after": self.history_after.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ObjectSummary:
     """Stable public state for one FreeCAD document object.
 
@@ -904,6 +978,10 @@ __all__ = [
     "DistanceYConstraintInput",
     "DistanceYPointToOriginConstraintInput",
     "DocumentCollection",
+    "DocumentHistoryInspectionResult",
+    "DocumentHistoryOperationResult",
+    "DocumentHistorySnapshot",
+    "DocumentHistoryTransaction",
     "DocumentSummary",
     "EqualConstraintInput",
     "HorizontalConstraintInput",

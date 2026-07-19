@@ -14,12 +14,15 @@ from freecad_mcp.commands import (
     CreateDocumentHandler,
     CreateSketchHandler,
     GetDocumentHandler,
+    GetDocumentHistoryHandler,
     GetObjectHandler,
     GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
     RecomputeDocumentHandler,
+    RedoDocumentHandler,
     SaveDocumentHandler,
+    UndoDocumentHandler,
 )
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.runtime import Runtime, _build_runtime
@@ -73,6 +76,9 @@ def test_build_runtime_wires_create_sketch_handler(
         "create": CreateDocumentHandler,
         "list": ListDocumentsHandler,
         "get": GetDocumentHandler,
+        "get_history": GetDocumentHistoryHandler,
+        "undo": UndoDocumentHandler,
+        "redo": RedoDocumentHandler,
         "save": SaveDocumentHandler,
         "object_query": ListObjectsHandler,
         "get_object": GetObjectHandler,

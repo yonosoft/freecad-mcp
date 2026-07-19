@@ -11,12 +11,15 @@ from freecad_mcp.commands import (
     CreateDocumentHandler,
     DocumentHandlers,
     GetDocumentHandler,
+    GetDocumentHistoryHandler,
     GetObjectHandler,
     GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
     RecomputeDocumentHandler,
+    RedoDocumentHandler,
     SaveDocumentHandler,
+    UndoDocumentHandler,
 )
 from freecad_mcp.commands.body import CreateBodyHandler
 from freecad_mcp.commands.sketch import CreateSketchHandler
@@ -62,6 +65,9 @@ def _build_runtime() -> Runtime:
         create=CreateDocumentHandler(adapter=adapter, dispatcher=dispatcher),
         list=ListDocumentsHandler(adapter=adapter, dispatcher=dispatcher),
         get=GetDocumentHandler(adapter=adapter, dispatcher=dispatcher),
+        get_history=GetDocumentHistoryHandler(adapter=adapter, dispatcher=dispatcher),
+        undo=UndoDocumentHandler(adapter=adapter, dispatcher=dispatcher),
+        redo=RedoDocumentHandler(adapter=adapter, dispatcher=dispatcher),
         save=SaveDocumentHandler(adapter=adapter, dispatcher=dispatcher),
         object_query=ListObjectsHandler(adapter=adapter, dispatcher=dispatcher),
         get_object=GetObjectHandler(adapter=adapter, dispatcher=dispatcher),

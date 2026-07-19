@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from freecad_mcp.freecad import (
     body_creation,
+    document_history,
     document_operations,
     object_inspection,
     sketch_constraint_creation,
@@ -45,6 +46,8 @@ from freecad_mcp.freecad.sketch_creation import (
 from freecad_mcp.freecad.sketch_creation import _verify_attachment as _verify_attachment
 from freecad_mcp.models import (
     DocumentCollection,
+    DocumentHistoryInspectionResult,
+    DocumentHistoryOperationResult,
     DocumentSummary,
     ObjectDetail,
     ObjectSummary,
@@ -88,6 +91,26 @@ class FreeCADDocumentAdapter:
     def recompute_document(self, document_name: str) -> DocumentSummary:
         """Recompute one open document and return its updated summary."""
         return document_operations.recompute_document(document_name)
+
+    def get_document_history(self, document_name: str) -> DocumentHistoryInspectionResult:
+        """Inspect controlled undo/redo state for one exact open document."""
+        return document_history.get_document_history(document_name)
+
+    def undo_document(
+        self,
+        document_name: str,
+        expected_transaction_name: str | None,
+    ) -> DocumentHistoryOperationResult:
+        """Undo exactly one verified transaction without recomputing or saving."""
+        return document_history.undo_document(document_name, expected_transaction_name)
+
+    def redo_document(
+        self,
+        document_name: str,
+        expected_transaction_name: str | None,
+    ) -> DocumentHistoryOperationResult:
+        """Redo exactly one verified transaction without recomputing or saving."""
+        return document_history.redo_document(document_name, expected_transaction_name)
 
     def create_body(self, document_name: str, name: str, label: str | None) -> ObjectDetail:
         return body_creation.create_body(document_name, name, label)

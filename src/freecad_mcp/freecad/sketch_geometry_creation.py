@@ -14,6 +14,7 @@ from freecad_mcp.exceptions import (
     SketchGeometryRollbackError,
     SketchTypeMismatchError,
 )
+from freecad_mcp.freecad.history_guard import history_activity
 from freecad_mcp.models import (
     ArcOfCircleGeometryInput,
     CircleGeometryInput,
@@ -22,9 +23,10 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
 )
+from freecad_mcp.transaction_names import ADD_SKETCH_GEOMETRY_TRANSACTION_NAME
 from freecad_mcp.validation import normalize_arc_angles_degrees
 
-_TRANSACTION_NAME = "MCP Add Sketch Geometry"
+_TRANSACTION_NAME = ADD_SKETCH_GEOMETRY_TRANSACTION_NAME
 
 
 def add_sketch_geometry(
@@ -255,7 +257,8 @@ def _rollback_geometry_batch(
 
     abort_failed = False
     try:
-        document.abortTransaction()
+        with history_activity(document, "rollback"):
+            document.abortTransaction()
     except Exception:
         abort_failed = True
 

@@ -14,6 +14,7 @@ from freecad_mcp.exceptions import (
     SketchConstraintRollbackError,
     SketchTypeMismatchError,
 )
+from freecad_mcp.freecad.history_guard import history_activity
 from freecad_mcp.models import (
     AngleBetweenLinesConstraintInput,
     AngleLineConstraintInput,
@@ -47,8 +48,9 @@ from freecad_mcp.models import (
     VerticalConstraintInput,
     VerticalPointsConstraintInput,
 )
+from freecad_mcp.transaction_names import ADD_SKETCH_CONSTRAINTS_TRANSACTION_NAME
 
-_TRANSACTION_NAME = "MCP Add Sketch Constraints"
+_TRANSACTION_NAME = ADD_SKETCH_CONSTRAINTS_TRANSACTION_NAME
 _UNUSED_GEOMETRY_REFERENCE = -2000
 _SKETCH_ROOT_GEOMETRY_ID = -1
 _SKETCH_ROOT_POINT_POSITION = 1
@@ -855,7 +857,8 @@ def _rollback_constraint_batch(
     abort_failed = False
     if owned_transaction:
         try:
-            document.abortTransaction()
+            with history_activity(document, "rollback"):
+                document.abortTransaction()
         except Exception:
             abort_failed = True
 

@@ -8,6 +8,8 @@ from typing import Protocol, TypeVar
 
 from freecad_mcp.models import (
     DocumentCollection,
+    DocumentHistoryInspectionResult,
+    DocumentHistoryOperationResult,
     DocumentSummary,
     ObjectDetail,
     ObjectSummary,
@@ -46,6 +48,23 @@ class DocumentAdapter(Protocol):
 
     def recompute_document(self, document_name: str) -> DocumentSummary:
         """Recompute one open document and return its updated summary."""
+
+    def get_document_history(self, document_name: str) -> DocumentHistoryInspectionResult:
+        """Inspect controlled undo/redo state for one exact open document."""
+
+    def undo_document(
+        self,
+        document_name: str,
+        expected_transaction_name: str | None,
+    ) -> DocumentHistoryOperationResult:
+        """Undo exactly one verified transaction in the named document."""
+
+    def redo_document(
+        self,
+        document_name: str,
+        expected_transaction_name: str | None,
+    ) -> DocumentHistoryOperationResult:
+        """Redo exactly one verified transaction in the named document."""
 
     def create_body(self, document_name: str, name: str, label: str | None) -> ObjectDetail:
         """Create a PartDesign::Body and return its controlled detail.

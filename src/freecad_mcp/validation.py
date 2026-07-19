@@ -125,6 +125,34 @@ def validate_document_reference(name: object) -> CommandResult | None:
     return None
 
 
+def validate_document_history_request(
+    document_name: object,
+    expected_transaction_name: object | None = None,
+) -> CommandResult | None:
+    """Validate one history inspection or mutation request."""
+    document_error = validate_document_reference(document_name)
+    if document_error is not None:
+        return document_error
+    if expected_transaction_name is None:
+        return None
+    if not isinstance(expected_transaction_name, str):
+        return CommandResult.failure(
+            code="validation_error",
+            message="Expected transaction name must be a non-empty string when supplied.",
+            data={
+                "field": "expected_transaction_name",
+                "actual_type": type(expected_transaction_name).__name__,
+            },
+        )
+    if not expected_transaction_name.strip():
+        return CommandResult.failure(
+            code="validation_error",
+            message="Expected transaction name must not be empty or whitespace.",
+            data={"field": "expected_transaction_name"},
+        )
+    return None
+
+
 def validate_object_reference(document_name: object, object_name: object) -> CommandResult | None:
     """Validate document- and object-name arguments used for object lookup."""
     doc_error = validate_document_reference(document_name)
@@ -705,6 +733,7 @@ __all__ = [
     "validate_create_body_request",
     "validate_create_document_request",
     "validate_create_sketch_request",
+    "validate_document_history_request",
     "validate_document_reference",
     "validate_object_reference",
 ]

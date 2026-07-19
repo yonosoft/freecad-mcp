@@ -69,6 +69,32 @@ class Application:
         """Recompute one open document through the shared application handler."""
         return self.documents.recompute.execute(document_name=document_name)
 
+    def get_document_history(self, document_name: object) -> CommandResult:
+        """Inspect controlled document history through the shared handler."""
+        return self.documents.get_history.execute(document_name=document_name)
+
+    def undo_document(
+        self,
+        document_name: object,
+        expected_transaction_name: object | None = None,
+    ) -> CommandResult:
+        """Undo exactly one controlled document transaction."""
+        return self.documents.undo.execute(
+            document_name=document_name,
+            expected_transaction_name=expected_transaction_name,
+        )
+
+    def redo_document(
+        self,
+        document_name: object,
+        expected_transaction_name: object | None = None,
+    ) -> CommandResult:
+        """Redo exactly one controlled document transaction."""
+        return self.documents.redo.execute(
+            document_name=document_name,
+            expected_transaction_name=expected_transaction_name,
+        )
+
     def create_body(
         self, document_name: object, name: object, label: object | None = None
     ) -> CommandResult:

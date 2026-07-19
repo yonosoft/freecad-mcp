@@ -43,6 +43,7 @@ class AppDocumentStub:
         self.save_as_calls: list[str] = []
         self.recompute_calls = 0
         self.open_transaction_calls = 0
+        self.open_transaction_names: list[str] = []
         self.commit_transaction_calls = 0
         self.abort_transaction_calls = 0
         self.addObject_calls: list[tuple[str, str]] = []
@@ -79,6 +80,7 @@ class AppDocumentStub:
 
     def openTransaction(self, name: str) -> None:
         self.open_transaction_calls += 1
+        self.open_transaction_names.append(name)
         self._pending_transaction_objects.clear()
 
     def commitTransaction(self) -> None:

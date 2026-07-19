@@ -13,17 +13,24 @@ from freecad_mcp.commands import (
     CreateDocumentHandler,
     DocumentHandlers,
     GetDocumentHandler,
+    GetDocumentHistoryHandler,
     GetObjectHandler,
     GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
     RecomputeDocumentHandler,
+    RedoDocumentHandler,
     SaveDocumentHandler,
+    UndoDocumentHandler,
 )
 from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.models import (
     AttachmentInfo,
     DocumentCollection,
+    DocumentHistoryInspectionResult,
+    DocumentHistoryOperationResult,
+    DocumentHistorySnapshot,
+    DocumentHistoryTransaction,
     DocumentSummary,
     ObjectDetail,
     OriginPlane,
@@ -55,6 +62,9 @@ class AdapterStub:
         self.create_calls: list[tuple[str, str | None]] = []
         self.list_calls = 0
         self.get_calls: list[str] = []
+        self.get_history_calls: list[str] = []
+        self.undo_calls: list[tuple[str, str | None]] = []
+        self.redo_calls: list[tuple[str, str | None]] = []
         self.save_calls: list[tuple[str, str | None]] = []
         self.list_objects_calls: list[str] = []
         self.get_object_calls: list[tuple[str, str]] = []
@@ -66,6 +76,8 @@ class AdapterStub:
         self.add_sketch_constraints_calls: list[
             tuple[str, str, tuple[SketchConstraintInput, ...]]
         ] = []
+        self.undo_names = ["Add sketch constraints"]
+        self.redo_names: list[str] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -79,6 +91,50 @@ class AdapterStub:
     def get_document(self, name: str) -> DocumentSummary:
         self.get_calls.append(name)
         return self.document
+
+    def _history(self) -> DocumentHistorySnapshot:
+        return DocumentHistorySnapshot(
+            undo_count=len(self.undo_names),
+            redo_count=len(self.redo_names),
+            can_undo=bool(self.undo_names),
+            can_redo=bool(self.redo_names),
+            next_undo_name=self.undo_names[0] if self.undo_names else None,
+            next_redo_name=self.redo_names[0] if self.redo_names else None,
+            transaction_active=False,
+            history_available=True,
+        )
+
+    def get_document_history(self, name: str) -> DocumentHistoryInspectionResult:
+        self.get_history_calls.append(name)
+        return DocumentHistoryInspectionResult(self._history(), self.document)
+
+    def undo_document(
+        self, name: str, expected_transaction_name: str | None
+    ) -> DocumentHistoryOperationResult:
+        self.undo_calls.append((name, expected_transaction_name))
+        before = self._history()
+        transaction_name = self.undo_names.pop(0)
+        self.redo_names.insert(0, transaction_name)
+        return DocumentHistoryOperationResult(
+            DocumentHistoryTransaction(transaction_name, "undo"),
+            before,
+            self._history(),
+            self.document,
+        )
+
+    def redo_document(
+        self, name: str, expected_transaction_name: str | None
+    ) -> DocumentHistoryOperationResult:
+        self.redo_calls.append((name, expected_transaction_name))
+        before = self._history()
+        transaction_name = self.redo_names.pop(0)
+        self.undo_names.insert(0, transaction_name)
+        return DocumentHistoryOperationResult(
+            DocumentHistoryTransaction(transaction_name, "redo"),
+            before,
+            self._history(),
+            self.document,
+        )
 
     def save_document(self, name: str, file_path: str | None) -> DocumentSummary:
         self.save_calls.append((name, file_path))
@@ -238,6 +294,9 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             create=CreateDocumentHandler(actual_adapter, dispatcher),
             list=ListDocumentsHandler(actual_adapter, dispatcher),
             get=GetDocumentHandler(actual_adapter, dispatcher),
+            get_history=GetDocumentHistoryHandler(actual_adapter, dispatcher),
+            undo=UndoDocumentHandler(actual_adapter, dispatcher),
+            redo=RedoDocumentHandler(actual_adapter, dispatcher),
             save=SaveDocumentHandler(actual_adapter, dispatcher),
             object_query=ListObjectsHandler(actual_adapter, dispatcher),
             get_object=GetObjectHandler(actual_adapter, dispatcher),

@@ -14,10 +14,11 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- twelve typed MCP tools for document creation, inspection, saving,
+- fifteen typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
-  controlled sketch-constraint addition;
+  controlled sketch-constraint addition, plus controlled document-history
+  inspection, one-step undo, and one-step redo;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -34,7 +35,8 @@ and [Codeberg](https://codeberg.org/aeromaker/freecad-mcp).
 The currently verified live environment is FreeCAD `1.1.1.20260414` with
 embedded Python `3.11.14` and PySide6 / Qt `6.8.3`. The MCP SDK uses stable v1
 (`>=1.27.2,<2`). Pure-Python automated checks run with standalone Python 3.11;
-live FreeCAD acceptance remains a manual check.
+direct FreeCAD adapter smokes use the embedded runtime, while live MCP endpoint
+acceptance remains a separate recorded check.
 
 ## Repository Layout
 
@@ -116,6 +118,9 @@ create_sketch
 get_sketch
 add_sketch_geometry
 add_sketch_constraints
+get_document_history
+undo_document
+redo_document
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -490,6 +495,84 @@ They do not add workbench commands or toolbar icons. `get_object` performs exact
 internal-name lookup only; labels are not used as lookup keys. If placement is
 unavailable the ``placement`` field returns ``null`` rather than failing the
 entire tool.
+
+### Controlled document history
+
+`get_document_history`, `undo_document`, and `redo_document` are tools 13–15.
+They operate on the exact internal `document_name` supplied; they never use the
+active document as a substitute and have no GUI command, toolbar item, or menu
+entry. Each history mutation moves exactly one current top transaction.
+
+History inspection returns the controlled document summary plus:
+
+```json
+{
+  "undo_count": 3,
+  "redo_count": 1,
+  "can_undo": true,
+  "can_redo": true,
+  "next_undo_name": "Add sketch constraints",
+  "next_redo_name": "Add sketch geometry",
+  "transaction_active": false,
+  "history_available": true
+}
+```
+
+It does not return complete native stacks, native transaction objects, or
+transaction IDs. Transaction names are current-step safety labels, not durable
+history identifiers. The controlled transaction names produced by current MCP
+model mutations are `Create body`, `Create sketch`, `Add sketch geometry`, and
+`Add sketch constraints`.
+
+Undo has this strict input shape; redo uses the same shape:
+
+```json
+{
+  "document_name": "Model",
+  "expected_transaction_name": "Add sketch constraints"
+}
+```
+
+`expected_transaction_name` is optional, but clients should supply it whenever
+the known top label is available. Matching is exact and case-sensitive. A
+mismatch, unavailable stack, disabled history, active transaction, re-entrant
+undo/redo/rollback, or inconsistent native transition returns a structured
+failure without intentionally taking a second history step. There is no
+`steps`, `count`, history index, undo-to, redo-to, clear-history, or generic
+history-mutation option.
+
+Undo and rollback serve different purposes. A failed atomic MCP mutation should
+already have rolled back to zero net mutation; do not call `undo_document`
+after that failure because it could remove the preceding valid step. Use undo
+when an operation succeeded technically but expressed the wrong design intent.
+The normal recovery loop is:
+
+```text
+recompute and inspect the successful result
+→ inspect document history
+→ verify the expected top transaction
+→ undo exactly that transaction
+→ inspect the restored document or sketch
+→ revise the strategy
+→ retry in the same sketch or model
+```
+
+Prefer correcting the current sketch through controlled undo over abandoning
+it, duplicating geometry, or creating a replacement sketch or document for a
+recoverable mistake. If the top transaction belongs to an unexpected GUI or
+user action, reinspect and ask for direction instead of undoing it. Redo only
+when intentionally restoring the most recently undone transaction; any new
+model mutation normally invalidates the redo entry.
+
+History mutation is in-memory only. It does not save, reverse a prior save,
+restore overwritten files, or change external filesystem state. Saved-file
+bytes and timestamps remain untouched until `save_document` is called, and an
+unsaved document remains without a file path. In the verified FreeCAD 1.1.1 GUI
+runtime, a clean document becomes modified after a committed mutation and stays
+modified after both undo and redo; history movement does not infer that the
+current in-memory state equals a prior saved state. Undo and redo also do not
+recompute. Sketch solver data therefore reports stale after either operation
+until an explicit `recompute_document`, followed by fresh inspection.
 
 ## Documentation
 
