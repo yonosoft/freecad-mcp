@@ -31,6 +31,7 @@ from freecad_mcp.models import (
     DistanceYPointToOriginConstraintInput,
     EqualConstraintInput,
     HorizontalConstraintInput,
+    HorizontalPointsConstraintInput,
     ParallelConstraintInput,
     PerpendicularConstraintInput,
     PointOnObjectConstraintInput,
@@ -43,6 +44,7 @@ from freecad_mcp.models import (
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
     VerticalConstraintInput,
+    VerticalPointsConstraintInput,
 )
 from freecad_mcp.validation import validate_add_sketch_constraints_request
 
@@ -91,6 +93,22 @@ VALID_CASES: list[tuple[dict[str, object], type[object]]] = [
             "second": _reference("horizontal_axis"),
         },
         PointOnObjectConstraintInput,
+    ),
+    (
+        {
+            "type": "point_on_object",
+            "first": _point(0, "end"),
+            "second": {"geometry_index": 1},
+        },
+        PointOnObjectConstraintInput,
+    ),
+    (
+        {"type": "horizontal_points", "first": _point(0), "second": _point(1, "point")},
+        HorizontalPointsConstraintInput,
+    ),
+    (
+        {"type": "vertical_points", "first": _point(0), "second": _point(1, "center")},
+        VerticalPointsConstraintInput,
     ),
     (
         {
@@ -238,6 +256,7 @@ def test_constraint_batch_accepts_exact_maximum_and_preserves_order() -> None:
         ([{"type": "tangent", "geometry_index": 0}], "unsupported_constraint_type"),
         ([{"type": "horizontal"}], "invalid_constraint_input"),
         ([{"type": "horizontal", "geometry_index": 0, "extra": True}], "invalid_constraint_input"),
+        ([{"type": "horizontal", "geometry_index": True}], "invalid_geometry_reference"),
         (
             {"not": "an array"},
             None,
@@ -289,6 +308,56 @@ def test_constraint_batch_accepts_exact_maximum_and_preserves_order() -> None:
                 }
             ],
             "unsupported_reference",
+        ),
+        (
+            [
+                {
+                    "type": "point_on_object",
+                    "first": _point(0, "start"),
+                    "second": _point(1, "end"),
+                }
+            ],
+            "unsupported_reference",
+        ),
+        (
+            [
+                {
+                    "type": "point_on_object",
+                    "first": _point(0, "start"),
+                    "second": {"geometry_index": 0},
+                }
+            ],
+            "point_on_object_self_target",
+        ),
+        (
+            [
+                {
+                    "type": "point_on_object",
+                    "first": _point(0, "start"),
+                    "second": {"geometry_index": 1, "position": "edge"},
+                }
+            ],
+            "invalid_position_reference",
+        ),
+        (
+            [
+                {
+                    "type": "horizontal_points",
+                    "first": _point(0, "start"),
+                    "second": _point(0, "start"),
+                }
+            ],
+            "identical_point_references",
+        ),
+        (
+            [
+                {
+                    "type": "vertical_points",
+                    "first": _point(0, "end"),
+                    "second": _point(0, "end"),
+                }
+            ],
+            "identical_point_references",
         ),
         (
             [
@@ -350,6 +419,16 @@ def test_constraint_batch_accepts_exact_maximum_and_preserves_order() -> None:
                 }
             ],
             "invalid_geometry_reference",
+        ),
+        (
+            [
+                {
+                    "type": "horizontal_points",
+                    "first": {"geometry_index": 0, "position": 1},
+                    "second": _point(1, "end"),
+                }
+            ],
+            "invalid_position_reference",
         ),
         (
             [{"type": "radius", "geometry_index": 0, "value": 0.0}],
@@ -543,6 +622,41 @@ def test_symmetric_about_line_uses_strict_controlled_geometry_reference() -> Non
     assert isinstance(result, tuple)
     assert isinstance(result[0], SymmetricConstraintInput)
     assert isinstance(result[0].about, SketchConstraintGeometryReferenceInput)
+
+
+def test_point_on_object_uses_strict_controlled_whole_geometry_target() -> None:
+    result = validate_add_sketch_constraints_request(
+        "Bracket",
+        "Sketch",
+        [
+            {
+                "type": "point_on_object",
+                "first": _point(0, "end"),
+                "second": {"geometry_index": 1},
+            }
+        ],
+    )
+
+    assert isinstance(result, tuple)
+    assert isinstance(result[0], PointOnObjectConstraintInput)
+    assert isinstance(result[0].second, SketchConstraintGeometryReferenceInput)
+
+
+@pytest.mark.parametrize("constraint_type", ["horizontal_points", "vertical_points"])
+def test_point_alignment_accepts_distinct_endpoints_of_one_line(constraint_type: str) -> None:
+    result = validate_add_sketch_constraints_request(
+        "Bracket",
+        "Sketch",
+        [
+            {
+                "type": constraint_type,
+                "first": _point(0, "start"),
+                "second": _point(0, "end"),
+            }
+        ],
+    )
+
+    assert isinstance(result, tuple)
 
 
 @pytest.mark.parametrize("value", [-540.0, -360.0, -180.0, 0.0, 180.0, 360.0, 540.0])

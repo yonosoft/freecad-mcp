@@ -20,11 +20,14 @@ from freecad_mcp.validation import validate_add_sketch_constraints_request
 _REQUEST_REASONS = {
     "geometry_reference_out_of_range",
     "degenerate_symmetry_line",
+    "identical_point_references",
     "identical_symmetric_points",
     "identical_symmetry_centre",
     "incompatible_geometry_type",
     "invalid_position_reference",
     "same_origin_reference",
+    "point_on_object_self_target",
+    "unsupported_point_on_object_target",
     "unsupported_reference",
 }
 

@@ -342,6 +342,22 @@ class VerticalConstraintInput(_SketchConstraintInputModel):
     geometry_index: int = Field(strict=True, ge=0)
 
 
+class HorizontalPointsConstraintInput(_SketchConstraintInputModel):
+    """Make two selected points share one Y coordinate."""
+
+    type: Literal["horizontal_points"]
+    first: SketchConstraintPointReferenceInput
+    second: SketchConstraintPointReferenceInput
+
+
+class VerticalPointsConstraintInput(_SketchConstraintInputModel):
+    """Make two selected points share one X coordinate."""
+
+    type: Literal["vertical_points"]
+    first: SketchConstraintPointReferenceInput
+    second: SketchConstraintPointReferenceInput
+
+
 class ParallelConstraintInput(_SketchConstraintInputModel):
     """Make two distinct line segments parallel."""
 
@@ -375,11 +391,11 @@ class CoincidentConstraintInput(_SketchConstraintInputModel):
 
 
 class PointOnObjectConstraintInput(_SketchConstraintInputModel):
-    """Constrain one geometry point to one native sketch axis."""
+    """Constrain one geometry point to one controlled object target."""
 
     type: Literal["point_on_object"]
     first: SketchPointOnObjectReferenceInput
-    second: SketchPointOnObjectReferenceInput
+    second: SketchPointOnObjectReferenceInput | SketchConstraintGeometryReferenceInput
 
 
 class SymmetricConstraintInput(_SketchConstraintInputModel):
@@ -521,6 +537,8 @@ AngleConstraintInput = Annotated[
 SketchConstraintInput = Annotated[
     HorizontalConstraintInput
     | VerticalConstraintInput
+    | HorizontalPointsConstraintInput
+    | VerticalPointsConstraintInput
     | ParallelConstraintInput
     | PerpendicularConstraintInput
     | EqualConstraintInput
@@ -889,6 +907,7 @@ __all__ = [
     "DocumentSummary",
     "EqualConstraintInput",
     "HorizontalConstraintInput",
+    "HorizontalPointsConstraintInput",
     "LineSegmentGeometryInput",
     "ObjectDetail",
     "ObjectSummary",
@@ -933,4 +952,5 @@ __all__ = [
     "UnsupportedSketchConstraint",
     "UnsupportedSketchGeometry",
     "VerticalConstraintInput",
+    "VerticalPointsConstraintInput",
 ]

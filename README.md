@@ -146,9 +146,12 @@ Version-one geometry support is `line_segment`, `circle`, `arc_of_circle`, and
 construction state. The supported constraint discriminators are `coincident`,
 `horizontal`, `vertical`, `parallel`, `perpendicular`, `equal`, `distance`,
 `distance_x`, `distance_y`, `radius`, `diameter`, `angle`, and
-`point_on_object`, and `symmetric`. Valid geometry or constraints outside those sets are
-returned as controlled `unsupported` records rather than failing the entire
-sketch.
+`point_on_object`, `horizontal_points`, `vertical_points`, and `symmetric`.
+Ordinary `point_on_object` targets read back as a controlled geometry reference
+with `position: edge`; point-pair alignment reads back with its two semantic
+point tokens and remains distinct from whole-line orientation. Valid geometry
+or constraints outside those sets are returned as controlled `unsupported`
+records rather than exposing native references.
 
 Lengths use `millimeter` and angles use `degree`. Solver facts come only from
 FreeCAD's cached properties: they are populated when the sketch state is up to
@@ -264,7 +267,8 @@ inspection support.
 constraints to an existing sketch. Its required top-level inputs are exactly
 `document_name`, `sketch_name`, and `constraints`; lookup uses exact internal
 names and never visible-label aliases. Each constraint is a strict typed union
-member with no additional fields. Version one supports:
+member with no additional fields. The top-level discriminator has exactly 16
+variants. Version one supports:
 
 - `horizontal` and `vertical` on line segments;
 - `parallel` and `perpendicular` between distinct line segments;
@@ -272,8 +276,12 @@ member with no additional fields. Version one supports:
   circles and circular arcs;
 - `coincident` between distinct geometry-point references, or between one
   geometry point and the native sketch origin;
-- `point_on_object` between one geometry point and the native horizontal or
-  vertical sketch axis;
+- `point_on_object` from one selected geometry point to a line segment, circle,
+  circular arc, or the native horizontal or vertical sketch axis;
+- `horizontal_points` between two distinct selected points that must share a Y
+  coordinate;
+- `vertical_points` between two distinct selected points that must share an X
+  coordinate;
 - `symmetric` between two distinct geometry points, about the sketch origin,
   either native sketch axis, another distinct geometry point, or a line segment;
 - `distance` modes `line_length`, `point_to_origin`, and `between_points`;
@@ -318,10 +326,27 @@ are strict one-field objects:
 `origin` is accepted by `coincident` and as `symmetric.about`.
 `horizontal_axis` and `vertical_axis` are accepted by `point_on_object` and as
 `symmetric.about`; either public order remains accepted for the two-sided
-`coincident` and `point_on_object` contracts. Negative geometry indices,
-external geometry, internal geometry, and other reference literals are
-rejected. The existing `point_to_origin` distance modes remain unchanged and
-do not expose FreeCAD's internal root-point encoding.
+axis-target `point_on_object` contract for backward compatibility. For ordinary
+targets, `first` is the selected point and `second` is the strict whole-geometry
+reference `{"geometry_index": n}`. Its target may resolve only to a current
+line segment, circle, or circular arc; line construction state does not change
+compatibility. Point geometry, origin, external/datum geometry, ellipses,
+B-splines, self-targets, and references carrying a point position are rejected.
+Negative geometry indices, internal geometry, native point-position integers,
+and other reference literals are also rejected. The existing `point_to_origin`
+distance modes remain unchanged and do not expose FreeCAD's internal root-point
+encoding.
+
+Point-pair alignment uses the existing point-reference vocabulary:
+
+```json
+{"type": "horizontal_points", "first": {"geometry_index": 0, "position": "center"}, "second": {"geometry_index": 1, "position": "point"}}
+{"type": "vertical_points", "first": {"geometry_index": 0, "position": "start"}, "second": {"geometry_index": 1, "position": "center"}}
+```
+
+These forms accept mixed supported point kinds. Distinct endpoints of the same
+line are valid, although whole-line `horizontal` or `vertical` is preferred
+when the intent is simply to orient that line.
 
 The strict symmetric shape reuses the same point-reference model for `first`,
 `second`, and point-centred `about`. A whole line is a strict one-field geometry
@@ -376,14 +401,17 @@ FreeCAD's GUI exposes both through its unified coincidence command. Native
 negative reference IDs remain private to the FreeCAD layer. These operations
 are not a composite `lock` constraint.
 
-Use symmetry when the design intent is symmetric. Prefer the sketch origin or
-native sketch axes over calculated positive and negative placement dimensions,
-and use the smallest natural constraint set. Do not add helper construction
-geometry or duplicate symmetry with coordinate, distance, or coincidence
-constraints that make the sketch redundant. After explicit recompute, require
-no redundant, partially redundant, conflicting, or malformed constraints. The
-tool exposes controlled symmetry but does not choose a constraint strategy for
-the calling agent.
+Use `point_on_object` for point-to-line/circle/arc/axis membership and
+`coincident` for point-to-point coincidence. Use whole-line `horizontal` or
+`vertical` for one line and `horizontal_points` or `vertical_points` for two
+independently selected points. Prefer native sketch axes over helper
+construction lines for sketch datums; reuse an existing construction line when
+it is intentional design geometry, but do not create one when a native axis
+expresses the same intent. Use symmetry when the design intent is symmetric and
+the smallest natural constraint set. Avoid duplicate, redundant, and
+substitute constraints. After explicit recompute, require no redundant,
+partially redundant, conflicting, or malformed constraints. The tool exposes
+these controlled choices but does not choose a strategy for the calling agent.
 
 A centred 30 mm × 20 mm rectangle is representable with four line segments,
 four endpoint coincidences, two horizontal constraints, two vertical
@@ -393,6 +421,16 @@ testing confirms that natural 11-constraint set is closed, fully constrained at
 zero degrees of freedom, and has no redundant, partially redundant,
 conflicting, or malformed constraints. It uses no helper geometry and no signed
 corner-coordinate dimensions.
+
+A second direct regression uses one origin-centred 10 mm circle and two point
+geometries near `(10, 0)` and `(0, 10)`. Each point uses ordinary
+`point_on_object` to the circle; the first uses `horizontal_points` to the
+circle centre and the second uses `vertical_points`. With origin coincidence
+and one radius constraint, FreeCAD 1.1.1 reports zero degrees of freedom, full
+constraint, and empty conflict, redundant, partially-redundant, and malformed
+diagnostics. The sketch contains no helper geometry, remains unsaved, reads
+back only controlled references, and the six-constraint batch is one undo/redo
+step.
 
 Length values are millimetres. Euclidean `distance`, `radius`, and `diameter`
 values must be finite and positive. `distance_x` and `distance_y` preserve
@@ -440,7 +478,10 @@ geometry references; and arbitrary `Sketcher.Constraint` passthrough remain
 unsupported. Controlled axes are accepted only by `point_on_object` and as the
 `about` reference of `symmetric`. Supported native symmetry reads back as three
 controlled references in `first`, `second`, `about` order; private negative IDs
-and native point-position integers are never returned. Existing unsupported
+and native point-position integers are never returned. Ordinary
+`PointOnObject` and point-pair `Horizontal`/`Vertical` read back as
+`point_on_object`, `horizontal_points`, and `vertical_points` without exposing
+their native constructor fields. Existing unsupported
 constraints remain inspectable through `get_sketch`; redundancy and conflicts
 are assessed only after explicit recompute.
 

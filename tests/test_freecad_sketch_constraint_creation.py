@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import sys
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -15,7 +15,13 @@ from freecad_mcp.exceptions import (
     SketchTypeMismatchError,
 )
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter
-from freecad_mcp.models import SketchConstraintInput
+from freecad_mcp.models import (
+    PointOnObjectConstraintInput,
+    SketchConstraintGeometryReferenceInput,
+    SketchConstraintInput,
+    SketchConstraintPointReferenceInput,
+    SketchPointPosition,
+)
 from freecad_mcp.validation import validate_add_sketch_constraints_request
 
 
@@ -86,7 +92,12 @@ class ConstraintStub:
         self.InVirtualSpace = False
 
         if constraint_type in {"Horizontal", "Vertical"}:
-            self.First = int(args[0])
+            if len(args) == 1:
+                self.First = int(args[0])
+            elif len(args) == 4:
+                self.First, self.FirstPos, self.Second, self.SecondPos = map(int, args)
+            else:
+                raise TypeError("unsupported point-alignment constructor")
         elif constraint_type in {"Parallel", "Perpendicular", "Equal"}:
             self.First = int(args[0])
             self.Second = int(args[1])
@@ -154,6 +165,8 @@ class SketchStub:
         failure_at: int | None = None,
         delete_failure: bool = False,
         parent: object | None = None,
+        map_mode: str = "Deactivated",
+        attachment_support: object | None = None,
     ) -> None:
         self.Name = "Sketch"
         self.Label = "Sketch label"
@@ -164,6 +177,8 @@ class SketchStub:
         self.failure_at = failure_at
         self.delete_failure = delete_failure
         self.parent = parent
+        self.MapMode = map_mode
+        self.AttachmentSupport = [] if attachment_support is None else attachment_support
         self.add_calls: list[ConstraintStub] = []
         self.del_calls: list[int] = []
         self.solve_calls = 0
@@ -245,11 +260,13 @@ class DocumentStub:
         pending: bool = False,
         commit_error: bool = False,
         abort_error: bool = False,
+        file_name: str = "",
     ) -> None:
         self.sketch = sketch
         self.HasPendingTransaction = pending
         self.commit_error = commit_error
         self.abort_error = abort_error
+        self.FileName = file_name
         self.open_calls: list[str] = []
         self.commit_calls = 0
         self.abort_calls = 0
@@ -471,6 +488,128 @@ def test_native_sketch_references_use_verified_constructors_without_extra_mutati
     assert document.recompute_calls == 0
     assert document.save_calls == 0
     assert sketch.solve_calls == 0
+
+
+def test_general_point_relationships_use_exact_verified_native_constructors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    construction = [False, False, True, False, False, False]
+    sketch = SketchStub(_geometry(), construction=construction)
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    payload: list[dict[str, object]] = [
+        {
+            "type": "point_on_object",
+            "first": {"geometry_index": 5, "position": "point"},
+            "second": {"geometry_index": 0},
+        },
+        {
+            "type": "point_on_object",
+            "first": {"geometry_index": 0, "position": "end"},
+            "second": {"geometry_index": 1},
+        },
+        {
+            "type": "point_on_object",
+            "first": {"geometry_index": 3, "position": "center"},
+            "second": {"geometry_index": 2},
+        },
+        {
+            "type": "point_on_object",
+            "first": {"geometry_index": 4, "position": "center"},
+            "second": {"geometry_index": 2},
+        },
+        {
+            "type": "point_on_object",
+            "first": {"geometry_index": 5, "position": "point"},
+            "second": {"geometry_index": 3},
+        },
+        {
+            "type": "point_on_object",
+            "first": {"geometry_index": 5, "position": "point"},
+            "second": {"geometry_index": 4},
+        },
+        {
+            "type": "horizontal_points",
+            "first": {"geometry_index": 0, "position": "start"},
+            "second": {"geometry_index": 3, "position": "center"},
+        },
+        {
+            "type": "vertical_points",
+            "first": {"geometry_index": 4, "position": "center"},
+            "second": {"geometry_index": 5, "position": "point"},
+        },
+    ]
+
+    result = FreeCADDocumentAdapter().add_sketch_constraints(
+        "Bracket",
+        "Sketch",
+        _parsed(payload),
+    )
+
+    assert result.added_indices == tuple(range(8))
+    assert [
+        (item.Type, item.First, item.FirstPos, item.Second, item.SecondPos)
+        for item in sketch._constraints
+    ] == [
+        ("PointOnObject", 5, 1, 0, 0),
+        ("PointOnObject", 0, 2, 1, 0),
+        ("PointOnObject", 3, 3, 2, 0),
+        ("PointOnObject", 4, 3, 2, 0),
+        ("PointOnObject", 5, 1, 3, 0),
+        ("PointOnObject", 5, 1, 4, 0),
+        ("Horizontal", 0, 1, 3, 3),
+        ("Vertical", 4, 3, 5, 1),
+    ]
+    assert sketch._construction == construction
+    assert document.open_calls == ["MCP Add Sketch Constraints"]
+    assert document.commit_calls == 1
+    assert document.recompute_calls == 0
+    assert document.save_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("geometry_index", "position", "native_position"),
+    [
+        (0, "start", 1),
+        (0, "end", 2),
+        (3, "center", 3),
+        (4, "start", 1),
+        (4, "end", 2),
+        (4, "center", 3),
+        (5, "point", 1),
+    ],
+)
+def test_every_controlled_selectable_point_can_target_ordinary_geometry(
+    monkeypatch: pytest.MonkeyPatch,
+    geometry_index: int,
+    position: str,
+    native_position: int,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    target_index = 2 if geometry_index != 2 else 1
+
+    FreeCADDocumentAdapter().add_sketch_constraints(
+        "Bracket",
+        "Sketch",
+        _parsed(
+            [
+                {
+                    "type": "point_on_object",
+                    "first": {"geometry_index": geometry_index, "position": position},
+                    "second": {"geometry_index": target_index},
+                }
+            ]
+        ),
+    )
+
+    constraint = sketch._constraints[0]
+    assert (constraint.First, constraint.FirstPos, constraint.Second) == (
+        geometry_index,
+        native_position,
+        target_index,
+    )
 
 
 def test_symmetric_uses_exact_verified_point_and_line_native_constructors(
@@ -806,6 +945,30 @@ def test_standalone_and_attached_sketches_use_the_same_constraint_path(
             },
             "geometry_reference_out_of_range",
         ),
+        (
+            {
+                "type": "point_on_object",
+                "first": {"geometry_index": 0, "position": "start"},
+                "second": {"geometry_index": 5},
+            },
+            "unsupported_point_on_object_target",
+        ),
+        (
+            {
+                "type": "point_on_object",
+                "first": {"geometry_index": 0, "position": "start"},
+                "second": {"geometry_index": 99},
+            },
+            "geometry_reference_out_of_range",
+        ),
+        (
+            {
+                "type": "horizontal_points",
+                "first": {"geometry_index": 3, "position": "start"},
+                "second": {"geometry_index": 5, "position": "point"},
+            },
+            "invalid_position_reference",
+        ),
     ],
 )
 def test_geometry_compatibility_fails_before_transaction(
@@ -823,6 +986,65 @@ def test_geometry_compatibility_fails_before_transaction(
     assert raised.value.reason == reason
     assert document.open_calls == []
     assert sketch.ConstraintCount == 0
+
+
+def test_point_on_object_self_target_is_defensively_rejected_before_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    constraint = PointOnObjectConstraintInput(
+        type="point_on_object",
+        first=SketchConstraintPointReferenceInput(
+            geometry_index=0,
+            position=SketchPointPosition.START,
+        ),
+        second=SketchConstraintGeometryReferenceInput(geometry_index=0),
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints(
+            "Bracket",
+            "Sketch",
+            (constraint,),
+        )
+
+    assert raised.value.reason == "point_on_object_self_target"
+    assert document.open_calls == []
+    assert sketch.ConstraintCount == 0
+
+
+@pytest.mark.parametrize("constraint_type", ["horizontal_points", "vertical_points"])
+def test_same_line_endpoint_alignment_is_supported(
+    monkeypatch: pytest.MonkeyPatch,
+    constraint_type: str,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+
+    FreeCADDocumentAdapter().add_sketch_constraints(
+        "Bracket",
+        "Sketch",
+        _parsed(
+            [
+                {
+                    "type": constraint_type,
+                    "first": {"geometry_index": 0, "position": "start"},
+                    "second": {"geometry_index": 0, "position": "end"},
+                }
+            ]
+        ),
+    )
+
+    constraint = sketch._constraints[0]
+    assert (constraint.First, constraint.FirstPos, constraint.Second, constraint.SecondPos) == (
+        0,
+        1,
+        0,
+        2,
+    )
 
 
 def test_later_invalid_symmetric_reference_rejects_complete_batch_before_transaction(
@@ -856,6 +1078,175 @@ def test_later_invalid_symmetric_reference_rejects_complete_batch_before_transac
     assert sketch.ConstraintCount == 0
     assert sketch.add_calls == []
     assert document.open_calls == []
+
+
+@pytest.mark.parametrize(
+    "first_constraint",
+    [
+        {
+            "type": "point_on_object",
+            "first": {"geometry_index": 5, "position": "point"},
+            "second": {"geometry_index": 0},
+        },
+        {
+            "type": "horizontal_points",
+            "first": {"geometry_index": 0, "position": "start"},
+            "second": {"geometry_index": 3, "position": "center"},
+        },
+        {
+            "type": "vertical_points",
+            "first": {"geometry_index": 4, "position": "center"},
+            "second": {"geometry_index": 5, "position": "point"},
+        },
+    ],
+)
+def test_later_invalid_point_relationship_rejects_complete_batch_before_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+    first_constraint: dict[str, object],
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    batch = _parsed(
+        [
+            first_constraint,
+            {
+                "type": "point_on_object",
+                "first": {"geometry_index": 5, "position": "point"},
+                "second": {"geometry_index": 99},
+            },
+        ]
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert raised.value.index == 1
+    assert raised.value.reason == "geometry_reference_out_of_range"
+    assert sketch.ConstraintCount == 0
+    assert sketch.add_calls == []
+    assert document.open_calls == []
+
+
+@pytest.mark.parametrize(
+    "first_constraint",
+    [
+        {
+            "type": "point_on_object",
+            "first": {"geometry_index": 5, "position": "point"},
+            "second": {"geometry_index": 0},
+        },
+        {
+            "type": "horizontal_points",
+            "first": {"geometry_index": 0, "position": "start"},
+            "second": {"geometry_index": 3, "position": "center"},
+        },
+        {
+            "type": "vertical_points",
+            "first": {"geometry_index": 4, "position": "center"},
+            "second": {"geometry_index": 5, "position": "point"},
+        },
+    ],
+)
+def test_native_failure_after_point_relationship_restores_complete_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    first_constraint: dict[str, object],
+) -> None:
+    sketch = SketchStub(
+        _geometry(),
+        construction=[True, False, True, False, False, False],
+        failure_at=1,
+    )
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    before_geometry = sketch.Geometry
+    batch = _parsed(
+        [
+            first_constraint,
+            {"type": "radius", "geometry_index": 3, "value": 5.0},
+        ]
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert raised.value.index == 1
+    assert raised.value.reason == "constraint_add_failed"
+    assert sketch.ConstraintCount == 0
+    assert sketch._geometry[0].EndPoint.y == before_geometry[0].EndPoint.y
+    assert sketch._construction == [True, False, True, False, False, False]
+    assert document.abort_calls == 1
+    assert document.commit_calls == 0
+
+
+def test_point_relationship_rollback_verifies_document_body_and_attachment_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = SimpleNamespace(Name="Body", TypeId="PartDesign::Body")
+    plane = SimpleNamespace(Name="XY_Plane", TypeId="PartDesign::Feature")
+    support = [(plane, ("",))]
+    sketch = SketchStub(
+        _geometry(),
+        parent=body,
+        map_mode="FlatFace",
+        attachment_support=support,
+        failure_at=1,
+    )
+    document = DocumentStub(sketch, file_name="C:/fixtures/point-relationships.FCStd")
+    _install_modules(monkeypatch, {"Bracket": document})
+    batch = _parsed(
+        [
+            {
+                "type": "point_on_object",
+                "first": {"geometry_index": 5, "position": "point"},
+                "second": {"geometry_index": 0},
+            },
+            {
+                "type": "horizontal_points",
+                "first": {"geometry_index": 5, "position": "point"},
+                "second": {"geometry_index": 3, "position": "center"},
+            },
+        ]
+    )
+
+    with pytest.raises(SketchConstraintCreationError, match="constraint_add_failed"):
+        FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert document.FileName == "C:/fixtures/point-relationships.FCStd"
+    assert sketch.getParentGeoFeatureGroup() is body
+    assert sketch.AttachmentSupport == support
+    assert sketch.MapMode == "FlatFace"
+    assert sketch.ConstraintCount == 0
+
+
+def test_point_relationship_rollback_detects_attachment_context_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(_geometry(), map_mode="FlatFace", failure_at=1)
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    original_delete = sketch.delConstraint
+
+    def delete_and_change_context(index: int) -> None:
+        original_delete(index)
+        sketch.MapMode = "Deactivated"
+
+    sketch.delConstraint = delete_and_change_context  # type: ignore[method-assign]
+    batch = _parsed(
+        [
+            {
+                "type": "point_on_object",
+                "first": {"geometry_index": 5, "position": "point"},
+                "second": {"geometry_index": 0},
+            },
+            {"type": "radius", "geometry_index": 3, "value": 5.0},
+        ]
+    )
+
+    with pytest.raises(SketchConstraintRollbackError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert raised.value.reason == "rollback_sketch_context_mismatch"
 
 
 @pytest.mark.parametrize("failure_at", [0, 1, 2])

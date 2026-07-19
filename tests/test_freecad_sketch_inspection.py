@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import sys
 from types import ModuleType, SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -431,6 +431,150 @@ def test_get_sketch_returns_native_point_on_axis_semantics(
         {"kind": "geometry", "geometry_index": 0, "position": "point"},
         {"reference": expected_reference},
     ]
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        LineSegment(Vector(-5.0, 0.0), Vector(5.0, 0.0)),
+        Circle(Vector(0.0, 0.0), 5.0),
+        ArcOfCircle(
+            Vector(0.0, 0.0),
+            5.0,
+            Vector(5.0, 0.0),
+            Vector(0.0, 5.0),
+            0.0,
+            math.pi / 2,
+        ),
+    ],
+)
+def test_get_sketch_returns_ordinary_point_on_object_semantics(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    target: Any,
+) -> None:
+    sketch = SketchStub(
+        geometry=[Point(3.0, 4.0), target],
+        constraints=[
+            ConstraintStub(
+                "PointOnObject",
+                first=0,
+                first_pos=1,
+                second=1,
+                second_pos=0,
+            )
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    constraints = cast(
+        list[dict[str, object]],
+        FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()["constraints"],
+    )
+    constraint = constraints[0]
+
+    assert constraint["type"] == "point_on_object"
+    assert constraint["references"] == [
+        {"kind": "geometry", "geometry_index": 0, "position": "point"},
+        {"kind": "geometry", "geometry_index": 1, "position": "edge"},
+    ]
+
+
+def test_get_sketch_distinguishes_point_pair_alignment_from_whole_line_orientation(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            LineSegment(Vector(0.0, 0.0), Vector(2.0, 3.0)),
+            Circle(Vector(4.0, 5.0), 2.0),
+            ArcOfCircle(
+                Vector(6.0, 7.0),
+                2.0,
+                Vector(8.0, 7.0),
+                Vector(6.0, 9.0),
+                0.0,
+                math.pi / 2,
+            ),
+            Point(9.0, 5.0),
+        ],
+        constraints=[
+            ConstraintStub("Horizontal", first=0),
+            ConstraintStub("Vertical", first=0),
+            ConstraintStub("Horizontal", first=1, first_pos=3, second=3, second_pos=1),
+            ConstraintStub("Vertical", first=0, first_pos=1, second=2, second_pos=3),
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    constraints = cast(
+        list[dict[str, object]],
+        FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()["constraints"],
+    )
+
+    assert [item["type"] for item in constraints] == [
+        "horizontal",
+        "vertical",
+        "horizontal_points",
+        "vertical_points",
+    ]
+    assert constraints[2]["references"] == [
+        {"kind": "geometry", "geometry_index": 1, "position": "center"},
+        {"kind": "geometry", "geometry_index": 3, "position": "point"},
+    ]
+    assert constraints[3]["references"] == [
+        {"kind": "geometry", "geometry_index": 0, "position": "start"},
+        {"kind": "geometry", "geometry_index": 2, "position": "center"},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("constraint_type", "first", "first_pos", "second", "second_pos"),
+    [
+        ("PointOnObject", 0, 1, 0, 0),
+        ("PointOnObject", 0, 1, 1, 0),
+        ("PointOnObject", 0, 1, 99, 0),
+        ("Horizontal", 0, 1, 0, 1),
+        ("Horizontal", 0, 1, 99, 1),
+        ("Vertical", 0, 0, 2, 1),
+    ],
+)
+def test_malformed_new_point_relationship_is_isolated_as_controlled_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    constraint_type: str,
+    first: int,
+    first_pos: int,
+    second: int,
+    second_pos: int,
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            Point(1.0, 2.0),
+            Point(3.0, 4.0),
+            LineSegment(Vector(0.0, 0.0), Vector(1.0, 0.0)),
+        ],
+        constraints=[
+            ConstraintStub(
+                constraint_type,
+                first=first,
+                first_pos=first_pos,
+                second=second,
+                second_pos=second_pos,
+            ),
+            ConstraintStub("Horizontal", first=2),
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    constraints = cast(
+        list[dict[str, object]],
+        FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()["constraints"],
+    )
+
+    assert constraints[0]["type"] == "unsupported"
+    assert constraints[1]["type"] == "horizontal"
+    assert "references" not in constraints[0]
 
 
 @pytest.mark.parametrize(

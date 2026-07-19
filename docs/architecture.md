@@ -750,11 +750,15 @@ registration loop, arbitrary property mutation, or raw constructor passthrough.
 
 The top-level schema requires exactly `document_name`, `sketch_name`, and a
 `constraints` array with 1 to 100 items. Both names use exact internal-name
-lookup. The strict nested discriminated union supports:
+lookup. The strict nested discriminated union has 16 top-level variants and
+supports:
 
 ```text
 horizontal / vertical
   geometry_index
+
+horizontal_points / vertical_points
+  first, second: two distinct controlled geometry points
 
 parallel / perpendicular / equal
   first_geometry_index, second_geometry_index
@@ -763,7 +767,8 @@ coincident
   first, second: exactly one geometry point plus origin, or two geometry points
 
 point_on_object
-  first, second: exactly one geometry point plus one controlled sketch axis
+  first: one controlled geometry point
+  second: one whole line/circle/circular-arc reference or controlled sketch axis
 
 symmetric
   first, second: two distinct geometry points
@@ -801,6 +806,15 @@ constraints. A symmetric line reference is the strict
 FreeCAD layer. Unknown literals, additional reference fields, raw negative
 geometry IDs, external geometry, and internal geometry are rejected.
 
+For ordinary `point_on_object`, the selected point is `first` and `second` is
+the same strict whole-geometry reference shape used elsewhere:
+`{"geometry_index": non_negative_integer}`. The adapter resolves that target
+only to `Part.LineSegment`, `Part.Circle`, or `Part.ArcOfCircle`; no point
+position accompanies the target. The established reverse public order remains
+accepted only for legacy axis-target requests. `horizontal_points` and
+`vertical_points` reuse the exact existing selectable-point model and do not
+overload the one-field whole-line `horizontal` and `vertical` variants.
+
 The focused FreeCAD layer alone translates `origin` to the native root point,
 `horizontal_axis` to the native horizontal sketch axis, and `vertical_axis` to
 the native vertical sketch axis. FreeCAD 1.1.1 verification confirmed that
@@ -808,6 +822,19 @@ origin membership is a native `Coincident` constraint and axis membership is a
 native `PointOnObject` constraint. No construction geometry or zero-valued X/Y
 distance constraints are synthesized. The existing explicit Euclidean
 `point_to_origin` modes and their controlled inspection readback are unchanged.
+
+FreeCAD 1.1.1 source and runtime verification locks three additional native
+translations. Ordinary membership uses
+`PointOnObject(point_geometry, point_position, target_geometry)`, whose legacy
+readback has `SecondPos == 0`. Point-pair alignment uses the four-index
+`Horizontal(first_geometry, first_position, second_geometry, second_position)`
+or matching `Vertical` form. Whole-line orientation retains the one-index
+constructors and reads back with `FirstPos == 0` and an unused second geometry.
+FreeCAD's Python wrapper exposes only the legacy first/second/third fields for
+these records in the installed build; generic element access is not public.
+The solver source admits more curve targets than this controlled contract, but
+the adapter deliberately limits ordinary targets to lines, circles, and
+circular arcs.
 
 For controlled symmetry, the FreeCAD layer selects one of the two verified
 native constructor forms: two points plus a third point for origin/geometry
@@ -842,8 +869,14 @@ the FreeCAD adapter resolves every current index and enforces:
 - horizontal, vertical, parallel, perpendicular, line length, and angles:
   `Part.LineSegment` only;
 - equal: line-to-line or any circle/circular-arc pair;
-- coincident, point-on-object, and point distances: only point tokens valid for
-  the runtime geometry type;
+- coincident, point-on-object, point-pair alignment, and point distances: only
+  point tokens valid for the runtime geometry type;
+- ordinary point-on-object targets: line segment, circle, or circular arc only,
+  never the selected point's own geometry; point geometry, unsupported curves,
+  and out-of-range targets fail before the transaction;
+- horizontal-points and vertical-points: two non-identical selected points;
+  distinct endpoints of the same line remain valid, with whole-line forms
+  preferred for simple line orientation;
 - symmetric: both selected points and any point-centre must use valid tokens;
   a whole-line centre must resolve specifically to `Part.LineSegment`;
 - radius and diameter: `Part.Circle` or `Part.ArcOfCircle` only.
@@ -857,7 +890,9 @@ and report them only through solver state.
 
 The adapter snapshots geometry and construction state plus every existing
 constraint's type, three geometry/position pairs, dimensional value, name,
-driving flag, active flag, and virtual-space flag. It observes
+driving flag, active flag, and virtual-space flag. The rollback snapshot also
+records the document file name, Body ownership, attachment support, and map
+mode. It observes
 `Document.HasPendingTransaction`: with no pending transaction it opens exactly
 one `MCP Add Sketch Constraints` transaction and owns the matching commit or
 abort; with a pending caller transaction it does not open, commit, or abort it.
@@ -875,7 +910,8 @@ constraint flags are restored where needed. Because FreeCAD's Python
 geometry immediately, rollback compares and, only when required, restores the
 captured geometry property and construction flags. It then verifies constraint
 count and complete constraint state, geometry and construction state, and
-transaction ownership. A failure of any restoration or verification becomes
+document path, Body ownership, attachment support, map mode, and transaction
+ownership. A failure of any restoration or verification becomes
 `sketch_constraint_rollback_failed`; no partial index list is returned.
 
 The tool itself never calls `Sketch.solve()`, `Document.recompute()`,
@@ -903,7 +939,9 @@ Public error codes are `validation_error`, `document_not_found`,
 `invalid_point_reference`, `invalid_constraint_value`, and
 `incompatible_geometry_type`, plus the focused symmetric reasons
 `identical_symmetric_points`, `identical_symmetry_centre`, and
-`degenerate_symmetry_line`, plus transaction/index/count/rollback
+`degenerate_symmetry_line`, plus `identical_point_references`,
+`point_on_object_self_target`, and `unsupported_point_on_object_target`, plus
+transaction/index/count/rollback
 reasons. Raw FreeCAD exception text is never public.
 
 Version one creates only active driving dimensional constraints. Tangency,
@@ -960,12 +998,21 @@ native origin coincidence is returned with the geometry-point reference plus
 `{"reference": "origin"}` in the order stored by FreeCAD. Native
 `PointOnObject` axis membership is returned as the geometry point plus
 `{"reference": "horizontal_axis"}` or `{"reference": "vertical_axis"}`.
+Ordinary membership returns the selected point plus a non-negative controlled
+geometry reference with `position: edge`; target construction state is retained
+on the geometry record rather than duplicated on the constraint. Four-index
+native `Horizontal` and `Vertical` records return `horizontal_points` and
+`vertical_points` with two semantic point references, while one-index records
+remain `horizontal` and `vertical` with one edge reference.
 Supported native `Symmetric` constraints return `type: symmetric` and exactly
 three controlled references in stored first/second/about order. The about
 reference is reconstructed as `origin`, either native axis, a geometry point,
 or a line geometry reference with `position: edge`. Incompatible or degenerate
 native symmetric records become controlled `unsupported` records without
 breaking inspection of the remaining constraints.
+Degenerate, unsupported-target, or out-of-range records in the new point
+relationship forms likewise become one controlled `unsupported` record so the
+following native constraints remain inspectable.
 Private root/axis IDs never cross the adapter boundary. Constraint type is
 interpreted together with point position: an axis-like native ID in a
 `Coincident` record is not misreported as origin or as controlled

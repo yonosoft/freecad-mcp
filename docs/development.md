@@ -268,7 +268,9 @@ error translation, application/runtime wiring, public adapter delegation, and
 architecture boundaries. Native-reference coverage locks the exact one-field
 `origin`, `horizontal_axis`, and `vertical_axis` models, both public orderings,
 origin-to-origin and invalid-scope rejection, raw-negative-ID rejection, and
-the exact 14-member top-level constraint schema. Symmetric coverage locks all
+the original axis-target request order. Milestone 14B coverage locks the exact
+16-member top-level constraint schema, strict ordinary whole-geometry targets,
+`horizontal_points`, and `vertical_points`. Symmetric coverage locks all
 five `about` forms, every supported point token, strict whole-line references,
 degenerate-reference rejection, and preservation of every preceding union
 member.
@@ -288,6 +290,16 @@ centres, both line endpoints, arc endpoints, `Part.Point`, construction
 geometry, origin coincidence, horizontal/vertical `PointOnObject`, controlled
 inspection, axis/origin disambiguation, later-item atomic rejection, and
 rollback after FreeCAD-like immediate geometry movement.
+
+General point-relationship adapter tests cover ordinary line, circle, and arc
+targets; point geometry, both line endpoints, circle centres, and all three arc
+point kinds; normal and construction target lines; mixed point kinds; same-line
+endpoint alignment; exact three- and five-argument native constructors;
+pre-transaction unsupported/self/identity/range/position failures; later-item
+prevalidation; injected native failure rollback; and controlled malformed-record
+isolation. Schema and MCP tests protect the unchanged whole-line variants,
+ordinary target `edge` readback, exact twelve-tool order, and modelling-policy
+description.
 
 Controlled symmetry adapter tests lock both verified native constructor forms,
 origin and both axes, geometry-point and line-segment centres, complete-batch
@@ -314,6 +326,18 @@ invalid-reference prevalidation, injected native failure rollback, saved and
 unsaved state, controlled readback, one-step undo/redo, and the fully
 constrained centred rectangle. Only its saved-state case writes a temporary
 fixture, and that case verifies the mutation does not update the file.
+
+Milestone 14B's focused direct runtime check is
+`scripts/smoke_sketch_point_relationships.py`. Run it with FreeCAD 1.1's
+embedded Python. It executes 24 clean-sketch scenarios: all ordinary target
+classes, both point-pair alignments with line and mixed point kinds, existing
+axis and whole-line regressions, controlled readback, invalid/self/later-item
+zero mutation, injected failure rollback, saved and unsaved state, one-step
+undo/redo, a body-owned origin-plane-attached sketch, and the circle
+cardinal-point product regression. Only the explicit saved-file case writes a
+temporary file. The product regression verifies a 10 mm origin-centred circle,
+two on-circle aligned points, zero DoF, clean solver diagnostics, no helper
+geometry, controlled references, one-step undo/redo, and unsaved state.
 
 ### Native Sketch Reference Live Acceptance Plan (Not Executed Here)
 
@@ -735,6 +759,80 @@ implementation edits, commit, or push.
     transcript, Report View, and before/after snapshots. Because MCP exposes no
     undo/redo tool, leave one-step GUI undo and redo as a clearly separate manual
     check rather than claiming it from the MCP transcript.
+
+### General Point Relationships AiderDesk live acceptance plan
+
+This Milestone 14B plan is prepared but was not executed by the implementation
+task. During acceptance, use only the twelve exposed MCP tools: do not use the
+FreeCAD Python console, edit implementation files, commit, or push. Because the
+public inventory can create only body-owned sketches, prepare any required
+standalone-sketch fixtures in the GUI before starting the recorded MCP session;
+all inspection and mutation of those fixtures must then occur through MCP.
+Leave GUI undo/redo as a separate manual check after the MCP transcript.
+
+1. Start a fresh FreeCAD 1.1.1 session, start MCP, connect AiderDesk, and retain
+   the protocol transcript plus Report View output.
+2. Discover the raw tool inventory and confirm the exact twelve-name order,
+   with `get_sketch` tenth, `add_sketch_geometry` eleventh, and
+   `add_sketch_constraints` twelfth. Confirm there is no new GUI command.
+3. Inspect raw tool-twelve schema separately from modelling prompts: exactly
+   three required top-level fields, a 1-to-100 array, 16 top-level variants,
+   strict point/whole-geometry/native references, unchanged old variants, and
+   forbidden additional fields, negative IDs, and native position integers.
+4. Use one clean sketch per semantic scenario. Through natural-language
+   modelling requests—not copied JSON recipes—ask separately for a point on a
+   line, circle, and circular arc; a line endpoint on another line; a circle
+   centre on a line; and an arc centre on a line. Include normal and existing
+   construction line targets. Do not create helper geometry merely for axes.
+5. In fresh sketches, naturally request horizontal alignment between two line
+   endpoints and between mixed point kinds, then vertical alignment for the
+   same two categories. Separately confirm whole-line horizontal and vertical
+   remain distinct and unchanged.
+6. Repeat representative ordinary-target and point-pair cases in a pre-created
+   standalone sketch and in body-owned sketches created through MCP, including
+   one sketch attached to a body origin plane and one unattached body sketch.
+7. After every successful mutation call `get_sketch`. Verify
+   `point_on_object` returns a selected point plus target `position: edge`,
+   `horizontal_points`/`vertical_points` return two semantic points, axis
+   membership remains controlled, geometry/construction/attachment state is
+   unchanged, and no native negative ID or point-position integer appears.
+8. Submit schema-negative cases separately: missing and extra fields, Boolean,
+   negative and stale indices, integer or invalid point tokens, point-position
+   data on a whole target, origin as target, raw axis IDs, identical point
+   references, self-targets, point-geometry targets, and unsupported geometry.
+   Compare `get_sketch` before and after every case to prove zero mutation.
+9. Submit mixed ordered batches containing existing constraints and all three
+   Milestone 14B capabilities. Verify contiguous returned indices, request
+   order, exact count transitions, and controlled readback.
+10. Submit each new valid form followed by a later invalid item. Verify the
+    complete before/after `get_sketch` snapshots match and no partial result or
+    point relationship remains.
+11. For a deterministic post-add failure, use a prearranged test build or
+    operator-controlled hook outside the MCP session, restore it in `finally`,
+    and submit a mixed batch through MCP. Verify constraints, geometry,
+    construction, Body ownership, support, map mode, transaction state, and
+    saved/unsaved state all match the baseline.
+12. In a fresh unsaved sketch, ask naturally for one 10 mm circle centred on
+    the sketch origin, one point on the circle horizontally aligned with the
+    circle centre, and a second point on the circle vertically aligned with the
+    centre. Do not provide a constraint recipe or permit helper geometry or
+    coordinate-dimension substitutes.
+13. Inspect the cardinal-point result: exactly one circle and two point
+    geometries, radius 10 mm, controlled origin coincidence, two ordinary
+    `point_on_object` records, one `horizontal_points`, one `vertical_points`,
+    no helper geometry, and no raw native IDs.
+14. Call `recompute_document` before final solver assertions, then call
+    `get_sketch` and require fresh diagnostics, zero DoF, fully constrained,
+    and empty redundant, partially redundant, conflicting, and malformed lists.
+15. Confirm the cardinal-point document remains unsaved. In a separate saved
+    disposable fixture, record path, timestamp, and bytes before mutation and
+    verify MCP does not save or alter the on-disk file.
+16. Confirm tangency, semantic profiles, deletion, repair, external geometry,
+    arbitrary mutation, and arbitrary Python remain unavailable.
+17. Stop MCP and close disposable documents without saving. Confirm repository
+    status is unchanged and retain the schema, transcript, state snapshots,
+    solver results, and the separately recorded manual one-step GUI undo/redo
+    check as acceptance evidence.
 
 ### Sketch index semantics
 

@@ -67,8 +67,8 @@ _REFERENCE_COUNTS = {
     "Coincident": {2},
     "PointOnObject": {2},
     "Symmetric": {3},
-    "Horizontal": {1},
-    "Vertical": {1},
+    "Horizontal": {1, 2},
+    "Vertical": {1, 2},
     "Parallel": {2},
     "Perpendicular": {2},
     "Equal": {2},
@@ -295,7 +295,7 @@ def _inspect_constraints(
         result.append(
             SketchConstraintData(
                 index=index,
-                type=_SUPPORTED_CONSTRAINTS[freecad_type],
+                type=_controlled_constraint_type(freecad_type, references),
                 name=name,
                 active=active,
                 virtual_space=virtual_space,
@@ -316,6 +316,10 @@ def _constraint_references(
     if symmetric is not None:
         return symmetric
 
+    point_alignment = _point_alignment_references(constraint, constraint_index, geometry)
+    if point_alignment is not None:
+        return point_alignment
+
     origin_coincidence = _coincident_origin_references(
         constraint,
         constraint_index,
@@ -324,9 +328,9 @@ def _constraint_references(
     if origin_coincidence is not None:
         return origin_coincidence
 
-    point_on_axis = _point_on_axis_references(constraint, constraint_index, geometry)
-    if point_on_axis is not None:
-        return point_on_axis
+    point_on_object = _point_on_object_references(constraint, constraint_index, geometry)
+    if point_on_object is not None:
+        return point_on_object
 
     origin_distance = _distance_to_origin_reference(constraint, constraint_index, geometry)
     if origin_distance is not None:
@@ -378,6 +382,17 @@ def _constraint_references(
             )
         )
     return tuple(references), False
+
+
+def _controlled_constraint_type(
+    freecad_type: str,
+    references: tuple[SketchConstraintReference, ...],
+) -> str:
+    if freecad_type == "Horizontal" and len(references) == 2:
+        return "horizontal_points"
+    if freecad_type == "Vertical" and len(references) == 2:
+        return "vertical_points"
+    return _SUPPORTED_CONSTRAINTS[freecad_type]
 
 
 def _symmetric_references(
@@ -483,7 +498,33 @@ def _coincident_origin_references(
     return tuple(references), False
 
 
-def _point_on_axis_references(
+def _point_alignment_references(
+    constraint: Any,
+    constraint_index: int,
+    geometry: tuple[SketchGeometry, ...],
+) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
+    try:
+        if constraint.Type not in {"Horizontal", "Vertical"}:
+            return None
+        first = (_required_integer(constraint.First), _required_integer(constraint.FirstPos))
+        second = (_required_integer(constraint.Second), _required_integer(constraint.SecondPos))
+    except Exception:
+        return (), True
+
+    if first[1] == 0 and second == (_UNUSED_GEOMETRY_REFERENCE, 0):
+        return None
+
+    try:
+        first_reference = _geometry_point_reference(*first, constraint_index, geometry)
+        second_reference = _geometry_point_reference(*second, constraint_index, geometry)
+    except SketchConstraintMalformedError:
+        return (), True
+    if first_reference is None or second_reference is None or first == second:
+        return (), True
+    return ((first_reference, second_reference), False)
+
+
+def _point_on_object_references(
     constraint: Any,
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
@@ -493,29 +534,52 @@ def _point_on_axis_references(
             return None
         geometry_index = _required_integer(constraint.First)
         position_index = _required_integer(constraint.FirstPos)
-        axis_index = _required_integer(constraint.Second)
-        axis_position = _required_integer(constraint.SecondPos)
+        target_index = _required_integer(constraint.Second)
+        target_position = _required_integer(constraint.SecondPos)
     except Exception as exc:
         raise SketchConstraintMalformedError(
             index=constraint_index,
             reason="reference_unreadable",
         ) from exc
 
-    axis_references = {-1: "horizontal_axis", -2: "vertical_axis"}
-    if axis_index not in axis_references or axis_position != 0:
+    if target_position != 0:
         return (), True
-    point = _geometry_point_reference(
-        geometry_index,
-        position_index,
-        constraint_index,
-        geometry,
-    )
+    try:
+        point = _geometry_point_reference(
+            geometry_index,
+            position_index,
+            constraint_index,
+            geometry,
+        )
+    except SketchConstraintMalformedError:
+        return (), True
     if point is None:
+        return (), True
+
+    axis_references = {-1: "horizontal_axis", -2: "vertical_axis"}
+    if target_index in axis_references:
+        return (
+            (
+                point,
+                SketchConstraintReference(reference=axis_references[target_index]),
+            ),
+            False,
+        )
+    if target_index < 0 or target_index >= len(geometry):
+        return (), True
+    if target_index == geometry_index or not isinstance(
+        geometry[target_index],
+        (SketchLineGeometry, SketchCircleGeometry, SketchArcGeometry),
+    ):
         return (), True
     return (
         (
             point,
-            SketchConstraintReference(reference=axis_references[axis_index]),
+            SketchConstraintReference(
+                kind="geometry",
+                geometry_index=target_index,
+                position="edge",
+            ),
         ),
         False,
     )

@@ -28,6 +28,7 @@ from freecad_mcp.models import (
     DistanceYPointToOriginConstraintInput,
     EqualConstraintInput,
     HorizontalConstraintInput,
+    HorizontalPointsConstraintInput,
     ParallelConstraintInput,
     PerpendicularConstraintInput,
     PointOnObjectConstraintInput,
@@ -44,6 +45,7 @@ from freecad_mcp.models import (
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
     VerticalConstraintInput,
+    VerticalPointsConstraintInput,
 )
 
 _TRANSACTION_NAME = "MCP Add Sketch Constraints"
@@ -73,6 +75,7 @@ _ConstraintState = tuple[
     bool,
     bool,
 ]
+_SketchContextState = tuple[str | None, object, object, str | None]
 
 
 def add_sketch_constraints(
@@ -102,6 +105,7 @@ def add_sketch_constraints(
         original_construction,
         Part,
     )
+    original_context = _sketch_context_state(document, sketch)
     expected_final_count = original_constraint_count + len(constraints)
     caller_owned_transaction = _pending_transaction(document)
     owned_transaction = False
@@ -182,6 +186,7 @@ def add_sketch_constraints(
                 original_geometry=original_geometry,
                 original_construction=original_construction,
                 original_geometry_signature=original_geometry_signature,
+                original_context=original_context,
                 part=Part,
                 owned_transaction=owned_transaction,
                 caller_owned_transaction=caller_owned_transaction,
@@ -233,6 +238,14 @@ def _validate_geometry_compatibility(
     for index, item in enumerate(constraints):
         if isinstance(item, (HorizontalConstraintInput, VerticalConstraintInput)):
             _require_line(geometry, item.geometry_index, part, index)
+        elif isinstance(item, (HorizontalPointsConstraintInput, VerticalPointsConstraintInput)):
+            _require_point(geometry, item.first, part, index)
+            _require_point(geometry, item.second, part, index)
+            if item.first == item.second:
+                raise SketchConstraintCreationError(
+                    index=index,
+                    reason="identical_point_references",
+                )
         elif isinstance(item, (ParallelConstraintInput, PerpendicularConstraintInput)):
             _require_line(geometry, item.first_geometry_index, part, index)
             _require_line(geometry, item.second_geometry_index, part, index)
@@ -259,8 +272,15 @@ def _validate_geometry_compatibility(
             for reference in point_references:
                 _require_point(geometry, reference, part, index)
         elif isinstance(item, PointOnObjectConstraintInput):
-            point, _axis = _point_on_object_references(item, index)
+            point, target = _point_on_object_references(item, index)
             _require_point(geometry, point, part, index)
+            if isinstance(target, SketchConstraintGeometryReferenceInput):
+                if point.geometry_index == target.geometry_index:
+                    raise SketchConstraintCreationError(
+                        index=index,
+                        reason="point_on_object_self_target",
+                    )
+                _require_point_on_object_target(geometry, target.geometry_index, part, index)
         elif isinstance(item, SymmetricConstraintInput):
             _validate_symmetric_compatibility(item, geometry, part, index)
         elif isinstance(item, DistanceLineLengthConstraintInput):
@@ -302,6 +322,22 @@ def _build_constraint(item: SketchConstraintInput, sketcher: Any, index: int) ->
             return sketcher.Constraint("Horizontal", item.geometry_index)
         if isinstance(item, VerticalConstraintInput):
             return sketcher.Constraint("Vertical", item.geometry_index)
+        if isinstance(item, HorizontalPointsConstraintInput):
+            return sketcher.Constraint(
+                "Horizontal",
+                item.first.geometry_index,
+                _point_position(item.first),
+                item.second.geometry_index,
+                _point_position(item.second),
+            )
+        if isinstance(item, VerticalPointsConstraintInput):
+            return sketcher.Constraint(
+                "Vertical",
+                item.first.geometry_index,
+                _point_position(item.first),
+                item.second.geometry_index,
+                _point_position(item.second),
+            )
         if isinstance(item, ParallelConstraintInput):
             return sketcher.Constraint(
                 "Parallel", item.first_geometry_index, item.second_geometry_index
@@ -325,12 +361,12 @@ def _build_constraint(item: SketchConstraintInput, sketcher: Any, index: int) ->
                 second_position,
             )
         if isinstance(item, PointOnObjectConstraintInput):
-            point, axis = _point_on_object_references(item, index)
+            point, target = _point_on_object_references(item, index)
             return sketcher.Constraint(
                 "PointOnObject",
                 point.geometry_index,
                 _point_position(point),
-                _axis_geometry_id(axis),
+                _point_on_object_target_geometry_id(target),
             )
         if isinstance(item, SymmetricConstraintInput):
             first_position = _point_position(item.first)
@@ -457,7 +493,15 @@ def _coincident_native_reference(
 def _point_on_object_references(
     item: PointOnObjectConstraintInput,
     index: int,
-) -> tuple[SketchConstraintPointReferenceInput, SketchAxisReferenceInput]:
+) -> tuple[
+    SketchConstraintPointReferenceInput,
+    SketchAxisReferenceInput | SketchConstraintGeometryReferenceInput,
+]:
+    if isinstance(item.first, SketchConstraintPointReferenceInput) and isinstance(
+        item.second,
+        SketchConstraintGeometryReferenceInput,
+    ):
+        return item.first, item.second
     if isinstance(item.first, SketchConstraintPointReferenceInput) and isinstance(
         item.second,
         (SketchHorizontalAxisReferenceInput, SketchVerticalAxisReferenceInput),
@@ -469,6 +513,14 @@ def _point_on_object_references(
     ):
         return item.second, item.first
     raise SketchConstraintCreationError(index=index, reason="unsupported_reference")
+
+
+def _point_on_object_target_geometry_id(
+    reference: SketchAxisReferenceInput | SketchConstraintGeometryReferenceInput,
+) -> int:
+    if isinstance(reference, SketchConstraintGeometryReferenceInput):
+        return reference.geometry_index
+    return _axis_geometry_id(reference)
 
 
 def _axis_geometry_id(reference: SketchAxisReferenceInput) -> int:
@@ -505,6 +557,24 @@ def _require_line(geometry: tuple[Any, ...], geometry_index: int, part: Any, ind
     candidate = _geometry_at(geometry, geometry_index, index)
     if not _part_instance(candidate, part, "LineSegment"):
         _incompatible(index)
+
+
+def _require_point_on_object_target(
+    geometry: tuple[Any, ...],
+    geometry_index: int,
+    part: Any,
+    index: int,
+) -> None:
+    candidate = _geometry_at(geometry, geometry_index, index)
+    if not (
+        _part_instance(candidate, part, "LineSegment")
+        or _part_instance(candidate, part, "Circle")
+        or _part_instance(candidate, part, "ArcOfCircle")
+    ):
+        raise SketchConstraintCreationError(
+            index=index,
+            reason="unsupported_point_on_object_target",
+        )
 
 
 def _require_point(
@@ -721,6 +791,51 @@ def _pending_transaction(document: Any) -> bool:
     return value
 
 
+def _sketch_context_state(document: Any, sketch: Any) -> _SketchContextState:
+    try:
+        file_name_value = getattr(document, "FileName", None)
+        file_name = None if file_name_value is None else str(file_name_value)
+
+        parent_getter = getattr(sketch, "getParentGeoFeatureGroup", None)
+        parent = parent_getter() if callable(parent_getter) else None
+        parent_signature = _object_reference_signature(parent)
+
+        try:
+            support = sketch.AttachmentSupport
+        except AttributeError:
+            support = getattr(sketch, "Support", None)
+        support_signature = _reference_value_signature(support)
+
+        map_mode_value = getattr(sketch, "MapMode", None)
+        map_mode = None if map_mode_value is None else str(map_mode_value)
+    except Exception as exc:
+        raise SketchConstraintCreationError(
+            index=None,
+            reason="sketch_context_state_unreadable",
+        ) from exc
+    return file_name, parent_signature, support_signature, map_mode
+
+
+def _object_reference_signature(value: Any) -> object:
+    if value is None:
+        return None
+    name = getattr(value, "Name", None)
+    type_id = getattr(value, "TypeId", None)
+    return (
+        type(value).__name__,
+        None if name is None else str(name),
+        None if type_id is None else str(type_id),
+    )
+
+
+def _reference_value_signature(value: Any) -> object:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return tuple(_reference_value_signature(item) for item in value)
+    return _object_reference_signature(value)
+
+
 def _rollback_constraint_batch(
     *,
     document: Any,
@@ -730,6 +845,7 @@ def _rollback_constraint_batch(
     original_geometry: tuple[Any, ...],
     original_construction: tuple[bool, ...],
     original_geometry_signature: tuple[object, ...],
+    original_context: _SketchContextState,
     part: Any,
     owned_transaction: bool,
     caller_owned_transaction: bool,
@@ -771,6 +887,7 @@ def _rollback_constraint_batch(
             part,
         )
         pending = _pending_transaction(document)
+        restored_context = _sketch_context_state(document, sketch)
     except SketchConstraintCreationError as exc:
         raise SketchConstraintRollbackError("rollback_verification_failed") from exc
 
@@ -782,6 +899,8 @@ def _rollback_constraint_batch(
         raise SketchConstraintRollbackError("rollback_geometry_state_mismatch")
     if restored_construction != original_construction:
         raise SketchConstraintRollbackError("rollback_construction_state_mismatch")
+    if restored_context != original_context:
+        raise SketchConstraintRollbackError("rollback_sketch_context_mismatch")
     if owned_transaction and pending:
         raise SketchConstraintRollbackError("transaction_remained_open")
     if caller_owned_transaction and not pending:
