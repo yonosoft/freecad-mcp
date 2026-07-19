@@ -14,13 +14,13 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- nineteen typed MCP tools for document creation, inspection, saving,
+- twenty-one typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
   inspection, one-step undo and redo, plus verified semantic axis-aligned
   lower-left and centre-defined rectangles, equilateral triangles, and regular
-  polygons;
+  polygons, straight slots, and axis-aligned rounded rectangles;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -127,6 +127,8 @@ create_sketch_rectangle
 create_sketch_centered_rectangle
 create_sketch_equilateral_triangle
 create_sketch_regular_polygon
+create_sketch_slot
+create_sketch_rounded_rectangle
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -807,6 +809,63 @@ self-intersecting polygon, construction-edge polygon, partial constraint,
 profile editing/deletion, persistent profile identity, automatic sketch/Body
 creation, or automatic saving is exposed.
 
+### Semantic curved profiles
+
+`create_sketch_slot` and `create_sketch_rounded_rectangle` are tools 20 and 21.
+They use one internal mixed line/arc engine for bounded arc construction,
+endpoint topology, tangent verification, counter-clockwise orientation,
+solver diagnostics, and atomic rollback. Their public schemas, constraint
+plans, semantic verification, success codes, and history labels remain
+distinct. Neither calls another MCP tool, a rectangle tool, or a GUI command.
+
+A slot request requires `document_name`, `sketch_name`, positive finite
+`overall_length` and `overall_width`, and strict `center: {x, y}`. It accepts an
+optional finite `angle_degrees` defaulting to `0.0`; negative and wrapped
+angles are reported modulo 360. `overall_length` is the complete end-to-end
+size, not arc-centre distance. The contract requires
+`overall_length > overall_width > 0`, derives
+`end_radius = overall_width / 2`, and derives the straight centre distance as
+`overall_length - overall_width`.
+
+The slot appends exactly two normal lines and two bounded normal semicircular
+arcs in the semantic order top, right arc, bottom, left arc. Stored directions
+form a true counter-clockwise boundary traversal (top, left arc, bottom, right
+arc). Its four native endpoint-tangent constraints jointly express bounded
+contact and tangency; an arc equality, natural centre placement, centre
+distance, one radius, and one orientation complete the profile. The proven
+constraint count is 9 at the origin and 10 elsewhere. Success returns
+`sketch_slot_created`, explicit element and bounded-join mappings, both bounded
+arc spans, requested and derived dimensions, normalized orientation, zero
+reference geometry, and verified closed/tangent/counter-clockwise/fully
+constrained flags.
+
+A rounded-rectangle request requires positive finite `width`, `height`, and
+`corner_radius`, plus one strict placement variant:
+`{"type":"lower_left","x":...,"y":...}` or
+`{"type":"center","x":...,"y":...}`. Width and height are the complete
+external bounds. The radius must be strictly less than half the smaller
+dimension, so zero-radius sharp rectangles remain tools 16/17 and the limiting
+capsule case is rejected. Rotation and per-corner radii are not accepted.
+
+The rounded rectangle appends exactly four normal lines and four bounded
+quarter arcs in alternating counter-clockwise order: bottom, lower-right arc,
+right, upper-right arc, top, upper-left arc, left, lower-left arc. Eight native
+endpoint tangencies close the bounded joins, three equalities share one corner
+radius, horizontal/vertical constraints preserve alignment, one width and one
+height dimension preserve external size, and natural placement completes the
+profile. The proven count is 19 for centre-at-origin and 20 otherwise. Success
+returns `sketch_rounded_rectangle_created`, external bounds, corner centres,
+bounded arcs and joins, placement intent, zero reference geometry, and verified
+closed/tangent/axis-aligned/counter-clockwise/fully constrained flags.
+
+Owned calls commit exactly one `Create sketch slot` or `Create sketch rounded
+rectangle` history step after recompute and full semantic verification. A
+failed call restores mixed geometry, arc parameters, constraints, construction
+flags, solver state, context, and history, so it must not be followed by undo.
+A technically valid but strategically wrong success should be inspected,
+undone by its exact label, and corrected in the same sketch. No operation saves
+automatically or creates a persistent native profile object.
+
 ### Controlled document history
 
 `get_document_history`, `undo_document`, and `redo_document` are tools 13–15.
@@ -833,9 +892,9 @@ It does not return complete native stacks, native transaction objects, or
 transaction IDs. Transaction names are current-step safety labels, not durable
 history identifiers. The controlled transaction names produced by current MCP
 model mutations are `Create body`, `Create sketch`, `Add sketch geometry`,
-`Add sketch constraints`, `Create sketch rectangle`, and `Create centered
-sketch rectangle`, `Create sketch equilateral triangle`, and `Create sketch
-regular polygon`.
+`Add sketch constraints`, `Create sketch rectangle`, `Create centered sketch
+rectangle`, `Create sketch equilateral triangle`, `Create sketch regular
+polygon`, `Create sketch slot`, and `Create sketch rounded rectangle`.
 
 Undo has this strict input shape; redo uses the same shape:
 

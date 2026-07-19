@@ -46,6 +46,8 @@ def test_controlled_transaction_names_are_stable_agent_readable_labels() -> None
         "Create centered sketch rectangle",
         "Create sketch equilateral triangle",
         "Create sketch regular polygon",
+        "Create sketch slot",
+        "Create sketch rounded rectangle",
     )
 
 

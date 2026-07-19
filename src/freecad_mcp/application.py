@@ -223,6 +223,44 @@ class Application:
             first_vertex_angle_degrees=first_vertex_angle_degrees,
         )
 
+    def create_sketch_slot(
+        self,
+        document_name: object,
+        sketch_name: object,
+        overall_length: object,
+        overall_width: object,
+        center: object,
+        angle_degrees: object = 0.0,
+    ) -> CommandResult:
+        """Create one verified straight slot through the shared curved-profile layer."""
+        return self.documents.create_sketch_slot.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            overall_length=overall_length,
+            overall_width=overall_width,
+            center=center,
+            angle_degrees=angle_degrees,
+        )
+
+    def create_sketch_rounded_rectangle(
+        self,
+        document_name: object,
+        sketch_name: object,
+        width: object,
+        height: object,
+        corner_radius: object,
+        placement: object,
+    ) -> CommandResult:
+        """Create one verified rounded rectangle through the shared curved-profile layer."""
+        return self.documents.create_sketch_rounded_rectangle.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            width=width,
+            height=height,
+            corner_radius=corner_radius,
+            placement=placement,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

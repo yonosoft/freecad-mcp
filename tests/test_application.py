@@ -14,6 +14,8 @@ from freecad_mcp.commands import (
     CreateSketchEquilateralTriangleHandler,
     CreateSketchRectangleHandler,
     CreateSketchRegularPolygonHandler,
+    CreateSketchRoundedRectangleHandler,
+    CreateSketchSlotHandler,
     DocumentHandlers,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
@@ -60,7 +62,9 @@ from freecad_mcp.models import (
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
+    SketchRoundedRectangleRequestInput,
     SketchSemanticPolygonRequest,
+    SketchSlotRequestInput,
     SketchSolverData,
 )
 from freecad_mcp.server.config import ServerConfig
@@ -81,6 +85,8 @@ class AdapterStub:
         )
         self.undo_names = ["Add sketch geometry"]
         self.redo_names: list[str] = []
+        self.slot_calls: list[SketchSlotRequestInput] = []
+        self.rounded_calls: list[SketchRoundedRectangleRequestInput] = []
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.document = replace(self.document, name=name, label=label or name)
@@ -345,10 +351,29 @@ class AdapterStub:
             document=self.document,
         )
 
+    def create_sketch_slot(self, request: SketchSlotRequestInput) -> Any:
+        self.slot_calls.append(request)
+        return _SemanticResult({"profile": {"type": "slot"}})
+
+    def create_sketch_rounded_rectangle(
+        self,
+        request: SketchRoundedRectangleRequestInput,
+    ) -> Any:
+        self.rounded_calls.append(request)
+        return _SemanticResult({"profile": {"type": "rounded_rectangle"}})
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
         return operation()
+
+
+class _SemanticResult:
+    def __init__(self, data: dict[str, object]) -> None:
+        self.data = data
+
+    def to_dict(self) -> dict[str, object]:
+        return self.data
 
 
 class RunnerStub:
@@ -391,6 +416,11 @@ def make_application() -> Application:
             adapter,
             dispatcher,
         ),
+        create_sketch_slot=CreateSketchSlotHandler(adapter, dispatcher),
+        create_sketch_rounded_rectangle=CreateSketchRoundedRectangleHandler(
+            adapter,
+            dispatcher,
+        ),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
@@ -402,6 +432,25 @@ def test_application_dispatches_status_command() -> None:
     assert result.ok is True
     assert result.code == "server_status"
     assert result.data["state"] == "stopped"
+
+
+def test_application_dispatches_both_semantic_curved_profiles() -> None:
+    application = make_application()
+
+    slot = application.create_sketch_slot(
+        "TestDocument", "Sketch", 40.0, 12.0, {"x": 0.0, "y": 0.0}
+    )
+    rounded = application.create_sketch_rounded_rectangle(
+        "TestDocument",
+        "Sketch",
+        40.0,
+        24.0,
+        4.0,
+        {"type": "center", "x": 0.0, "y": 0.0},
+    )
+
+    assert slot.code == "sketch_slot_created"
+    assert rounded.code == "sketch_rounded_rectangle_created"
 
 
 def test_application_dispatches_lifecycle_and_document_commands() -> None:

@@ -1507,3 +1507,57 @@ campaign only and must not edit the repository. Preserve raw 19-tool discovery,
 both strict schemas and controlled results, unchanged first-17 schema evidence,
 the unchanged 17-variant constraint union, solver/history snapshots, saved-file
 metadata, repository status, and Report View output.
+
+## Milestone 16 Curved-Profile Verification
+
+Run `scripts/smoke_sketch_curved_profiles.py` with FreeCAD's embedded Python
+after changing slot or rounded-rectangle models, planning, native constraints,
+bounded-arc verification, shared rollback, history, or tool guidance:
+
+```powershell
+$sp = (Resolve-Path '.venv\Lib\site-packages').Path
+$env:PYTHONPATH = ($sp, (Join-Path $sp 'win32'), (Join-Path $sp 'win32\lib'), `
+  (Join-Path $sp 'pythonwin')) -join ';'
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\smoke_sketch_curved_profiles.py
+```
+
+The campaign records 78 named scenarios. It covers horizontal, arbitrary,
+positive, negative, wrapped, near-minimum, lower-left, direct-centre,
+near-radius-limit, non-empty, Body-owned, XY-attached, unsaved, and saved-file
+contexts. It verifies bounded 180°/90° arc spans, exact endpoints, native
+endpoint tangencies, deterministic append/traversal order, dimensions,
+placement, external bounds, true counter-clockwise orientation, no helpers,
+zero DoF, and clean diagnostics. It also injects first-geometry, arc, tangent,
+and semantic-verification failures for both tools and requires exact rollback
+with no history entry.
+
+The proven native constraint sequences are fixed. Slot uses four endpoint
+tangencies, one arc equality, origin symmetry or two signed placement
+constraints, one centre distance, one radius, and one angle: 9 constraints at
+origin, 10 otherwise. Rounded rectangle uses eight endpoint tangencies, three
+arc equalities, two horizontal and two vertical constraints, centre-distance
+width/height, one radius, and origin symmetry or two signed placement
+constraints: 19 for centre-at-origin, 20 otherwise. A changed count requires a
+new FreeCAD 1.1.1 source/runtime proof and full redundancy audit.
+
+The campaign runs the sharp lower-left rectangle, sharp centred rectangle,
+triangle, polygon, tangent, symmetric, point-relationship, and history smokes
+as regressions. Endpoint tangency remains internal: raw 21-tool discovery must
+show the first 19 unchanged and `add_sketch_constraints` must still contain
+exactly 17 public variants. General sketch inspection must retain its prior
+endpoint-tangent unsupported-record behavior.
+
+For a failed atomic call, do not invoke undo: compare the complete sketch and
+history snapshot directly. For a strategically wrong success, require the
+exact `Create sketch slot` or `Create sketch rounded rectangle` top history
+name, undo once, and create the correction in the original sketch; prove redo
+invalidation and absence of replacement or abandoned geometry. Creation,
+undo, and redo must not alter saved file bytes/timestamp or turn an unsaved
+document into a saved one.
+
+The separate live MCP acceptance script is prepared in
+`docs/codex-milestone-16-acceptance.md`. It is an operator-run campaign and is
+not executed during implementation. Preserve raw schemas, results, solver and
+history snapshots, Report View output, saved-file metadata, exact repository
+status, and confirmation that the campaign did not edit, commit, or push.

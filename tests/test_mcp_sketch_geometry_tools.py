@@ -185,6 +185,8 @@ def test_add_sketch_geometry_remains_tool_eleven_without_changing_first_ten() ->
         "create_sketch_centered_rectangle",
         "create_sketch_equilateral_triangle",
         "create_sketch_regular_polygon",
+        "create_sketch_slot",
+        "create_sketch_rounded_rectangle",
     ]
     assert actual == list(REGISTERED_TOOL_NAMES)
     assert actual[9] == "get_sketch"

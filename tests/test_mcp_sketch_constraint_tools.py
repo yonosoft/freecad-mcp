@@ -250,6 +250,8 @@ def test_add_sketch_constraints_remains_exactly_tool_twelve() -> None:
         "create_sketch_centered_rectangle",
         "create_sketch_equilateral_triangle",
         "create_sketch_regular_polygon",
+        "create_sketch_slot",
+        "create_sketch_rounded_rectangle",
     ]
     assert actual == list(REGISTERED_TOOL_NAMES)
     assert actual[:11] == list(REGISTERED_TOOL_NAMES[:11])

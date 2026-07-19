@@ -74,6 +74,22 @@ local MCP server inside FreeCAD.
   readback, the 3–64 side-count range, the construction centre and explicit
   construction circumcircle, and the `3N+3` origin / `3N+4` non-origin natural
   constraint formulas. Do not hide or remove either semantic reference.
+- Use `create_sketch_slot` for straight-slot, obround, capsule, or pill-profile
+  intent. Overall length is total end-to-end length, not arc-centre distance.
+  Preserve two lines, two bounded semicircular arcs, true counter-clockwise
+  traversal, modulo-360 angle readback, no helpers, and the 9/10 origin/non-origin
+  natural constraint counts.
+- Use `create_sketch_rounded_rectangle` for an axis-aligned rounded rectangle
+  with one common positive radius and explicit lower-left or direct-centre
+  placement. Preserve four lines, four bounded quarter arcs, external width and
+  height, strict radius less than half the smaller dimension, no helpers, and
+  the 19/20 centre-origin/other-placement natural constraint counts. Sharp
+  rectangles remain tools 16/17; rotated and per-corner-radius profiles are not
+  accepted.
+- The two curved tools share internal bounded-arc, topology, tangency,
+  orientation, and rollback infrastructure but retain distinct public schemas,
+  handlers, verification, errors, and history labels. Never route one through
+  the other, primitive MCP tools, rectangle MCP tools, or GUI commands.
 - Provide inspection, validation, and recovery tools alongside mutating tools.
 - After a successful modelling mutation, recompute and inspect the result. If
   it is technically valid but expresses the wrong design intent, inspect the
@@ -86,6 +102,10 @@ local MCP server inside FreeCAD.
   that arc contact lies on the intended visible bounded arc. Do not use
   tangency as endpoint coincidence, point-on-object, parallel, perpendicular,
   or collinearity, and do not synthesize hidden helper geometry for it.
+  The public primitive constraint remains whole-geometry-only. Semantic curved
+  profile adapters may use their separately verified native endpoint-tangent
+  form internally because the bounded joins and arc domains are fixed and
+  returned explicitly; do not add that form to the public 17-way union.
 - Do not undo after a failed atomic MCP operation whose rollback restored zero
   mutation. Do not undo an unexpected GUI or user transaction; reinspect and
   ask for direction. Redo only to restore the most recently undone step, before
@@ -110,6 +130,10 @@ local MCP server inside FreeCAD.
   triangle` or `Create sketch regular polygon` history step. Correct a wrong
   success through exact-name undo and retry in the same sketch; failed atomic
   polygon calls own their rollback and must not be followed by undo.
+- A successful slot or rounded rectangle is one verified `Create sketch slot`
+  or `Create sketch rounded rectangle` history step. Correct a wrong success by
+  exact-name undo in the same sketch; failed atomic curved-profile calls own
+  their rollback and must not be followed by undo.
 
 ## Python Standards
 

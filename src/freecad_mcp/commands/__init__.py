@@ -19,6 +19,10 @@ from freecad_mcp.commands.object_query import GetObjectHandler, ListObjectsHandl
 from freecad_mcp.commands.sketch import CreateSketchHandler
 from freecad_mcp.commands.sketch_centered_rectangle import CreateSketchCenteredRectangleHandler
 from freecad_mcp.commands.sketch_constraints import AddSketchConstraintsHandler
+from freecad_mcp.commands.sketch_curved_profiles import (
+    CreateSketchRoundedRectangleHandler,
+    CreateSketchSlotHandler,
+)
 from freecad_mcp.commands.sketch_geometry import AddSketchGeometryHandler
 from freecad_mcp.commands.sketch_polygon import (
     CreateSketchEquilateralTriangleHandler,
@@ -51,6 +55,8 @@ class DocumentHandlers:
     create_sketch_centered_rectangle: CreateSketchCenteredRectangleHandler
     create_sketch_equilateral_triangle: CreateSketchEquilateralTriangleHandler
     create_sketch_regular_polygon: CreateSketchRegularPolygonHandler
+    create_sketch_slot: CreateSketchSlotHandler
+    create_sketch_rounded_rectangle: CreateSketchRoundedRectangleHandler
     recompute: RecomputeDocumentHandler
 
 
@@ -64,6 +70,8 @@ __all__ = [
     "CreateSketchHandler",
     "CreateSketchRectangleHandler",
     "CreateSketchRegularPolygonHandler",
+    "CreateSketchRoundedRectangleHandler",
+    "CreateSketchSlotHandler",
     "DocumentHandlers",
     "GetDocumentHandler",
     "GetDocumentHistoryHandler",

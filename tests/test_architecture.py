@@ -82,6 +82,12 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         "freecad/sketch_centered_rectangle_creation.py",
         "freecad/sketch_polygon_creation.py",
         "freecad/sketch_polygon_profile.py",
+        "freecad/sketch_curved_profile.py",
+        "freecad/sketch_curved_profile_creation.py",
+        "freecad/sketch_slot_profile.py",
+        "freecad/sketch_slot_creation.py",
+        "freecad/sketch_rounded_rectangle_profile.py",
+        "freecad/sketch_rounded_rectangle_creation.py",
         "freecad/sketch_rectangle_creation.py",
         "freecad/sketch_rectangle_profile.py",
         "freecad/sketch_inspection.py",
@@ -116,6 +122,7 @@ def test_mcp_registration_does_not_depend_on_freecad_implementation() -> None:
         "mcp/sketch_rectangle_tools.py",
         "mcp/sketch_centered_rectangle_tools.py",
         "mcp/sketch_polygon_tools.py",
+        "mcp/sketch_curved_profile_tools.py",
         "mcp/server.py",
     )
     for relative_path in registration_modules:
@@ -138,6 +145,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "mcp/sketch_rectangle_tools.py",
         "mcp/sketch_centered_rectangle_tools.py",
         "mcp/sketch_polygon_tools.py",
+        "mcp/sketch_curved_profile_tools.py",
     )
     registered_constants: list[str] = []
     for relative_path in registration_modules:
@@ -181,6 +189,8 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "CREATE_SKETCH_CENTERED_RECTANGLE_TOOL",
         "CREATE_SKETCH_EQUILATERAL_TRIANGLE_TOOL",
         "CREATE_SKETCH_REGULAR_POLYGON_TOOL",
+        "CREATE_SKETCH_SLOT_TOOL",
+        "CREATE_SKETCH_ROUNDED_RECTANGLE_TOOL",
     ]
     assert _imported_modules("tool_registry.py") == set()
 
@@ -226,6 +236,17 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "SketchPolygonCircumcircleReference",
             "SketchPolygonProfile",
             "SketchPolygonCreationResult",
+            "SketchSlotRequestInput",
+            "SketchSlotProfile",
+            "SketchSlotCreationResult",
+            "CenterRoundedRectanglePlacementInput",
+            "SketchRoundedRectangleRequestInput",
+            "SketchRoundedRectangleProfile",
+            "SketchRoundedRectangleCreationResult",
+            "SketchBoundedArcProfile",
+            "SketchCurvedProfileJoin",
+            "SketchProfileBounds",
+            "SketchRoundedCornerProfile",
         },
         "protocols.py": {
             "Dispatcher",
@@ -233,6 +254,7 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "RunnerFactory",
             "ServerRunner",
             "SketchPolygonAdapter",
+            "SketchCurvedProfileAdapter",
             "TaskExecutor",
         },
         "exceptions.py": {
@@ -279,6 +301,12 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "SketchPolygonCreationError",
             "SketchPolygonRollbackError",
             "SketchPolygonVerificationError",
+            "SketchSlotCreationError",
+            "SketchSlotRollbackError",
+            "SketchSlotVerificationError",
+            "SketchRoundedRectangleCreationError",
+            "SketchRoundedRectangleRollbackError",
+            "SketchRoundedRectangleVerificationError",
             "SketchTypeMismatchError",
         },
         "validation.py": {
@@ -293,6 +321,8 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "validate_create_sketch_centered_rectangle_request",
             "validate_create_sketch_equilateral_triangle_request",
             "validate_create_sketch_regular_polygon_request",
+            "validate_create_sketch_slot_request",
+            "validate_create_sketch_rounded_rectangle_request",
             "validate_object_reference",
         },
         "freecad/document.py": {"FreeCADDocumentAdapter"},
@@ -317,6 +347,7 @@ def test_representative_modules_import_in_clean_processes() -> None:
         "freecad_mcp.mcp.sketch_constraint_tools",
         "freecad_mcp.mcp.sketch_centered_rectangle_tools",
         "freecad_mcp.mcp.sketch_polygon_tools",
+        "freecad_mcp.mcp.sketch_curved_profile_tools",
         "freecad_mcp.mcp.document_history_tools",
         "freecad_mcp.mcp.sketch_rectangle_tools",
         "freecad_mcp.mcp.server",
@@ -470,3 +501,71 @@ def test_polygon_engine_does_not_delegate_to_rectangle_or_mcp_layers() -> None:
         isinstance(node, ast.Attribute) and node.attr in forbidden_attributes
         for node in ast.walk(tree)
     )
+
+
+def test_curved_profiles_share_one_native_engine_without_gui_commands() -> None:
+    native_tree = _tree("freecad/sketch_curved_profile_creation.py")
+    forbidden_calls = {"runCommand", "doCommand", "doCommandGui"}
+    assert not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in forbidden_calls
+        for node in ast.walk(native_tree)
+    )
+    assert "create_curved_profile" in _defined_names("freecad/sketch_curved_profile_creation.py")
+    assert "verify_curved_profile_geometry" in _defined_names("freecad/sketch_curved_profile.py")
+
+
+def test_curved_profile_commands_and_transport_have_no_native_dependencies() -> None:
+    forbidden = {"FreeCAD", "FreeCADGui", "Part", "Sketcher", "freecad_mcp.freecad"}
+    command_violations = {
+        module
+        for module in _imported_modules("commands/sketch_curved_profiles.py")
+        if _matches_prefix(module, forbidden)
+    }
+    transport_violations = {
+        module
+        for module in _imported_modules("mcp/sketch_curved_profile_tools.py")
+        if _matches_prefix(module, forbidden)
+    }
+    assert command_violations == set()
+    assert transport_violations == set()
+
+
+def test_curved_profile_transport_calls_only_dedicated_handlers() -> None:
+    transport_tree = _tree("mcp/sketch_curved_profile_tools.py")
+    handler_calls = {
+        node.func.attr
+        for node in ast.walk(transport_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Attribute)
+        and isinstance(node.func.value.value, ast.Name)
+        and node.func.value.value.id == "handlers"
+    }
+    assert handler_calls == {"execute"}
+
+
+def test_curved_adapters_do_not_delegate_to_mcp_or_rectangle_tools() -> None:
+    files = (
+        "freecad/sketch_curved_profile_creation.py",
+        "freecad/sketch_slot_creation.py",
+        "freecad/sketch_rounded_rectangle_creation.py",
+    )
+    for relative_path in files:
+        imports = _imported_modules(relative_path)
+        assert not any(
+            module == "freecad_mcp.mcp" or module.startswith("freecad_mcp.mcp.")
+            for module in imports
+        )
+        tree = _tree(relative_path)
+        forbidden_attributes = {
+            "create_sketch_rectangle",
+            "create_sketch_centered_rectangle",
+            "create_sketch_slot" if "rounded_rectangle" in relative_path else "never",
+            "create_sketch_rounded_rectangle" if "slot_creation" in relative_path else "never",
+        }
+        assert not any(
+            isinstance(node, ast.Attribute) and node.attr in forbidden_attributes
+            for node in ast.walk(tree)
+        )

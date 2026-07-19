@@ -36,6 +36,8 @@ from freecad_mcp.models import (
     SketchHorizontalAxisReferenceInput,
     SketchRectangleRequestInput,
     SketchRegularPolygonRequestInput,
+    SketchRoundedRectangleRequestInput,
+    SketchSlotRequestInput,
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
     TangentConstraintInput,
@@ -84,6 +86,12 @@ _SKETCH_EQUILATERAL_TRIANGLE_REQUEST_ADAPTER: TypeAdapter[SketchEquilateralTrian
 )
 _SKETCH_REGULAR_POLYGON_REQUEST_ADAPTER: TypeAdapter[SketchRegularPolygonRequestInput] = (
     TypeAdapter(SketchRegularPolygonRequestInput)
+)
+_SKETCH_SLOT_REQUEST_ADAPTER: TypeAdapter[SketchSlotRequestInput] = TypeAdapter(
+    SketchSlotRequestInput
+)
+_SKETCH_ROUNDED_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchRoundedRectangleRequestInput] = (
+    TypeAdapter(SketchRoundedRectangleRequestInput)
 )
 
 
@@ -474,6 +482,151 @@ def validate_create_sketch_regular_polygon_request(
             code="invalid_polygon_parameters",
             message="Polygon parameters must produce finite sketch coordinates.",
             data={"field": "center", "reason": "polygon_coordinate_overflow"},
+        )
+    return parsed
+
+
+def validate_create_sketch_slot_request(
+    document_name: object,
+    sketch_name: object,
+    overall_length: object,
+    overall_width: object,
+    center: object,
+    angle_degrees: object = 0.0,
+) -> CommandResult | SketchSlotRequestInput:
+    """Validate one strict centre-defined slot request without native imports."""
+    name_error = _validate_polygon_names(document_name, sketch_name)
+    if name_error is not None:
+        return name_error
+    try:
+        parsed = _SKETCH_SLOT_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "overall_length": overall_length,
+                "overall_width": overall_width,
+                "center": center,
+                "angle_degrees": angle_degrees,
+            }
+        )
+    except ValidationError as exc:
+        first_error = exc.errors(include_url=False)[0]
+        location = ".".join(str(item) for item in first_error.get("loc", ()))
+        return CommandResult.failure(
+            code="invalid_slot_dimensions",
+            message=(
+                "Slot length, width, centre, and angle must be strict finite numbers with "
+                "only the documented fields."
+            ),
+            data={
+                "field": location or "request",
+                "profile_type": "slot",
+                "reason": str(first_error.get("type", "invalid_parameters")),
+            },
+        )
+    if parsed.overall_length <= parsed.overall_width:
+        return CommandResult.failure(
+            code="invalid_slot_dimensions",
+            message="Slot overall_length must be strictly greater than overall_width.",
+            data={
+                "field": "overall_length",
+                "profile_type": "slot",
+                "reason": "slot_length_not_greater_than_width",
+            },
+        )
+    extent = float(parsed.overall_length) / 2.0
+    if not all(
+        math.isfinite(value)
+        for value in (
+            parsed.center.x - extent,
+            parsed.center.x + extent,
+            parsed.center.y - extent,
+            parsed.center.y + extent,
+        )
+    ):
+        return CommandResult.failure(
+            code="invalid_slot_dimensions",
+            message="Slot dimensions and centre must produce finite profile coordinates.",
+            data={
+                "field": "center",
+                "profile_type": "slot",
+                "reason": "slot_coordinate_overflow",
+            },
+        )
+    return parsed
+
+
+def validate_create_sketch_rounded_rectangle_request(
+    document_name: object,
+    sketch_name: object,
+    width: object,
+    height: object,
+    corner_radius: object,
+    placement: object,
+) -> CommandResult | SketchRoundedRectangleRequestInput:
+    """Validate one strict two-variant rounded-rectangle request."""
+    name_error = _validate_polygon_names(document_name, sketch_name)
+    if name_error is not None:
+        return name_error
+    try:
+        parsed = _SKETCH_ROUNDED_RECTANGLE_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "width": width,
+                "height": height,
+                "corner_radius": corner_radius,
+                "placement": placement,
+            }
+        )
+    except ValidationError as exc:
+        first_error = exc.errors(include_url=False)[0]
+        location = ".".join(str(item) for item in first_error.get("loc", ()))
+        return CommandResult.failure(
+            code="invalid_rounded_rectangle_dimensions",
+            message=(
+                "Rounded-rectangle dimensions and placement must be strict, finite, and "
+                "contain only the documented fields."
+            ),
+            data={
+                "field": location or "request",
+                "profile_type": "rounded_rectangle",
+                "reason": str(first_error.get("type", "invalid_parameters")),
+            },
+        )
+    if parsed.corner_radius >= min(parsed.width, parsed.height) / 2.0:
+        return CommandResult.failure(
+            code="invalid_rounded_rectangle_dimensions",
+            message="corner_radius must be strictly less than half the smaller dimension.",
+            data={
+                "field": "corner_radius",
+                "profile_type": "rounded_rectangle",
+                "reason": "corner_radius_not_strictly_inside_bounds",
+            },
+        )
+    if parsed.placement.type == "lower_left":
+        coordinates = (
+            parsed.placement.x,
+            parsed.placement.x + parsed.width,
+            parsed.placement.y,
+            parsed.placement.y + parsed.height,
+        )
+    else:
+        coordinates = (
+            parsed.placement.x - parsed.width / 2.0,
+            parsed.placement.x + parsed.width / 2.0,
+            parsed.placement.y - parsed.height / 2.0,
+            parsed.placement.y + parsed.height / 2.0,
+        )
+    if not all(math.isfinite(float(value)) for value in coordinates):
+        return CommandResult.failure(
+            code="invalid_rounded_rectangle_dimensions",
+            message="Rounded-rectangle dimensions and placement must produce finite bounds.",
+            data={
+                "field": "placement",
+                "profile_type": "rounded_rectangle",
+                "reason": "rounded_rectangle_coordinate_overflow",
+            },
         )
     return parsed
 
@@ -1031,6 +1184,8 @@ __all__ = [
     "validate_create_sketch_rectangle_request",
     "validate_create_sketch_regular_polygon_request",
     "validate_create_sketch_request",
+    "validate_create_sketch_rounded_rectangle_request",
+    "validate_create_sketch_slot_request",
     "validate_document_history_request",
     "validate_document_reference",
     "validate_object_reference",

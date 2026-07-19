@@ -18,6 +18,7 @@ from freecad_mcp.mcp.sketch_centered_rectangle_tools import (
     register_create_sketch_centered_rectangle_tool,
 )
 from freecad_mcp.mcp.sketch_constraint_tools import register_add_sketch_constraints_tool
+from freecad_mcp.mcp.sketch_curved_profile_tools import register_sketch_curved_profile_tools
 from freecad_mcp.mcp.sketch_geometry_tools import register_add_sketch_geometry_tool
 from freecad_mcp.mcp.sketch_polygon_tools import register_sketch_polygon_tools
 from freecad_mcp.mcp.sketch_rectangle_tools import register_create_sketch_rectangle_tool
@@ -45,6 +46,12 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             "create_sketch_regular_polygon for generic regular polygons with a specified side "
             "count. Do not substitute the polygon tool for explicit rectangle intent or manually "
             "reconstruct matching semantic polygons with primitive calls."
+            " Use create_sketch_slot for explicit straight-slot, obround, capsule, or pill-shaped "
+            "intent; its overall length is total end-to-end length, not arc-centre distance. Use "
+            "create_sketch_rounded_rectangle for explicit axis-aligned rounded-rectangle intent "
+            "with lower-left or direct-centre placement. Use the sharp rectangle tools when the "
+            "requested corner radius is zero, and do not approximate either curved profile with "
+            "regular polygons or repeated primitive calls."
         ),
         host=config.host,
         port=config.port,
@@ -65,5 +72,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_create_sketch_rectangle_tool(server, handlers)
     register_create_sketch_centered_rectangle_tool(server, handlers)
     register_sketch_polygon_tools(server, handlers)
+    register_sketch_curved_profile_tools(server, handlers)
 
     return server

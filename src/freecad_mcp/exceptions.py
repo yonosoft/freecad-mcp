@@ -323,6 +323,110 @@ class SketchPolygonRollbackError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchSlotCreationError(RuntimeError):
+    """Raised when one semantic slot phase cannot be completed."""
+
+    def __init__(
+        self,
+        *,
+        phase: str,
+        reason: str,
+        expected_count: int | None = None,
+        actual_count: int | None = None,
+    ) -> None:
+        self.phase = phase
+        self.reason = reason
+        self.expected_count = expected_count
+        self.actual_count = actual_count
+        super().__init__(reason)
+
+    def details(self) -> dict[str, object]:
+        details: dict[str, object] = {"phase": self.phase, "reason": self.reason}
+        if self.expected_count is not None:
+            details["expected_count"] = self.expected_count
+        if self.actual_count is not None:
+            details["actual_count"] = self.actual_count
+        return details
+
+
+class SketchSlotVerificationError(SketchSlotCreationError):
+    """Raised when native creation violates complete slot semantics."""
+
+    def __init__(
+        self,
+        reason: str,
+        *,
+        expected_count: int | None = None,
+        actual_count: int | None = None,
+    ) -> None:
+        super().__init__(
+            phase="verification",
+            reason=reason,
+            expected_count=expected_count,
+            actual_count=actual_count,
+        )
+
+
+class SketchSlotRollbackError(RuntimeError):
+    """Raised when a failed slot cannot restore the exact sketch."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SketchRoundedRectangleCreationError(RuntimeError):
+    """Raised when one semantic rounded-rectangle phase cannot be completed."""
+
+    def __init__(
+        self,
+        *,
+        phase: str,
+        reason: str,
+        expected_count: int | None = None,
+        actual_count: int | None = None,
+    ) -> None:
+        self.phase = phase
+        self.reason = reason
+        self.expected_count = expected_count
+        self.actual_count = actual_count
+        super().__init__(reason)
+
+    def details(self) -> dict[str, object]:
+        details: dict[str, object] = {"phase": self.phase, "reason": self.reason}
+        if self.expected_count is not None:
+            details["expected_count"] = self.expected_count
+        if self.actual_count is not None:
+            details["actual_count"] = self.actual_count
+        return details
+
+
+class SketchRoundedRectangleVerificationError(SketchRoundedRectangleCreationError):
+    """Raised when native creation violates rounded-rectangle semantics."""
+
+    def __init__(
+        self,
+        reason: str,
+        *,
+        expected_count: int | None = None,
+        actual_count: int | None = None,
+    ) -> None:
+        super().__init__(
+            phase="verification",
+            reason=reason,
+            expected_count=expected_count,
+            actual_count=actual_count,
+        )
+
+
+class SketchRoundedRectangleRollbackError(RuntimeError):
+    """Raised when a failed rounded rectangle cannot restore the exact sketch."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SketchTypeMismatchError(RuntimeError):
     """Raised when an object exists but is not a Sketcher::SketchObject."""
 
@@ -428,6 +532,12 @@ __all__ = [
     "SketchRectangleCreationError",
     "SketchRectangleRollbackError",
     "SketchRectangleVerificationError",
+    "SketchRoundedRectangleCreationError",
+    "SketchRoundedRectangleRollbackError",
+    "SketchRoundedRectangleVerificationError",
+    "SketchSlotCreationError",
+    "SketchSlotRollbackError",
+    "SketchSlotVerificationError",
     "SketchTypeMismatchError",
     "UndoNotAvailableError",
 ]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from freecad_mcp.commands import (
     AddSketchConstraintsHandler,
@@ -15,6 +15,8 @@ from freecad_mcp.commands import (
     CreateSketchEquilateralTriangleHandler,
     CreateSketchRectangleHandler,
     CreateSketchRegularPolygonHandler,
+    CreateSketchRoundedRectangleHandler,
+    CreateSketchSlotHandler,
     DocumentHandlers,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
@@ -61,7 +63,11 @@ from freecad_mcp.models import (
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
+    SketchRoundedRectangleCreationResult,
+    SketchRoundedRectangleRequestInput,
     SketchSemanticPolygonRequest,
+    SketchSlotCreationResult,
+    SketchSlotRequestInput,
     SketchSolverData,
 )
 
@@ -98,6 +104,8 @@ class AdapterStub:
         self.create_sketch_rectangle_calls: list[SketchRectangleRequestInput] = []
         self.create_sketch_centered_rectangle_calls: list[SketchCenteredRectangleRequestInput] = []
         self.create_sketch_polygon_calls: list[SketchSemanticPolygonRequest] = []
+        self.create_sketch_slot_calls: list[SketchSlotRequestInput] = []
+        self.create_sketch_rounded_rectangle_calls: list[SketchRoundedRectangleRequestInput] = []
         self.undo_names = ["Add sketch constraints"]
         self.redo_names: list[str] = []
 
@@ -387,10 +395,69 @@ class AdapterStub:
             document=self.document,
         )
 
+    def create_sketch_slot(
+        self,
+        request: SketchSlotRequestInput,
+    ) -> SketchSlotCreationResult:
+        self.create_sketch_slot_calls.append(request)
+        return cast(
+            SketchSlotCreationResult,
+            _SemanticResultStub(
+                {
+                    "profile": {
+                        "type": "slot",
+                        "geometry_indices": [0, 1, 2, 3],
+                        "reference_geometry_indices": [],
+                        "constraint_indices": list(range(9)),
+                        "overall_length": float(request.overall_length),
+                        "overall_width": float(request.overall_width),
+                        "angle_degrees": float(request.angle_degrees) % 360.0,
+                        "fully_constrained": True,
+                    },
+                    "sketch": self.get_sketch(request.document_name, request.sketch_name).to_dict(),
+                    "document": self.document.to_dict(),
+                }
+            ),
+        )
+
+    def create_sketch_rounded_rectangle(
+        self,
+        request: SketchRoundedRectangleRequestInput,
+    ) -> SketchRoundedRectangleCreationResult:
+        self.create_sketch_rounded_rectangle_calls.append(request)
+        return cast(
+            SketchRoundedRectangleCreationResult,
+            _SemanticResultStub(
+                {
+                    "profile": {
+                        "type": "rounded_rectangle",
+                        "geometry_indices": list(range(8)),
+                        "reference_geometry_indices": [],
+                        "constraint_indices": list(range(20)),
+                        "width": float(request.width),
+                        "height": float(request.height),
+                        "corner_radius": float(request.corner_radius),
+                        "placement": request.placement.model_dump(mode="json"),
+                        "fully_constrained": True,
+                    },
+                    "sketch": self.get_sketch(request.document_name, request.sketch_name).to_dict(),
+                    "document": self.document.to_dict(),
+                }
+            ),
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
         return operation()
+
+
+class _SemanticResultStub:
+    def __init__(self, value: dict[str, object]) -> None:
+        self.value = value
+
+    def to_dict(self) -> dict[str, object]:
+        return self.value
 
 
 def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers, AdapterStub]:
@@ -422,6 +489,11 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
                 dispatcher,
             ),
             create_sketch_regular_polygon=CreateSketchRegularPolygonHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            create_sketch_slot=CreateSketchSlotHandler(actual_adapter, dispatcher),
+            create_sketch_rounded_rectangle=CreateSketchRoundedRectangleHandler(
                 actual_adapter,
                 dispatcher,
             ),

@@ -14,6 +14,8 @@ from freecad_mcp.freecad import (
     sketch_inspection,
     sketch_polygon_creation,
     sketch_rectangle_creation,
+    sketch_rounded_rectangle_creation,
+    sketch_slot_creation,
 )
 from freecad_mcp.freecad.document_operations import (
     _active_document_name as _active_document_name,
@@ -66,7 +68,11 @@ from freecad_mcp.models import (
     SketchPolygonCreationResult,
     SketchRectangleCreationResult,
     SketchRectangleRequestInput,
+    SketchRoundedRectangleCreationResult,
+    SketchRoundedRectangleRequestInput,
     SketchSemanticPolygonRequest,
+    SketchSlotCreationResult,
+    SketchSlotRequestInput,
 )
 
 
@@ -190,3 +196,17 @@ class FreeCADDocumentAdapter:
     ) -> SketchPolygonCreationResult:
         """Create either public polygon profile through the one shared engine."""
         return sketch_polygon_creation.create_sketch_polygon(request)
+
+    def create_sketch_slot(
+        self,
+        request: SketchSlotRequestInput,
+    ) -> SketchSlotCreationResult:
+        """Create one verified straight slot without GUI commands or saving."""
+        return sketch_slot_creation.create_sketch_slot(request)
+
+    def create_sketch_rounded_rectangle(
+        self,
+        request: SketchRoundedRectangleRequestInput,
+    ) -> SketchRoundedRectangleCreationResult:
+        """Create one verified rounded rectangle without GUI commands or saving."""
+        return sketch_rounded_rectangle_creation.create_sketch_rounded_rectangle(request)

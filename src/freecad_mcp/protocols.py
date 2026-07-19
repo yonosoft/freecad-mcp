@@ -25,7 +25,11 @@ from freecad_mcp.models import (
     SketchPolygonCreationResult,
     SketchRectangleCreationResult,
     SketchRectangleRequestInput,
+    SketchRoundedRectangleCreationResult,
+    SketchRoundedRectangleRequestInput,
     SketchSemanticPolygonRequest,
+    SketchSlotCreationResult,
+    SketchSlotRequestInput,
 )
 
 T = TypeVar("T")
@@ -137,6 +141,22 @@ class SketchPolygonAdapter(Protocol):
         """Create and verify one triangle or regular polygon atomically."""
 
 
+class SketchCurvedProfileAdapter(Protocol):
+    """Focused slot and rounded-rectangle operations sharing one internal engine."""
+
+    def create_sketch_slot(
+        self,
+        request: SketchSlotRequestInput,
+    ) -> SketchSlotCreationResult:
+        """Create and verify one straight slot atomically."""
+
+    def create_sketch_rounded_rectangle(
+        self,
+        request: SketchRoundedRectangleRequestInput,
+    ) -> SketchRoundedRectangleCreationResult:
+        """Create and verify one rounded rectangle atomically."""
+
+
 class TaskExecutor(Protocol):
     """Supplies thread detection and queued task submission."""
 
@@ -165,6 +185,7 @@ __all__ = [
     "DocumentAdapter",
     "RunnerFactory",
     "ServerRunner",
+    "SketchCurvedProfileAdapter",
     "SketchPolygonAdapter",
     "TaskExecutor",
 ]

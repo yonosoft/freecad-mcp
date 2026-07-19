@@ -206,6 +206,8 @@ registers controlled history inspection, undo, and redo.
 explicitly register the two semantic rectangle profiles.
 `mcp.sketch_polygon_tools` explicitly appends the semantic equilateral triangle
 and regular polygon profiles.
+`mcp.sketch_curved_profile_tools` explicitly appends the semantic slot and
+rounded-rectangle profiles.
 `mcp.server` is the small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
@@ -215,7 +217,9 @@ undo, and redo are exactly tools thirteen through fifteen;
 `create_sketch_rectangle` is exactly tool sixteen and
 `create_sketch_centered_rectangle` is exactly tool seventeen;
 `create_sketch_equilateral_triangle` and `create_sketch_regular_polygon` are
-exactly tools eighteen and nineteen. No registration loop is used.
+exactly tools eighteen and nineteen; `create_sketch_slot` and
+`create_sketch_rounded_rectangle` are exactly tools twenty and twenty-one. No
+registration loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
 
@@ -229,7 +233,8 @@ The registry currently exposes `create_document`, `list_documents`,
 `add_sketch_geometry`, `add_sketch_constraints`, `get_document_history`,
 `undo_document`, `redo_document`, `create_sketch_rectangle`, and
 `create_sketch_centered_rectangle`, `create_sketch_equilateral_triangle`, and
-`create_sketch_regular_polygon`, in that order.
+`create_sketch_regular_polygon`, `create_sketch_slot`, and
+`create_sketch_rounded_rectangle`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -495,6 +500,98 @@ Polygon by side length/apothem, irregular/star/self-intersecting or construction
 profiles, profile editing/removal, automatic sketch/Body creation, and automatic
 saving remain outside the contract. The existing first seventeen tools and
 seventeen constraint discriminators remain unchanged.
+
+## Semantic Curved Profiles
+
+Milestone 16 appends two public contracts while keeping the first nineteen
+tool names, request/result schemas, transaction labels, rectangle/polygon
+semantics, and the 17-way public constraint union unchanged:
+
+```text
+create_sketch_slot MCP registration
+→ CreateSketchSlotHandler
+→ SketchCurvedProfileAdapter.create_sketch_slot
+→ freecad.sketch_slot_creation
+→ freecad.sketch_curved_profile_creation
+→ freecad.sketch_curved_profile
+
+create_sketch_rounded_rectangle MCP registration
+→ CreateSketchRoundedRectangleHandler
+→ SketchCurvedProfileAdapter.create_sketch_rounded_rectangle
+→ freecad.sketch_rounded_rectangle_creation
+→ the same curved-profile creation and verification infrastructure
+```
+
+The focused profile modules own their deterministic coordinate and native
+constraint plans. The shared pure module owns bounded-arc facts, endpoint
+extraction, line/arc tangent tests, closed topology, traversal, analytic signed
+area, sweep direction/magnitude, and result join construction. The shared
+FreeCAD adapter owns `Part.LineSegment`, `Part.Circle`, `Part.ArcOfCircle`, and
+`Sketcher.Constraint` construction, index/count transitions, recompute,
+controlled readback, full snapshot verification, transaction commit, and mixed
+geometry rollback. MCP-to-MCP calls, rectangle-tool delegation, GUI commands,
+edit mode, selection, automatic constraints, and hidden helper geometry are
+absent.
+
+The source audit targeted installed revision
+`0108fd4b4850cc46e625b60e53cea7a7bbe69f8d`. Relevant primary sources were
+`DrawSketchHandlerSlot.h`, the rounded-rectangle sections of
+`DrawSketchHandlerRectangle.h`, `CommandCreateGeo.cpp`,
+`SketchObjectPyImp.cpp`, `ConstraintPyImp.cpp`, `Constraint.cpp`, `Sketch.cpp`,
+`SketchObject.cpp`, `Document.cpp`, and Planegcs constraint sources. The GUI
+slot implementation confirmed native endpoint-position tangent constraints and
+equal arcs; the rounded-rectangle implementation confirmed bounded tangent
+joins and shared radii. Python bindings confirmed bounded
+`Part.ArcOfCircle` insertion, and document sources confirmed open/commit/abort
+and undo restoration behavior. GUI implementations are evidence only and are
+never invoked in production.
+
+Installed FreeCAD 1.1.1 / Python 3.11.14 probes established the final slot
+strategy. Append order is top line, right semicircle, bottom line, left
+semicircle. Stored directions form the true counter-clockwise traversal top →
+left arc → bottom → right arc. Four endpoint tangencies jointly constrain
+bounded contact and tangent direction, followed by one arc equality. Centre at
+the origin uses symmetry of the arc centres; other centres use signed placement
+of the left arc centre. One arc-centre distance expresses
+`overall_length - overall_width`, one radius expresses
+`overall_width / 2`, and one bottom-line angle expresses orientation. Counts
+are exactly 9 at origin and 10 otherwise.
+
+Rounded-rectangle append and traversal order is bottom, lower-right arc, right,
+upper-right arc, top, upper-left arc, left, lower-left arc. Eight endpoint
+tangencies close all bounded line/arc joins; three equalities share four radii;
+two horizontal and two vertical constraints preserve axes; centre distances
+between corner arcs express `width - 2r` and `height - 2r`; one radius preserves
+`r`. Centre-at-origin uses opposite corner-centre symmetry, while every other
+placement uses signed lower-left corner-centre coordinates. Counts are exactly
+19 for centre-at-origin and 20 otherwise.
+
+The endpoint-tangent constructor is internal to these fully specified semantic
+profiles. The public primitive `tangent` request remains whole-geometry-only,
+and established general sketch-inspection behavior is unchanged. The curved
+adapter compares exact native geometry/position fields, checks every bounded
+endpoint coordinate and tangent direction, verifies 180° or 90° visible CCW
+sweeps, positive signed area, dimensions, centre/bounds, exact constraint
+ranges, zero DoF, and clean redundant/partial/conflict/malformed diagnostics.
+Results expose controlled bounded arcs and joins without native objects.
+
+Both tools snapshot geometry including arc parameters, construction flags,
+constraints, solver state, Body/support/MapMode/placement context, document
+identity/file state, and history before mutation. An owned operation opens
+exactly `Create sketch slot` or `Create sketch rounded rectangle` and commits
+only after semantic verification. Failure removes constraints and mixed
+geometry in reverse, aborts only an owned transaction, restores solver-moved
+content and flags, and verifies exact history restoration. Caller-owned
+transactions are never nested, committed, or aborted. Exact-name undo/redo
+removes/restores a complete profile; an intervening correction in the same
+sketch invalidates redo. Creation never saves.
+
+The direct embedded-runtime campaign is
+`scripts/smoke_sketch_curved_profiles.py`. It records 78 named scenarios,
+including the two product fixtures, negative/wrapped angles, near-degenerate
+valid branches, non-empty/attached/saved contexts, injected geometry/arc/
+tangent/verification rollback, history and same-sketch recovery, all earlier
+profile regressions, tool selection, and raw-object exclusion.
 
 ## Document Tools
 
