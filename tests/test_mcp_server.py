@@ -79,6 +79,11 @@ def test_mcp_server_composes_explicit_registration_groups(
         "register_create_sketch_rectangle_tool",
         recorder("create_sketch_rectangle_tool"),
     )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_create_sketch_centered_rectangle_tool",
+        recorder("create_sketch_centered_rectangle_tool"),
+    )
 
     server = mcp_server_module.build_mcp_server(handlers, ServerConfig())
 
@@ -92,6 +97,7 @@ def test_mcp_server_composes_explicit_registration_groups(
         "add_sketch_constraints_tool",
         "document_history_tools",
         "create_sketch_rectangle_tool",
+        "create_sketch_centered_rectangle_tool",
     ]
     assert asyncio.run(server.list_tools()) == []
 
@@ -115,11 +121,12 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
     assert "get_sketch" in actual_tools
     assert "add_sketch_geometry" in actual_tools
     assert "add_sketch_constraints" in actual_tools
-    assert actual_tools[-4:] == [
+    assert actual_tools[-5:] == [
         "get_document_history",
         "undo_document",
         "redo_document",
         "create_sketch_rectangle",
+        "create_sketch_centered_rectangle",
     ]
 
 

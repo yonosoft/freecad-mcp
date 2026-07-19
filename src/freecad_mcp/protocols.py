@@ -14,6 +14,8 @@ from freecad_mcp.models import (
     ObjectDetail,
     ObjectSummary,
     OriginPlane,
+    SketchCenteredRectangleCreationResult,
+    SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchCreationResult,
@@ -108,6 +110,12 @@ class DocumentAdapter(Protocol):
         request: SketchRectangleRequestInput,
     ) -> SketchRectangleCreationResult:
         """Create and verify one semantic axis-aligned rectangle atomically."""
+
+    def create_sketch_centered_rectangle(
+        self,
+        request: SketchCenteredRectangleRequestInput,
+    ) -> SketchCenteredRectangleCreationResult:
+        """Create and verify one semantic centre-defined rectangle atomically."""
 
 
 class Dispatcher(Protocol):

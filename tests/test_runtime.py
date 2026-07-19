@@ -12,6 +12,7 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
+    CreateSketchCenteredRectangleHandler,
     CreateSketchHandler,
     CreateSketchRectangleHandler,
     GetDocumentHandler,
@@ -89,6 +90,7 @@ def test_build_runtime_wires_create_sketch_handler(
         "add_sketch_geometry": AddSketchGeometryHandler,
         "add_sketch_constraints": AddSketchConstraintsHandler,
         "create_sketch_rectangle": CreateSketchRectangleHandler,
+        "create_sketch_centered_rectangle": CreateSketchCenteredRectangleHandler,
         "recompute": RecomputeDocumentHandler,
     }
 

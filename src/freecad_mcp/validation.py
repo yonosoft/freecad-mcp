@@ -27,6 +27,7 @@ from freecad_mcp.models import (
     PerpendicularConstraintInput,
     PointGeometryInput,
     PointOnObjectConstraintInput,
+    SketchCenteredRectangleRequestInput,
     SketchConstraintGeometryReferenceInput,
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
@@ -72,6 +73,9 @@ _SKETCH_CONSTRAINT_INPUT_ADAPTER: TypeAdapter[SketchConstraintInput] = TypeAdapt
 )
 _SKETCH_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchRectangleRequestInput] = TypeAdapter(
     SketchRectangleRequestInput
+)
+_SKETCH_CENTERED_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchCenteredRectangleRequestInput] = (
+    TypeAdapter(SketchCenteredRectangleRequestInput)
 )
 
 
@@ -312,6 +316,81 @@ def validate_create_sketch_rectangle_request(
             data={
                 "field": "placement",
                 "reason": "rectangle_coordinate_overflow",
+            },
+        )
+    return parsed
+
+
+def validate_create_sketch_centered_rectangle_request(
+    document_name: object,
+    sketch_name: object,
+    width: object,
+    height: object,
+    center: object,
+) -> CommandResult | SketchCenteredRectangleRequestInput:
+    """Validate and parse one complete direct-centre rectangle request."""
+    document_error = validate_document_reference(document_name)
+    if document_error is not None:
+        return document_error
+    sketch_error = _validate_object_name(
+        sketch_name,
+        field="sketch_name",
+        subject="Sketch",
+    )
+    if sketch_error is not None:
+        return sketch_error
+
+    try:
+        parsed = _SKETCH_CENTERED_RECTANGLE_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "width": width,
+                "height": height,
+                "center": center,
+            }
+        )
+    except ValidationError as exc:
+        first_error = exc.errors(include_url=False)[0]
+        location = ".".join(str(item) for item in first_error.get("loc", ()))
+        if location in {"width", "height"}:
+            invalid_value = width if location == "width" else height
+            return CommandResult.failure(
+                code="invalid_centered_rectangle_dimensions",
+                message=(
+                    "Centered rectangle width and height must be finite strict numbers "
+                    "greater than zero."
+                ),
+                data={
+                    "field": location,
+                    "reason": "invalid_centered_rectangle_dimensions",
+                    "actual_type": type(invalid_value).__name__,
+                },
+            )
+        return CommandResult.failure(
+            code="validation_error",
+            message="Centered rectangle center must contain exactly finite strict x and y values.",
+            data={
+                "field": location or "center",
+                "reason": "invalid_centered_rectangle_center",
+            },
+        )
+
+    half_width = float(parsed.width) / 2.0
+    half_height = float(parsed.height) / 2.0
+    corners = (
+        parsed.center.x - half_width,
+        parsed.center.x + half_width,
+        parsed.center.y - half_height,
+        parsed.center.y + half_height,
+    )
+    if not all(math.isfinite(value) for value in corners):
+        return CommandResult.failure(
+            code="invalid_centered_rectangle_dimensions",
+            message="Centered rectangle dimensions and center must produce finite corners.",
+            data={
+                "field": "center",
+                "reason": "centered_rectangle_coordinate_overflow",
             },
         )
     return parsed

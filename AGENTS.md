@@ -49,13 +49,21 @@ local MCP server inside FreeCAD.
 - Prefer high-level workflow tools for common operations while retaining focused
   mid-level tools for flexibility.
 - Use `create_sketch_rectangle` for a complete axis-aligned normal rectangle
-  defined by width, height, and lower-left placement. Do not reconstruct that
+  defined by width, height, and lower-left placement. Use
+  `create_sketch_centered_rectangle` when the same complete profile is defined
+  by centre, width, and height. Do not translate centre intent to lower-left
+  placement when the dedicated semantic tool is available, reconstruct either
   standard profile through repeated primitive MCP calls, call one MCP tool from
   another, or invoke/simulate the Sketcher GUI Rectangle command.
 - Use `add_sketch_geometry` for individual lines or incomplete/custom
   arrangements, and `add_sketch_constraints` to modify relationships on
-  existing geometry. Centred, rotated, rounded, construction, and partially
-  constrained rectangles are not `create_sketch_rectangle` request variants.
+  existing geometry. Tool 16 remains lower-left-only and tool 17 remains
+  centre-only. Rotated, rounded, three-point, construction-edge, and partially
+  constrained rectangles are not variants of either semantic rectangle tool.
+- A centred rectangle has exactly four normal profile edges and one explicit
+  construction point returned as semantic reference geometry. Preserve its
+  direct corner symmetry, deterministic order, 12/13-constraint branches, and
+  zero incidental helper geometry; do not replace the point with diagonals.
 - Provide inspection, validation, and recovery tools alongside mutating tools.
 - After a successful modelling mutation, recompute and inspect the result. If
   it is technically valid but expresses the wrong design intent, inspect the
@@ -83,10 +91,11 @@ local MCP server inside FreeCAD.
 - Document-history tools are one-step-only, must run through the Qt dispatcher,
   and must not expose native transaction IDs or objects, save implicitly, or
   wrap native undo/redo in another transaction.
-- A successful semantic rectangle is one verified `Create sketch rectangle`
-  history step. If its intent is wrong, recompute, inspect, match and undo that
-  step, then retry in the same sketch. A failed rectangle call owns its rollback
-  and must not be followed by undo.
+- A successful lower-left rectangle is one verified `Create sketch rectangle`
+  history step; a successful centre-defined rectangle is one verified `Create
+  centered sketch rectangle` step. If its intent is wrong, recompute, inspect,
+  match and undo that exact step, then retry in the same sketch. A failed
+  rectangle call owns its rollback and must not be followed by undo.
 
 ## Python Standards
 

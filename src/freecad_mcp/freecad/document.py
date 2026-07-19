@@ -7,6 +7,7 @@ from freecad_mcp.freecad import (
     document_history,
     document_operations,
     object_inspection,
+    sketch_centered_rectangle_creation,
     sketch_constraint_creation,
     sketch_creation,
     sketch_geometry_creation,
@@ -53,6 +54,8 @@ from freecad_mcp.models import (
     ObjectDetail,
     ObjectSummary,
     OriginPlane,
+    SketchCenteredRectangleCreationResult,
+    SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchCreationResult,
@@ -170,3 +173,10 @@ class FreeCADDocumentAdapter:
     ) -> SketchRectangleCreationResult:
         """Create one verified semantic rectangle without GUI commands or saving."""
         return sketch_rectangle_creation.create_sketch_rectangle(request)
+
+    def create_sketch_centered_rectangle(
+        self,
+        request: SketchCenteredRectangleRequestInput,
+    ) -> SketchCenteredRectangleCreationResult:
+        """Create one verified centre-defined rectangle without GUI commands or saving."""
+        return sketch_centered_rectangle_creation.create_sketch_centered_rectangle(request)

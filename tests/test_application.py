@@ -10,6 +10,7 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
+    CreateSketchCenteredRectangleHandler,
     CreateSketchRectangleHandler,
     DocumentHandlers,
     GetDocumentHandler,
@@ -37,12 +38,17 @@ from freecad_mcp.models import (
     PlacementData,
     PlacementPosition,
     PlacementRotation,
+    SketchCenteredRectangleCreationResult,
+    SketchCenteredRectangleProfile,
+    SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchCreationResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchProfileCenter,
+    SketchProfilePointReference,
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
@@ -269,6 +275,27 @@ class AdapterStub:
             document=self.document,
         )
 
+    def create_sketch_centered_rectangle(
+        self,
+        request: SketchCenteredRectangleRequestInput,
+    ) -> SketchCenteredRectangleCreationResult:
+        return SketchCenteredRectangleCreationResult(
+            profile=SketchCenteredRectangleProfile(
+                geometry_indices=(0, 1, 2, 3),
+                reference_geometry_indices=(4,),
+                constraint_indices=tuple(range(12)),
+                center=SketchProfileCenter(
+                    x=float(request.center.x),
+                    y=float(request.center.y),
+                    reference=SketchProfilePointReference(4),
+                ),
+                width=float(request.width),
+                height=float(request.height),
+            ),
+            sketch=self.get_sketch(request.document_name, request.sketch_name),
+            document=self.document,
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -303,6 +330,10 @@ def make_application() -> Application:
         add_sketch_geometry=AddSketchGeometryHandler(adapter, dispatcher),
         add_sketch_constraints=AddSketchConstraintsHandler(adapter, dispatcher),
         create_sketch_rectangle=CreateSketchRectangleHandler(adapter, dispatcher),
+        create_sketch_centered_rectangle=CreateSketchCenteredRectangleHandler(
+            adapter,
+            dispatcher,
+        ),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)

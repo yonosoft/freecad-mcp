@@ -43,6 +43,7 @@ def test_rectangle_is_exactly_tool_sixteen_and_preserves_first_fifteen() -> None
         "undo_document",
         "redo_document",
         "create_sketch_rectangle",
+        "create_sketch_centered_rectangle",
     ]
     assert tuple(actual) == REGISTERED_TOOL_NAMES
 

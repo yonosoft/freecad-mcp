@@ -11,6 +11,7 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
+    CreateSketchCenteredRectangleHandler,
     CreateSketchRectangleHandler,
     DocumentHandlers,
     GetDocumentHandler,
@@ -38,12 +39,17 @@ from freecad_mcp.models import (
     PlacementData,
     PlacementPosition,
     PlacementRotation,
+    SketchCenteredRectangleCreationResult,
+    SketchCenteredRectangleProfile,
+    SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchCreationResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchProfileCenter,
+    SketchProfilePointReference,
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
@@ -81,6 +87,7 @@ class AdapterStub:
             tuple[str, str, tuple[SketchConstraintInput, ...]]
         ] = []
         self.create_sketch_rectangle_calls: list[SketchRectangleRequestInput] = []
+        self.create_sketch_centered_rectangle_calls: list[SketchCenteredRectangleRequestInput] = []
         self.undo_names = ["Add sketch constraints"]
         self.redo_names: list[str] = []
 
@@ -302,6 +309,28 @@ class AdapterStub:
             document=self.document,
         )
 
+    def create_sketch_centered_rectangle(
+        self,
+        request: SketchCenteredRectangleRequestInput,
+    ) -> SketchCenteredRectangleCreationResult:
+        self.create_sketch_centered_rectangle_calls.append(request)
+        return SketchCenteredRectangleCreationResult(
+            profile=SketchCenteredRectangleProfile(
+                geometry_indices=(0, 1, 2, 3),
+                reference_geometry_indices=(4,),
+                constraint_indices=tuple(range(12)),
+                center=SketchProfileCenter(
+                    x=float(request.center.x),
+                    y=float(request.center.y),
+                    reference=SketchProfilePointReference(4),
+                ),
+                width=float(request.width),
+                height=float(request.height),
+            ),
+            sketch=self.get_sketch(request.document_name, request.sketch_name),
+            document=self.document,
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -328,6 +357,10 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             add_sketch_geometry=AddSketchGeometryHandler(actual_adapter, dispatcher),
             add_sketch_constraints=AddSketchConstraintsHandler(actual_adapter, dispatcher),
             create_sketch_rectangle=CreateSketchRectangleHandler(actual_adapter, dispatcher),
+            create_sketch_centered_rectangle=CreateSketchCenteredRectangleHandler(
+                actual_adapter,
+                dispatcher,
+            ),
             recompute=RecomputeDocumentHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,

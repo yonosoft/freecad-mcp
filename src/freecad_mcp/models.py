@@ -363,6 +363,23 @@ class SketchRectangleRequestInput(_SketchGeometryInputModel):
     placement: LowerLeftRectanglePlacementInput
 
 
+class SketchCenterPointInput(_SketchGeometryInputModel):
+    """Strict finite semantic centre point reusable by centred profiles."""
+
+    x: float = Field(strict=True, allow_inf_nan=False)
+    y: float = Field(strict=True, allow_inf_nan=False)
+
+
+class SketchCenteredRectangleRequestInput(_SketchGeometryInputModel):
+    """Complete strict semantic request for one centred axis-aligned rectangle."""
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    width: RectangleDimension
+    height: RectangleDimension
+    center: SketchCenterPointInput
+
+
 class SketchPointPosition(StrEnum):
     """Controlled public sketch-point selectors."""
 
@@ -759,6 +776,80 @@ class SketchRectangleProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class SketchProfilePointReference:
+    """Explicit semantic construction-point reference reusable by profile results."""
+
+    geometry_index: int
+    position: Literal["point"] = "point"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "geometry_index": self.geometry_index,
+            "position": self.position,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchProfileCenter:
+    """Requested centre coordinates and their controlled construction reference."""
+
+    x: float
+    y: float
+    reference: SketchProfilePointReference
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "x": self.x,
+            "y": self.y,
+            "reference": self.reference.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchCenteredRectangleProfile:
+    """Verified semantic mapping for a centre-defined rectangle profile."""
+
+    geometry_indices: tuple[int, int, int, int]
+    reference_geometry_indices: tuple[int]
+    constraint_indices: tuple[int, ...]
+    center: SketchProfileCenter
+    width: float
+    height: float
+    closed: bool = True
+    axis_aligned: bool = True
+    centered: bool = True
+    fully_constrained: bool = True
+
+    def to_dict(self) -> dict[str, object]:
+        bottom, right, top, left = self.geometry_indices
+        return {
+            "type": "centered_rectangle",
+            "geometry_indices": list(self.geometry_indices),
+            "reference_geometry_indices": list(self.reference_geometry_indices),
+            "constraint_indices": list(self.constraint_indices),
+            "edges": {
+                "bottom": bottom,
+                "right": right,
+                "top": top,
+                "left": left,
+            },
+            "corners": {
+                "lower_left": SketchRectangleCornerReference(bottom, "start").to_dict(),
+                "lower_right": SketchRectangleCornerReference(bottom, "end").to_dict(),
+                "upper_right": SketchRectangleCornerReference(right, "end").to_dict(),
+                "upper_left": SketchRectangleCornerReference(top, "end").to_dict(),
+            },
+            "center": self.center.to_dict(),
+            "width": self.width,
+            "height": self.height,
+            "closed": self.closed,
+            "axis_aligned": self.axis_aligned,
+            "centered": self.centered,
+            "fully_constrained": self.fully_constrained,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SketchLineGeometry:
     """Controlled line-segment geometry."""
 
@@ -1059,6 +1150,22 @@ class SketchRectangleCreationResult:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class SketchCenteredRectangleCreationResult:
+    """Verified centred rectangle with current sketch and document readback."""
+
+    profile: SketchCenteredRectangleProfile
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "profile": self.profile.to_dict(),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
 __all__ = [
     "MAX_SKETCH_CONSTRAINT_BATCH_SIZE",
     "MAX_SKETCH_GEOMETRY_BATCH_SIZE",
@@ -1106,6 +1213,10 @@ __all__ = [
     "SketchArcGeometry",
     "SketchAttachmentData",
     "SketchAxisReferenceInput",
+    "SketchCenterPointInput",
+    "SketchCenteredRectangleCreationResult",
+    "SketchCenteredRectangleProfile",
+    "SketchCenteredRectangleRequestInput",
     "SketchCircleGeometry",
     "SketchCoincidentReferenceInput",
     "SketchConstraint",
@@ -1130,6 +1241,8 @@ __all__ = [
     "SketchPointGeometry",
     "SketchPointOnObjectReferenceInput",
     "SketchPointPosition",
+    "SketchProfileCenter",
+    "SketchProfilePointReference",
     "SketchRectangleCornerReference",
     "SketchRectangleCreationResult",
     "SketchRectangleProfile",

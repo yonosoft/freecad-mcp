@@ -14,6 +14,9 @@ from freecad_mcp.mcp.document_tools import (
     register_recompute_document_tool,
 )
 from freecad_mcp.mcp.object_tools import register_get_sketch_tool, register_object_tools
+from freecad_mcp.mcp.sketch_centered_rectangle_tools import (
+    register_create_sketch_centered_rectangle_tool,
+)
 from freecad_mcp.mcp.sketch_constraint_tools import register_add_sketch_constraints_tool
 from freecad_mcp.mcp.sketch_geometry_tools import register_add_sketch_geometry_tool
 from freecad_mcp.mcp.sketch_rectangle_tools import register_create_sketch_rectangle_tool
@@ -32,9 +35,11 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             "current sketch over abandoning it or creating replacement sketches for recoverable "
             "mistakes. Do not undo a failed atomic operation that already rolled back. Redo only "
             "when intentionally restoring the most recently undone transaction."
-            " Use create_sketch_rectangle for a complete axis-aligned rectangle defined by "
-            "width, height, and lower-left placement; use primitive sketch tools only for custom "
-            "or incomplete geometry."
+            " Use create_sketch_centered_rectangle for a complete axis-aligned rectangle defined "
+            "by centre, width, and height. Use create_sketch_rectangle for a complete rectangle "
+            "defined by width, height, and lower-left placement. Do not translate centre intent "
+            "into a lower-left call while the dedicated centred tool is available; use primitive "
+            "sketch tools only for custom or incomplete geometry."
         ),
         host=config.host,
         port=config.port,
@@ -53,5 +58,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_add_sketch_constraints_tool(server, handlers)
     register_document_history_tools(server, handlers)
     register_create_sketch_rectangle_tool(server, handlers)
+    register_create_sketch_centered_rectangle_tool(server, handlers)
 
     return server

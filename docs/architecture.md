@@ -44,9 +44,11 @@ Atomic geometry addition belongs to `freecad.sketch_geometry_creation`, while
 read-only sketch state belongs to `freecad.sketch_inspection`. Both remain
 separate from sketch creation and behind the same public adapter facade.
 Semantic axis-aligned rectangle creation belongs to
-`freecad.sketch_rectangle_creation`; it composes the established internal
-geometry/constraint translators, but owns complete-profile verification and
-rollback.
+`freecad.sketch_rectangle_creation` and
+`freecad.sketch_centered_rectangle_creation`. They share deterministic
+four-edge generation and verification through `sketch_rectangle_profile` and
+the established native translators, while each owns its public intent,
+centre/lower-left constraints, complete-profile verification, and rollback.
 Controlled history inspection and one-step mutation belong to
 `freecad.document_history`; `freecad.history_guard` makes MCP-owned undo, redo,
 and rollback visible to re-entrant calls without exposing that state publicly.
@@ -200,15 +202,17 @@ and sketch creation. `mcp.sketch_geometry_tools` explicitly registers the
 atomic geometry mutation, and `mcp.sketch_constraint_tools` explicitly
 registers atomic constraint mutation. `mcp.document_history_tools` explicitly
 registers controlled history inspection, undo, and redo.
-`mcp.sketch_rectangle_tools` explicitly registers the first semantic profile.
+`mcp.sketch_rectangle_tools` and `mcp.sketch_centered_rectangle_tools`
+explicitly register the two semantic rectangle profiles.
 `mcp.server` is the small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
 `add_sketch_geometry` follows as exactly tool eleven, and
 `add_sketch_constraints` follows as exactly tool twelve. History inspection,
 undo, and redo are exactly tools thirteen through fifteen;
-`create_sketch_rectangle` is exactly tool sixteen. No registration loop is
-used.
+`create_sketch_rectangle` is exactly tool sixteen and
+`create_sketch_centered_rectangle` is exactly tool seventeen. No registration
+loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
 
@@ -220,7 +224,8 @@ The registry currently exposes `create_document`, `list_documents`,
 `get_document`, `save_document`, `list_objects`, `get_object`,
 `recompute_document`, `create_body`, `create_sketch`, `get_sketch`,
 `add_sketch_geometry`, `add_sketch_constraints`, `get_document_history`,
-`undo_document`, `redo_document`, and `create_sketch_rectangle`, in that order.
+`undo_document`, `redo_document`, `create_sketch_rectangle`, and
+`create_sketch_centered_rectangle`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -317,6 +322,81 @@ success is corrected by matching and undoing `Create sketch rectangle`, then
 retrying in the same sketch. Saved files are never written by creation,
 rollback, undo, or redo; unsaved documents remain pathless.
 
+## Semantic Centred Rectangle Profile
+
+Milestone 15B adds a second semantic profile without widening Milestone 15A's
+lower-left placement union:
+
+```text
+create_sketch_centered_rectangle MCP registration
+→ CreateSketchCenteredRectangleHandler / application
+→ DocumentAdapter.create_sketch_centered_rectangle protocol
+→ Qt main-thread dispatcher
+→ FreeCADDocumentAdapter facade
+→ freecad.sketch_centered_rectangle_creation
+→ shared sketch_rectangle_profile geometry/verification helpers
+→ shared geometry and constraint translators
+→ SketchObject.addGeometry / addConstraint
+→ recompute and controlled semantic inspection
+```
+
+The strict public request contains exact document and sketch names, finite
+positive width and height, and `center` with exactly finite strict numeric `x`
+and `y`. It does not contain `placement`, native indices, construction options,
+or a branch selector. Tool 16 remains lower-left-only; tool 17 is centre-only;
+all first-sixteen schemas and all 17 constraint variants remain unchanged.
+
+`sketch_rectangle_profile` owns the shared bounds, four edge inputs, common ten
+closure/orientation/dimension constraints, point references, and semantic edge
+verification. The lower-left adapter calls those helpers with lower-left
+bounds. The centred adapter calls them with centre-derived bounds, then adds
+exactly one construction `Part.Point`. It never calls the lower-left handler,
+adapter entry point, primitive MCP tools, or a GUI command.
+
+Geometry append order is bottom, right, top, left, centre point. The four line
+indices remain the profile's `geometry_indices`; the point is returned in
+`reference_geometry_indices` and through a controlled `point` centre
+reference. There are four normal edges, one semantic construction reference,
+and zero incidental helpers. The point is used directly as the centre of one
+symmetry constraint between the lower-left and upper-right corners. No
+diagonal, centre line, helper circle, or duplicate point is created.
+
+Constraint order is the shared four coincidences, four orientations, width and
+height, then centre symmetry and centre placement. At the origin placement is
+one point-to-origin coincidence. On the vertical axis it is
+`point_on_object` plus signed Y distance; on the horizontal axis it is
+`point_on_object` plus signed X distance; away from both it is signed X and Y
+distance. Installed FreeCAD 1.1.1 evidence proves 12 constraints at the origin
+and 13 on each non-origin branch, zero DoF, full constraint, and no redundant,
+partially redundant, conflicting, or malformed constraints.
+
+The adapter uses the same complete snapshot and caller-owned transaction
+contract as tool 16. An owned operation opens exactly `Create centered sketch
+rectangle`, appends and verifies each index/count/construction transition,
+recomputes, performs controlled semantic readback, and commits only after full
+verification. Verification includes the five-element append range, line/point
+types, order, exact corners, closure, axis alignment, dimensions, requested
+centre, diagonal midpoint, direct symmetry, placement references, clean solver,
+unchanged pre-existing signatures, Body ownership, support, MapMode, placement,
+document identity, and file path.
+
+Failure deletes appended constraints in reverse, then the centre point and
+edges in reverse, aborts only an owned transaction, restores solver-moved
+pre-existing geometry and all construction/constraint flags, recomputes when
+appropriate, and verifies the full snapshot and history state. A caller-owned
+transaction stays active and is neither nested nor committed. A failed call
+creates no history entry and needs no undo.
+
+A successful owned call is one undo step. Exact-name undo removes four edges,
+the centre reference, and all constraints while preserving the same sketch and
+earlier content; redo restores order, construction state, mappings, and the
+fully constrained result. A new mutation invalidates redo. Recovery from a
+wrong centre uses the same sketch and the exact `Create centered sketch
+rectangle` name. Create, undo, and redo never save: unsaved documents stay
+pathless and explicitly saved file bytes and timestamps remain unchanged.
+Body-owned and supported attached sketches keep ownership, support, MapMode,
+placement, and identity throughout.
+
 ## Document Tools
 
 The `create_document` tool creates a FreeCAD document through the shared
@@ -402,7 +482,8 @@ reported as `document_history_verification_failed`; the adapter does not hide
 it with an automatic compensating history operation.
 
 Model mutations use the central safety labels `Create body`, `Create sketch`,
-`Add sketch geometry`, `Add sketch constraints`, and `Create sketch rectangle`.
+`Add sketch geometry`, `Add sketch constraints`, `Create sketch rectangle`,
+and `Create centered sketch rectangle`.
 Document creation, saving, recomputation, and inspection do not create an
 MCP-owned undo transaction.
 Atomic-operation rollback remains separate from controlled undo: rollback

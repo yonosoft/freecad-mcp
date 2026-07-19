@@ -36,14 +36,19 @@ from freecad_mcp.freecad.sketch_constraint_creation import (
     _sketch_context_state,
 )
 from freecad_mcp.freecad.sketch_geometry_creation import _build_geometry
+from freecad_mcp.freecad.sketch_rectangle_profile import (
+    RectangleProfileVerificationError,
+    point_reference,
+    rectangle_base_constraint_inputs,
+    rectangle_bounds_from_lower_left,
+    rectangle_geometry_inputs,
+    verify_rectangle_edges,
+)
 from freecad_mcp.models import (
     CoincidentConstraintInput,
-    DistanceLineLengthConstraintInput,
     DistanceXPointToOriginConstraintInput,
     DistanceYPointToOriginConstraintInput,
     DocumentSummary,
-    HorizontalConstraintInput,
-    LineSegmentGeometryInput,
     PointOnObjectConstraintInput,
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
@@ -52,14 +57,12 @@ from freecad_mcp.models import (
     SketchLineGeometry,
     SketchOriginReferenceInput,
     SketchPoint2D,
-    SketchPoint2DInput,
     SketchPointPosition,
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
     SketchSolverData,
     SketchVerticalAxisReferenceInput,
-    VerticalConstraintInput,
 )
 from freecad_mcp.transaction_names import CREATE_SKETCH_RECTANGLE_TRANSACTION_NAME
 
@@ -396,39 +399,13 @@ def _clone_geometry(geometry: tuple[Any, ...]) -> tuple[Any, ...]:
 def _rectangle_geometry_inputs(
     request: SketchRectangleRequestInput,
 ) -> tuple[SketchGeometryInput, ...]:
-    x = float(request.placement.x)
-    y = float(request.placement.y)
-    right = x + float(request.width)
-    top = y + float(request.height)
-    lower_left = SketchPoint2DInput(x=x, y=y)
-    lower_right = SketchPoint2DInput(x=right, y=y)
-    upper_right = SketchPoint2DInput(x=right, y=top)
-    upper_left = SketchPoint2DInput(x=x, y=top)
-    return (
-        LineSegmentGeometryInput(
-            type="line_segment",
-            start=lower_left,
-            end=lower_right,
-            construction=False,
-        ),
-        LineSegmentGeometryInput(
-            type="line_segment",
-            start=lower_right,
-            end=upper_right,
-            construction=False,
-        ),
-        LineSegmentGeometryInput(
-            type="line_segment",
-            start=upper_right,
-            end=upper_left,
-            construction=False,
-        ),
-        LineSegmentGeometryInput(
-            type="line_segment",
-            start=upper_left,
-            end=lower_left,
-            construction=False,
-        ),
+    return rectangle_geometry_inputs(
+        rectangle_bounds_from_lower_left(
+            float(request.placement.x),
+            float(request.placement.y),
+            float(request.width),
+            float(request.height),
+        )
     )
 
 
@@ -436,56 +413,22 @@ def _point(
     geometry_index: int,
     position: SketchPointPosition,
 ) -> SketchConstraintPointReferenceInput:
-    return SketchConstraintPointReferenceInput(
-        geometry_index=geometry_index,
-        position=position,
-    )
+    return point_reference(geometry_index, position)
 
 
 def _rectangle_constraint_inputs(
     request: SketchRectangleRequestInput,
     first_geometry_index: int,
 ) -> tuple[SketchConstraintInput, ...]:
-    bottom, right, top, left = range(first_geometry_index, first_geometry_index + 4)
+    bottom = first_geometry_index
     bottom_start = _point(bottom, SketchPointPosition.START)
-    constraints: list[SketchConstraintInput] = [
-        CoincidentConstraintInput(
-            type="coincident",
-            first=_point(bottom, SketchPointPosition.END),
-            second=_point(right, SketchPointPosition.START),
-        ),
-        CoincidentConstraintInput(
-            type="coincident",
-            first=_point(right, SketchPointPosition.END),
-            second=_point(top, SketchPointPosition.START),
-        ),
-        CoincidentConstraintInput(
-            type="coincident",
-            first=_point(top, SketchPointPosition.END),
-            second=_point(left, SketchPointPosition.START),
-        ),
-        CoincidentConstraintInput(
-            type="coincident",
-            first=_point(left, SketchPointPosition.END),
-            second=bottom_start,
-        ),
-        HorizontalConstraintInput(type="horizontal", geometry_index=bottom),
-        VerticalConstraintInput(type="vertical", geometry_index=right),
-        HorizontalConstraintInput(type="horizontal", geometry_index=top),
-        VerticalConstraintInput(type="vertical", geometry_index=left),
-        DistanceLineLengthConstraintInput(
-            type="distance",
-            mode="line_length",
-            geometry_index=bottom,
-            value=float(request.width),
-        ),
-        DistanceLineLengthConstraintInput(
-            type="distance",
-            mode="line_length",
-            geometry_index=right,
-            value=float(request.height),
-        ),
-    ]
+    constraints = list(
+        rectangle_base_constraint_inputs(
+            first_geometry_index,
+            float(request.width),
+            float(request.height),
+        )
+    )
 
     x = float(request.placement.x)
     y = float(request.placement.y)
@@ -620,59 +563,16 @@ def _verify_rectangle(
     if constraint_indices != tuple(range(len(snapshot.constraints), expected_constraint_count)):
         raise SketchRectangleVerificationError("constraint_index_mapping_mismatch")
 
-    x = float(request.placement.x)
-    y = float(request.placement.y)
-    right = x + float(request.width)
-    top = y + float(request.height)
-    expected_edges = (
-        ((x, y), (right, y)),
-        ((right, y), (right, top)),
-        ((right, top), (x, top)),
-        ((x, top), (x, y)),
-    )
-    rectangle_edges: list[SketchLineGeometry] = []
-    for geometry_index, (expected_start, expected_end) in zip(
-        geometry_indices,
-        expected_edges,
-        strict=True,
-    ):
-        item = inspected.geometry[geometry_index]
-        if not isinstance(item, SketchLineGeometry):
-            raise SketchRectangleVerificationError("rectangle_geometry_type_mismatch")
-        if item.index != geometry_index:
-            raise SketchRectangleVerificationError("rectangle_geometry_order_mismatch")
-        if item.construction:
-            raise SketchRectangleVerificationError("rectangle_construction_geometry")
-        if not _same_xy(item.start, expected_start) or not _same_xy(item.end, expected_end):
-            raise SketchRectangleVerificationError("rectangle_endpoint_mismatch")
-        rectangle_edges.append(item)
-
-    for index, edge in enumerate(rectangle_edges):
-        following = rectangle_edges[(index + 1) % _GEOMETRY_COUNT]
-        if not _same_points(edge.end, following.start):
-            raise SketchRectangleVerificationError("rectangle_open_chain")
-    if not _horizontal(rectangle_edges[0]) or not _horizontal(rectangle_edges[2]):
-        raise SketchRectangleVerificationError("rectangle_not_horizontal")
-    if not _vertical(rectangle_edges[1]) or not _vertical(rectangle_edges[3]):
-        raise SketchRectangleVerificationError("rectangle_not_vertical")
-    if not math.isclose(
-        _length(rectangle_edges[0]),
+    bounds = rectangle_bounds_from_lower_left(
+        float(request.placement.x),
+        float(request.placement.y),
         float(request.width),
-        rel_tol=0.0,
-        abs_tol=_TOLERANCE,
-    ):
-        raise SketchRectangleVerificationError("rectangle_width_mismatch")
-    if not math.isclose(
-        _length(rectangle_edges[1]),
         float(request.height),
-        rel_tol=0.0,
-        abs_tol=_TOLERANCE,
-    ):
-        raise SketchRectangleVerificationError("rectangle_height_mismatch")
-    if not _same_xy(rectangle_edges[0].start, (x, y)):
-        raise SketchRectangleVerificationError("rectangle_placement_mismatch")
-    if not _same_xy(rectangle_edges[1].end, (right, top)):
-        raise SketchRectangleVerificationError("rectangle_upper_right_mismatch")
+    )
+    try:
+        verify_rectangle_edges(inspected.geometry, geometry_indices, bounds)
+    except RectangleProfileVerificationError as exc:
+        raise SketchRectangleVerificationError(exc.reason) from exc
 
     actual_constraints = _rectangle_constraint_state(sketch)
     if actual_constraints[: len(snapshot.constraints)] != snapshot.constraints:

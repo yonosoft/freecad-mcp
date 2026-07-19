@@ -17,6 +17,7 @@ from freecad_mcp.commands.document_query import (
 from freecad_mcp.commands.document_save import SaveDocumentHandler
 from freecad_mcp.commands.object_query import GetObjectHandler, ListObjectsHandler
 from freecad_mcp.commands.sketch import CreateSketchHandler
+from freecad_mcp.commands.sketch_centered_rectangle import CreateSketchCenteredRectangleHandler
 from freecad_mcp.commands.sketch_constraints import AddSketchConstraintsHandler
 from freecad_mcp.commands.sketch_geometry import AddSketchGeometryHandler
 from freecad_mcp.commands.sketch_query import GetSketchHandler
@@ -43,6 +44,7 @@ class DocumentHandlers:
     add_sketch_geometry: AddSketchGeometryHandler
     add_sketch_constraints: AddSketchConstraintsHandler
     create_sketch_rectangle: CreateSketchRectangleHandler
+    create_sketch_centered_rectangle: CreateSketchCenteredRectangleHandler
     recompute: RecomputeDocumentHandler
 
 
@@ -51,6 +53,7 @@ __all__ = [
     "AddSketchGeometryHandler",
     "CreateBodyHandler",
     "CreateDocumentHandler",
+    "CreateSketchCenteredRectangleHandler",
     "CreateSketchHandler",
     "CreateSketchRectangleHandler",
     "DocumentHandlers",

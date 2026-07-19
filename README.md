@@ -14,12 +14,12 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- sixteen typed MCP tools for document creation, inspection, saving,
+- seventeen typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
   inspection, one-step undo and redo, plus verified semantic axis-aligned
-  rectangle creation;
+  lower-left and centre-defined rectangle creation;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -123,6 +123,7 @@ get_document_history
 undo_document
 redo_document
 create_sketch_rectangle
+create_sketch_centered_rectangle
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -460,11 +461,13 @@ strategy in the same sketch, reapply tangency, recompute, and inspect again.
 Do not undo after a failed atomic call that already restored zero mutation, and
 do not abandon a recoverable sketch merely to obtain another branch.
 
-A complete axis-aligned rectangle should use `create_sketch_rectangle`, not a
-sequence of primitive geometry and constraint calls. A centred 30 mm × 20 mm
-request is translated by the calling agent to width `30`, height `20`, and
-lower-left `(-15, -10)`; `center` is not a public placement variant. The
-semantic tool creates and verifies the natural closed profile in one operation.
+A complete axis-aligned rectangle should use a semantic rectangle tool, not a
+sequence of primitive geometry and constraint calls. Use
+`create_sketch_rectangle` for lower-left-defined intent and
+`create_sketch_centered_rectangle` for centre-defined intent. Do not calculate
+a lower-left corner for a centre-defined request when tool 17 is available.
+Use `add_sketch_geometry` only for custom, incomplete, or non-rectangular line
+arrangements and `add_sketch_constraints` to modify existing relationships.
 
 A second direct regression uses one origin-centred 10 mm circle and two point
 geometries near `(10, 0)` and `(0, 10)`. Each point uses ordinary
@@ -646,6 +649,102 @@ documents remain without a path, and saved files are not written until an
 explicit `save_document` call. The implementation calls neither another MCP
 tool nor a GUI Rectangle command.
 
+### Semantic centred rectangles
+
+`create_sketch_centered_rectangle` is exactly tool 17 and is distinct from the
+lower-left-only tool 16. It targets an existing sketch and accepts this strict
+request; every object forbids additional properties:
+
+```json
+{
+  "document_name": "Model",
+  "sketch_name": "BaseSketch",
+  "width": 30.0,
+  "height": 20.0,
+  "center": {"x": 12.0, "y": -7.0}
+}
+```
+
+`center` contains exactly finite strict numeric `x` and `y` values. Width and
+height are finite strict numbers greater than zero; booleans are rejected as
+numbers. The tool does not accept `placement`, `lower_left`, rotation,
+construction-edge, partial-constraint, native-index, or branch controls. Tool
+16 remains exactly lower-left-only, and the established 17 constraint
+variants are unchanged.
+
+The adapter derives all four corners and appends exactly four normal lines in
+`bottom`, `right`, `top`, `left` order, followed by one construction
+`Part.Point` at the requested centre. The first four indices are profile
+geometry; the fifth is returned separately in `reference_geometry_indices`.
+The point is deliberate semantic profile metadata and the symmetry centre, not
+an incidental hidden helper. No diagonal, centre line, circle, duplicate
+corner, or other helper geometry is created.
+
+The deterministic constraint sequence is four endpoint coincidences, four
+edge orientations, bottom width, right height, and one direct symmetry between
+the lower-left and upper-right corners about the construction point. Centre
+placement uses one origin coincidence at `(0,0)`; vertical-axis membership plus
+Y distance when only `x` is zero; horizontal-axis membership plus X distance
+when only `y` is zero; otherwise signed X and Y distances. FreeCAD 1.1.1
+verifies 12 constraints at the origin and 13 for every other branch, zero DoF,
+full constraint, and clean solver diagnostics.
+
+Success has the existing envelope and controlled readback shape:
+
+```json
+{
+  "ok": true,
+  "code": "sketch_centered_rectangle_created",
+  "message": "Created and verified an axis-aligned centred sketch rectangle.",
+  "profile": {
+    "type": "centered_rectangle",
+    "geometry_indices": [4, 5, 6, 7],
+    "reference_geometry_indices": [8],
+    "constraint_indices": [10, 11, 12],
+    "edges": {"bottom": 4, "right": 5, "top": 6, "left": 7},
+    "corners": {
+      "lower_left": {"geometry_index": 4, "position": "start"},
+      "lower_right": {"geometry_index": 4, "position": "end"},
+      "upper_right": {"geometry_index": 5, "position": "end"},
+      "upper_left": {"geometry_index": 6, "position": "end"}
+    },
+    "center": {
+      "x": 12.0,
+      "y": -7.0,
+      "reference": {"geometry_index": 8, "position": "point"}
+    },
+    "width": 30.0,
+    "height": 20.0,
+    "closed": true,
+    "axis_aligned": true,
+    "centered": true,
+    "fully_constrained": true
+  },
+  "sketch": {"...": "existing controlled sketch inspection"},
+  "document": {"...": "existing controlled document summary"}
+}
+```
+
+Creation, recompute, semantic verification, and commit are one atomic
+`Create centered sketch rectangle` transaction. Verification covers exact
+append ranges and types, construction state, edge/corner coordinates, centre
+and diagonal midpoint, symmetry and placement readback, constraint count,
+solver diagnostics, and unchanged Body ownership, attachment, MapMode,
+placement, document path, and pre-existing content. On failure the appended
+constraints, centre point, and four edges are removed; the complete snapshot
+and caller-owned transaction state are restored; no history entry remains.
+
+One matching undo removes all four edges, the centre reference, and every new
+constraint; one redo restores their order, construction state, mappings, and
+fully constrained solver state. A new mutation after undo invalidates redo. A
+valid rectangle at the wrong centre should be inspected, matched to `Create
+centered sketch rectangle`, undone, and recreated in the same sketch. Saved
+files are not written by create/undo/redo, unsaved documents stay pathless, and
+Body-owned or supported attached sketches retain their identity and support.
+The operation calls neither another MCP tool nor a GUI command. Rotated,
+rounded, three-point, construction-edge, and partially constrained rectangles
+remain future work.
+
 ### Controlled document history
 
 `get_document_history`, `undo_document`, and `redo_document` are tools 13–15.
@@ -672,7 +771,8 @@ It does not return complete native stacks, native transaction objects, or
 transaction IDs. Transaction names are current-step safety labels, not durable
 history identifiers. The controlled transaction names produced by current MCP
 model mutations are `Create body`, `Create sketch`, `Add sketch geometry`,
-`Add sketch constraints`, and `Create sketch rectangle`.
+`Add sketch constraints`, `Create sketch rectangle`, and `Create centered
+sketch rectangle`.
 
 Undo has this strict input shape; redo uses the same shape:
 

@@ -170,6 +170,23 @@ class Application:
             placement=placement,
         )
 
+    def create_sketch_centered_rectangle(
+        self,
+        document_name: object,
+        sketch_name: object,
+        width: object,
+        height: object,
+        center: object,
+    ) -> CommandResult:
+        """Create one verified centre-defined rectangle through the shared handler."""
+        return self.documents.create_sketch_centered_rectangle.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            width=width,
+            height=height,
+            center=center,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()
