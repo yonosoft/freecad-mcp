@@ -8,6 +8,7 @@ from freecad_mcp.application import Application, create_application
 from freecad_mcp.commands import (
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
+    AnalyzeSketchHandler,
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
     CreateSketchEquilateralTriangleHandler,
@@ -22,10 +23,12 @@ from freecad_mcp.commands import (
     GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
+    ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
     SaveDocumentHandler,
     UndoDocumentHandler,
+    ValidateSketchProfileHandler,
 )
 from freecad_mcp.commands.body import CreateBodyHandler
 from freecad_mcp.commands.sketch import CreateSketchHandler
@@ -80,6 +83,15 @@ def _build_runtime() -> Runtime:
         create_body=CreateBodyHandler(adapter=adapter, dispatcher=dispatcher),
         create_sketch=CreateSketchHandler(adapter=adapter, dispatcher=dispatcher),
         get_sketch=GetSketchHandler(adapter=adapter, dispatcher=dispatcher),
+        analyze_sketch=AnalyzeSketchHandler(adapter=adapter, dispatcher=dispatcher),
+        validate_sketch_profile=ValidateSketchProfileHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        list_sketch_open_vertices=ListSketchOpenVerticesHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
         add_sketch_geometry=AddSketchGeometryHandler(adapter=adapter, dispatcher=dispatcher),
         add_sketch_constraints=AddSketchConstraintsHandler(adapter=adapter, dispatcher=dispatcher),
         create_sketch_rectangle=CreateSketchRectangleHandler(

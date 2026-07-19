@@ -91,6 +91,8 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         "freecad/sketch_rectangle_creation.py",
         "freecad/sketch_rectangle_profile.py",
         "freecad/sketch_inspection.py",
+        "freecad/sketch_analysis.py",
+        "freecad/sketch_topology.py",
         "freecad/document_history.py",
         "freecad/history_guard.py",
         "freecad/qt_dispatcher.py",
@@ -123,6 +125,7 @@ def test_mcp_registration_does_not_depend_on_freecad_implementation() -> None:
         "mcp/sketch_centered_rectangle_tools.py",
         "mcp/sketch_polygon_tools.py",
         "mcp/sketch_curved_profile_tools.py",
+        "mcp/sketch_analysis_tools.py",
         "mcp/server.py",
     )
     for relative_path in registration_modules:
@@ -146,6 +149,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "mcp/sketch_centered_rectangle_tools.py",
         "mcp/sketch_polygon_tools.py",
         "mcp/sketch_curved_profile_tools.py",
+        "mcp/sketch_analysis_tools.py",
     )
     registered_constants: list[str] = []
     for relative_path in registration_modules:
@@ -191,6 +195,9 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "CREATE_SKETCH_REGULAR_POLYGON_TOOL",
         "CREATE_SKETCH_SLOT_TOOL",
         "CREATE_SKETCH_ROUNDED_RECTANGLE_TOOL",
+        "ANALYZE_SKETCH_TOOL",
+        "VALIDATE_SKETCH_PROFILE_TOOL",
+        "LIST_SKETCH_OPEN_VERTICES_TOOL",
     ]
     assert _imported_modules("tool_registry.py") == set()
 
@@ -247,6 +254,11 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "SketchCurvedProfileJoin",
             "SketchProfileBounds",
             "SketchRoundedCornerProfile",
+            "SketchAnalysisRequestInput",
+            "SketchProfileAnalysisRequestInput",
+            "SketchAnalysisResult",
+            "SketchProfileValidationResult",
+            "SketchOpenVerticesResult",
         },
         "protocols.py": {
             "Dispatcher",
@@ -255,6 +267,7 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "ServerRunner",
             "SketchPolygonAdapter",
             "SketchCurvedProfileAdapter",
+            "SketchAnalysisAdapter",
             "TaskExecutor",
         },
         "exceptions.py": {
@@ -280,6 +293,7 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "FileSystemCheckError",
             "FreeCADDocumentError",
             "InvalidFilePathError",
+            "InvalidGeometrySelectionError",
             "ObjectAlreadyExistsError",
             "ObjectNotFoundError",
             "OriginPlaneNotFoundError",
@@ -292,6 +306,7 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "SketchGeometryRollbackError",
             "SketchConstraintRollbackError",
             "SketchInspectionError",
+            "SketchAnalysisError",
             "SketchRectangleCreationError",
             "SketchRectangleRollbackError",
             "SketchRectangleVerificationError",
@@ -324,6 +339,8 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "validate_create_sketch_slot_request",
             "validate_create_sketch_rounded_rectangle_request",
             "validate_object_reference",
+            "validate_analyze_sketch_request",
+            "validate_sketch_profile_analysis_request",
         },
         "freecad/document.py": {"FreeCADDocumentAdapter"},
         "mcp/server.py": {"build_mcp_server"},
@@ -348,6 +365,9 @@ def test_representative_modules_import_in_clean_processes() -> None:
         "freecad_mcp.mcp.sketch_centered_rectangle_tools",
         "freecad_mcp.mcp.sketch_polygon_tools",
         "freecad_mcp.mcp.sketch_curved_profile_tools",
+        "freecad_mcp.mcp.sketch_analysis_tools",
+        "freecad_mcp.freecad.sketch_analysis",
+        "freecad_mcp.freecad.sketch_topology",
         "freecad_mcp.mcp.document_history_tools",
         "freecad_mcp.mcp.sketch_rectangle_tools",
         "freecad_mcp.mcp.server",
@@ -569,3 +589,67 @@ def test_curved_adapters_do_not_delegate_to_mcp_or_rectangle_tools() -> None:
             isinstance(node, ast.Attribute) and node.attr in forbidden_attributes
             for node in ast.walk(tree)
         )
+
+
+def test_sketch_analysis_layers_preserve_read_only_architecture() -> None:
+    command_forbidden = {"FreeCAD", "FreeCADGui", "Part", "Sketcher", "freecad_mcp.freecad"}
+    command_imports = _imported_modules("commands/sketch_analysis.py")
+    assert not any(_matches_prefix(module, command_forbidden) for module in command_imports)
+
+    transport_forbidden = {"FreeCAD", "FreeCADGui", "Part", "Sketcher", "freecad_mcp.freecad"}
+    transport_imports = _imported_modules("mcp/sketch_analysis_tools.py")
+    assert not any(_matches_prefix(module, transport_forbidden) for module in transport_imports)
+
+    pure_imports = _imported_modules("freecad/sketch_topology.py")
+    native_modules = {"FreeCAD", "FreeCADGui", "Part", "Sketcher", "PySide"}
+    assert not any(_matches_prefix(module, native_modules) for module in pure_imports)
+
+    forbidden_calls = {
+        "recompute",
+        "openTransaction",
+        "commitTransaction",
+        "abortTransaction",
+        "save",
+        "saveAs",
+        "addGeometry",
+        "addConstraint",
+        "delGeometry",
+        "toggleConstruction",
+        "runCommand",
+        "doCommand",
+        "doCommandGui",
+    }
+    for relative_path in ("freecad/sketch_analysis.py", "freecad/sketch_topology.py"):
+        tree = _tree(relative_path)
+        assert not any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in forbidden_calls
+            for node in ast.walk(tree)
+        )
+
+
+def test_all_three_analysis_tools_use_one_shared_topology_engine() -> None:
+    adapter_tree = _tree("freecad/sketch_analysis.py")
+    topology_calls = {
+        node.func.attr
+        for node in ast.walk(adapter_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "sketch_topology"
+    }
+    assert topology_calls == {
+        "analyze_sketch",
+        "validate_sketch_profile",
+        "list_sketch_open_vertices",
+    }
+
+    transport_tree = _tree("mcp/sketch_analysis_tools.py")
+    assert not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id
+        in {"analyze_sketch", "validate_sketch_profile", "list_sketch_open_vertices"}
+        for node in ast.walk(transport_tree)
+    )

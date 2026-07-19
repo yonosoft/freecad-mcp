@@ -14,6 +14,8 @@ from freecad_mcp.models import (
     ObjectDetail,
     ObjectSummary,
     OriginPlane,
+    SketchAnalysisRequestInput,
+    SketchAnalysisResult,
     SketchCenteredRectangleCreationResult,
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
@@ -22,7 +24,10 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchOpenVerticesResult,
     SketchPolygonCreationResult,
+    SketchProfileAnalysisRequestInput,
+    SketchProfileValidationResult,
     SketchRectangleCreationResult,
     SketchRectangleRequestInput,
     SketchRoundedRectangleCreationResult,
@@ -157,6 +162,25 @@ class SketchCurvedProfileAdapter(Protocol):
         """Create and verify one rounded rectangle atomically."""
 
 
+class SketchAnalysisAdapter(Protocol):
+    """Read-only sketch analysis operations backed by one topology engine."""
+
+    def analyze_sketch(self, request: SketchAnalysisRequestInput) -> SketchAnalysisResult:
+        """Return broad sketch topology and cached solver diagnostics."""
+
+    def validate_sketch_profile(
+        self,
+        request: SketchProfileAnalysisRequestInput,
+    ) -> SketchProfileValidationResult:
+        """Validate all or selected geometry as closed profile regions."""
+
+    def list_sketch_open_vertices(
+        self,
+        request: SketchProfileAnalysisRequestInput,
+    ) -> SketchOpenVerticesResult:
+        """Return only degree-one topology vertices."""
+
+
 class TaskExecutor(Protocol):
     """Supplies thread detection and queued task submission."""
 
@@ -185,6 +209,7 @@ __all__ = [
     "DocumentAdapter",
     "RunnerFactory",
     "ServerRunner",
+    "SketchAnalysisAdapter",
     "SketchCurvedProfileAdapter",
     "SketchPolygonAdapter",
     "TaskExecutor",

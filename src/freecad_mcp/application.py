@@ -127,6 +127,55 @@ class Application:
             sketch_name=sketch_name,
         )
 
+    def analyze_sketch(
+        self,
+        document_name: object,
+        sketch_name: object,
+        include_construction: object = False,
+        include_external: object = False,
+    ) -> CommandResult:
+        """Return broad read-only sketch topology and solver diagnostics."""
+        return self.documents.analyze_sketch.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            include_construction=include_construction,
+            include_external=include_external,
+        )
+
+    def validate_sketch_profile(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object = None,
+        include_construction: object = False,
+        include_external: object = False,
+    ) -> CommandResult:
+        """Validate all or selected sketch geometry as closed profiles."""
+        return self.documents.validate_sketch_profile.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+            include_construction=include_construction,
+            include_external=include_external,
+        )
+
+    def list_sketch_open_vertices(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object = None,
+        include_construction: object = False,
+        include_external: object = False,
+    ) -> CommandResult:
+        """Return unmatched degree-one endpoints for all or selected geometry."""
+        return self.documents.list_sketch_open_vertices.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+            include_construction=include_construction,
+            include_external=include_external,
+        )
+
     def add_sketch_geometry(
         self,
         document_name: object,

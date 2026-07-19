@@ -28,10 +28,10 @@ def _server() -> Any:
 def test_curved_profiles_are_exactly_tools_twenty_and_twenty_one() -> None:
     actual = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert len(actual) == 21
+    assert len(actual) == 24
     assert tuple(actual) == REGISTERED_TOOL_NAMES
     assert actual[:19] == list(REGISTERED_TOOL_NAMES[:19])
-    assert actual[19:] == ["create_sketch_slot", "create_sketch_rounded_rectangle"]
+    assert actual[19:21] == ["create_sketch_slot", "create_sketch_rounded_rectangle"]
 
 
 def test_slot_tool_has_strict_exact_schema_and_zero_angle_default() -> None:

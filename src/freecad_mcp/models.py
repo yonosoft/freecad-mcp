@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated, Literal, TypeAlias
@@ -338,6 +339,36 @@ SketchGeometryBatch = Annotated[
     list[SketchGeometryInput],
     Field(min_length=1, max_length=MAX_SKETCH_GEOMETRY_BATCH_SIZE),
 ]
+
+
+SketchAnalysisGeometryIndex = Annotated[int, Field(strict=True, ge=0)]
+
+
+class SketchAnalysisRequestInput(_SketchGeometryInputModel):
+    """Strict request for a broad read-only sketch analysis."""
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    include_construction: bool = Field(default=False, strict=True)
+    include_external: bool = Field(default=False, strict=True)
+
+
+class SketchProfileAnalysisRequestInput(_SketchGeometryInputModel):
+    """Strict shared request for profile validation and open-vertex listing.
+
+    ``geometry_indices`` contains internal sketch geometry only.  The public
+    contract rejects an empty or duplicate selection before this model is
+    constructed; the tuple keeps the adapter boundary immutable.
+    """
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    geometry_indices: tuple[SketchAnalysisGeometryIndex, ...] | None = Field(
+        default=None,
+        min_length=1,
+    )
+    include_construction: bool = Field(default=False, strict=True)
+    include_external: bool = Field(default=False, strict=True)
 
 
 RectangleDimension = Annotated[
@@ -1582,6 +1613,57 @@ class SketchInspectionResult:
 
 
 @dataclass(frozen=True, slots=True)
+class SketchAnalysisResult:
+    """Controlled broad-analysis payload returned across the adapter boundary."""
+
+    analysis: Mapping[str, object]
+    sketch: Mapping[str, object]
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "analysis": dict(self.analysis),
+            "sketch": dict(self.sketch),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchProfileValidationResult:
+    """Controlled profile-validation payload returned by the shared engine."""
+
+    validation: Mapping[str, object]
+    sketch: Mapping[str, object]
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "validation": dict(self.validation),
+            "sketch": dict(self.sketch),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchOpenVerticesResult:
+    """Controlled projection containing only degree-one topology vertices."""
+
+    open_vertices: tuple[Mapping[str, object], ...]
+    findings: tuple[Mapping[str, object], ...]
+    sketch: Mapping[str, object]
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "open_vertex_count": len(self.open_vertices),
+            "open_vertices": [dict(item) for item in self.open_vertices],
+            "findings": [dict(item) for item in self.findings],
+            "sketch": dict(self.sketch),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SketchRectangleCreationResult:
     """Verified semantic rectangle with current sketch and document readback."""
 
@@ -1713,6 +1795,9 @@ __all__ = [
     "RadiusConstraintInput",
     "RectangleDimension",
     "RoundedRectanglePlacementInput",
+    "SketchAnalysisGeometryIndex",
+    "SketchAnalysisRequestInput",
+    "SketchAnalysisResult",
     "SketchArcGeometry",
     "SketchAttachmentData",
     "SketchAxisReferenceInput",
@@ -1741,6 +1826,7 @@ __all__ = [
     "SketchHorizontalAxisReferenceInput",
     "SketchInspectionResult",
     "SketchLineGeometry",
+    "SketchOpenVerticesResult",
     "SketchOriginReferenceInput",
     "SketchPoint2D",
     "SketchPoint2DInput",
@@ -1753,9 +1839,11 @@ __all__ = [
     "SketchPolygonProfile",
     "SketchPolygonVertex",
     "SketchPolygonVertexReference",
+    "SketchProfileAnalysisRequestInput",
     "SketchProfileBounds",
     "SketchProfileCenter",
     "SketchProfilePointReference",
+    "SketchProfileValidationResult",
     "SketchRectangleCornerReference",
     "SketchRectangleCreationResult",
     "SketchRectangleProfile",

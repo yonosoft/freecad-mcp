@@ -223,6 +223,12 @@ Add tests beside the responsibility they exercise:
   `test_mcp_sketch_centered_rectangle_tools.py`; server composition,
   inventory agreement, lifecycle reporting, and HTTP transport belong in
   `test_mcp_server.py`;
+- deterministic clustering, topology, profile traversal, analytic area,
+  containment, intersections, and finding projections belong in
+  `test_sketch_topology.py`; strict analysis validation and handler delegation
+  belong in `test_sketch_analysis_commands.py`; exact tools 22--24 schemas,
+  descriptions, registration order, and serialization belong in
+  `test_mcp_sketch_analysis_tools.py`;
 - compatibility identity belongs in `test_module_compatibility.py`, and stable
   dependency-direction safeguards belong in `test_architecture.py`.
 
@@ -1561,3 +1567,61 @@ The separate live MCP acceptance script is prepared in
 not executed during implementation. Preserve raw schemas, results, solver and
 history snapshots, Report View output, saved-file metadata, exact repository
 status, and confirmation that the campaign did not edit, commit, or push.
+
+## Milestone 17 Sketch-Analysis Verification
+
+Tools 22--24 share a pure topology engine and a read-only FreeCAD adapter. Run
+the standalone suite first, then the native campaign whenever controlled sketch
+inspection, endpoint extraction, external geometry translation, topology,
+profile validation, or runtime composition changes:
+
+```powershell
+.\scripts\test.ps1 -PythonExe "C:\Program Files\FreeCAD 1.1\bin\python.exe"
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\smoke_sketch_analysis.py
+```
+
+The native campaign contains 63 named scenarios. It covers empty, open, closed,
+branched, intersecting, duplicate, negligible, near-gap, selected-subset,
+construction, external, line/arc, circle, disjoint, and nested fixtures. It
+also exercises the known rectangle, centred rectangle, triangle, hexagon, slot,
+and rounded-rectangle families, plus Body ownership, XY attachment, non-active
+named documents, cross-document isolation, saved bytes, unsaved state, history,
+undo/redo counts, cached solver diagnostics, inventory, and absence of raw
+native values.
+
+Every analysis operation must preserve the complete controlled geometry and
+constraint snapshot, construction flags, solver state and freshness, Body and
+attachment data, placement, active document, selection, edit mode, history,
+undo/redo stacks, file path, modified state, and saved-file bytes and timestamp.
+It must not recompute, solve, transact, save, select, activate, or mutate. A
+failure is audited directly; do not invoke undo after a failed read-only call.
+
+The fixed endpoint clustering tolerance is `1e-7` mm. A gap at or below that
+tolerance clusters; a clearly larger gap remains open. The pure suite separately
+protects line-line, line-arc, and arc-arc shared endpoints, crossings, tangent
+touches and overlaps, deterministic cluster ordering, analytic area and
+orientation, containment, full circles, unsupported geometry, and construction
+or external inclusion policy. Findings prefixed `suspected_` are heuristic and
+must not be presented as exact geometric proof.
+
+Because the adapter reuses controlled `get_sketch` extraction, run the native
+reference smoke after inspection refactors. Run the prior curved-profile smoke
+when the shared geometry extraction path changes; it includes sharp rectangle,
+centred rectangle, polygon, history, tangent, symmetry, and point-relationship
+regressions:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\smoke_sketch_native_references.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\smoke_sketch_curved_profiles.py
+```
+
+The separate live MCP campaign is prepared in
+`docs/codex-milestone-17-acceptance.md`. It is an operator-only endpoint test,
+not an implementation task: do not edit the repository, and retain raw
+24-tool discovery, unchanged first-21 schemas, the unchanged 17-variant
+constraint union, all three strict new schemas, structured results, deterministic
+topology evidence, preservation snapshots, Report View output, saved metadata,
+and exact repository status.

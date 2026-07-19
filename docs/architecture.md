@@ -208,6 +208,8 @@ explicitly register the two semantic rectangle profiles.
 and regular polygon profiles.
 `mcp.sketch_curved_profile_tools` explicitly appends the semantic slot and
 rounded-rectangle profiles.
+`mcp.sketch_analysis_tools` explicitly appends read-only sketch analysis,
+profile validation, and open-vertex location.
 `mcp.server` is the small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
@@ -218,8 +220,10 @@ undo, and redo are exactly tools thirteen through fifteen;
 `create_sketch_centered_rectangle` is exactly tool seventeen;
 `create_sketch_equilateral_triangle` and `create_sketch_regular_polygon` are
 exactly tools eighteen and nineteen; `create_sketch_slot` and
-`create_sketch_rounded_rectangle` are exactly tools twenty and twenty-one. No
-registration loop is used.
+`create_sketch_rounded_rectangle` are exactly tools twenty and twenty-one;
+`analyze_sketch`, `validate_sketch_profile`, and
+`list_sketch_open_vertices` are exactly tools twenty-two through twenty-four.
+No registration loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
 
@@ -234,7 +238,8 @@ The registry currently exposes `create_document`, `list_documents`,
 `undo_document`, `redo_document`, `create_sketch_rectangle`, and
 `create_sketch_centered_rectangle`, `create_sketch_equilateral_triangle`, and
 `create_sketch_regular_polygon`, `create_sketch_slot`, and
-`create_sketch_rounded_rectangle`, in that order.
+`create_sketch_rounded_rectangle`, `analyze_sketch`,
+`validate_sketch_profile`, and `list_sketch_open_vertices`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -1541,6 +1546,53 @@ Live acceptance confirmed that inspection preserves the active document,
 modified state, file name, transaction state, undo and redo counts, sketch
 state, geometry and constraint counts, visibility, selection, edit mode, map
 mode, attachment, placement, and attachment offset.
+
+## Shared Sketch Analysis Engine
+
+The three analysis tools are separate public operations over one implementation
+path:
+
+```text
+MCP sketch-analysis registration
+-> typed analysis command handler
+-> SketchAnalysisAdapter protocol
+-> FreeCADDocumentAdapter facade
+-> focused read-only sketch-analysis adapter
+-> existing controlled sketch inspector
+-> pure sketch-topology engine
+-> controlled result models
+```
+
+The FreeCAD-facing adapter resolves the exact named document and sketch,
+reuses `sketch_inspection.py` for controlled geometry, constraint, solver, and
+attachment data, optionally translates `ExternalGeo`, and then passes ordinary
+Python mappings to `sketch_topology.py`. Native objects, native geometry
+indices, arbitrary properties, and exception text do not cross that boundary.
+External geometry receives result-local negative indices because FreeCAD's
+native index convention includes hidden axis slots and is not a stable public
+contract.
+
+`sketch_topology.py` has no FreeCAD, Qt, MCP, handler, or runtime imports. It
+owns the fixed endpoint tolerance, deterministic clustering, graph components,
+open and branch vertices, endpoint-on-edge T junctions, duplicates, negligible
+geometry, overlaps, line/arc/circle intersections, closed-loop traversal,
+Green-theorem area, orientation, containment, and final classification. The
+broad analysis, profile validation, and open-vertex projection functions all
+consume the same computed analysis; public tools do not call one another.
+
+Construction and external geometry are visible as controlled counts but do not
+participate unless explicitly requested. An optional non-empty, unique list of
+non-negative internal geometry indices narrows the profile and opening tools;
+it never selects native external references. Points remain informational,
+unsupported curves yield controlled findings, and full circles are intrinsic
+closed profiles.
+
+The complete path is read-only. It does not open or commit a transaction,
+recompute or solve, add or change geometry or constraints, save, move history,
+enter edit mode, change selection, or activate a document. Cached solver facts
+therefore retain the freshness reported by `get_sketch`. All expected input,
+lookup, malformed-data, topology, adapter, and dispatch failures are mapped to
+stable command codes without leaking native exception details.
 
 ## Test Ownership
 

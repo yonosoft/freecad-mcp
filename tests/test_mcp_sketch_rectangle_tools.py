@@ -48,6 +48,9 @@ def test_rectangle_is_exactly_tool_sixteen_and_preserves_first_fifteen() -> None
         "create_sketch_regular_polygon",
         "create_sketch_slot",
         "create_sketch_rounded_rectangle",
+        "analyze_sketch",
+        "validate_sketch_profile",
+        "list_sketch_open_vertices",
     ]
     assert tuple(actual) == REGISTERED_TOOL_NAMES
 

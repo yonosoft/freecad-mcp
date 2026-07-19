@@ -129,6 +129,9 @@ create_sketch_equilateral_triangle
 create_sketch_regular_polygon
 create_sketch_slot
 create_sketch_rounded_rectangle
+analyze_sketch
+validate_sketch_profile
+list_sketch_open_vertices
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -945,6 +948,97 @@ modified after both undo and redo; history movement does not infer that the
 current in-memory state equals a prior saved state. Undo and redo also do not
 recompute. Sketch solver data therefore reports stale after either operation
 until an explicit `recompute_document`, followed by fresh inspection.
+
+### Read-only sketch analysis and profile validation
+
+Tools 22–24 are `analyze_sketch`, `validate_sketch_profile`, and
+`list_sketch_open_vertices`. They use one pure topology engine over the existing
+controlled sketch inspection. None calls another MCP tool. All three target the
+exact named document even when it is not active, and none recomputes, opens a
+transaction, changes geometry or constraints, enters edit mode, changes
+selection, saves, or creates history.
+
+`analyze_sketch` accepts exactly:
+
+```json
+{
+  "document_name": "Model",
+  "sketch_name": "BaseSketch",
+  "include_construction": false,
+  "include_external": false
+}
+```
+
+The names are required. Both flags are optional strict booleans defaulting to
+`false`; additional fields, caller tolerances, native references, repair flags,
+and mutation flags are forbidden. Success code `sketch_analyzed` returns a
+compact sketch/document summary plus geometry, constraint, cached solver,
+component, probable-profile, open/branch, and structured finding counts. It
+does not duplicate the detailed arrays from `get_sketch`.
+
+`validate_sketch_profile` and `list_sketch_open_vertices` accept exactly:
+
+```json
+{
+  "document_name": "Model",
+  "sketch_name": "BaseSketch",
+  "geometry_indices": null,
+  "include_construction": false,
+  "include_external": false
+}
+```
+
+Omitted or `null` `geometry_indices` analyzes all participating geometry. A
+supplied selection must be a non-empty array of unique non-negative strict
+integers and selects internal geometry only; booleans are rejected as integers,
+missing indices return `invalid_geometry_selection`, and an empty array is
+rejected as accidental. Explicit `include_external` adds all controlled
+external geometry. Result-local external indices are `-1`, `-2`, and so on,
+not FreeCAD's native axis-offset values.
+
+Normal internal lines, bounded circular arcs, and circles participate.
+Construction and external geometry are counted but excluded by default. Points
+are informational and never profile edges or open vertices. Unsupported curves
+produce `unsupported_geometry`. A full normal circle is one intrinsically
+closed profile with zero openings and exact positive area. Virtual-space
+constraint state is inspected but is not profile geometry.
+
+Endpoint clustering uses a fixed `1e-7` mm tolerance. Clusters are numbered by
+representative X, then Y, then first geometry index and `start`/`end` position.
+Numbers are result-local, not persistent sketch identifiers. Graph vertices are
+clustered endpoints and edges are participating geometries: degree one is open,
+degree two is an ordinary chain/loop vertex, and degree greater than two is a
+branch. Endpoint-on-edge T junctions include the traversed curve's two
+half-edges and are correctly branched.
+
+Profile classifications are `empty`, `single_closed_profile`,
+`multiple_disjoint_profiles`, `nested_profiles`, `open_profile`,
+`branched_profile`, `self_intersecting_profile`, `ambiguous_profile`, and
+`unsupported_geometry`. Simple line and line/bounded-arc loops use exact Green
+theorem contributions for deterministic signed area and orientation. Full
+circles use πr². Common polygon, rounded-profile, and circle nesting is
+reported; opposite loop orientation is not required for holes.
+
+Definitive checks cover zero/negligible geometry, same- and reverse-direction
+duplicates, overlaps, line-line, line-arc, and arc-arc crossings, intended
+endpoint joins, endpoint-on-edge branches, and off-endpoint tangencies.
+`suspected_overlap`, `suspected_near_duplicate`, and
+`suspected_near_open_gap` remain heuristic warnings. Ambiguous or intersecting
+sets are never promoted to valid simple profiles.
+
+`validate_sketch_profile` succeeds with `sketch_profile_validated` and returns
+validity, classification, counts, profile geometry, orientation, signed area,
+containment, openings, findings, and tolerance. `list_sketch_open_vertices`
+succeeds with `sketch_open_vertices_listed` and returns only degree-one
+vertices, each with result-local number, coordinates, component, degree, and
+controlled member references. Branch vertices are findings, not open vertices.
+
+Use `analyze_sketch` for broad health, `validate_sketch_profile` for “is this
+usable closed profile geometry?”, `list_sketch_open_vertices` for “where is the
+gap?”, and `get_sketch` for detailed geometry and constraints. Existing mutation
+tools—not analysis tools—create or change geometry. Known limits are no repair,
+healing, tolerance override, persistent IDs, B-spline profile support, face or
+Pad validation, GUI highlighting, or automatic save.
 
 ## Documentation
 

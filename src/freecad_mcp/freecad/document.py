@@ -7,6 +7,7 @@ from freecad_mcp.freecad import (
     document_history,
     document_operations,
     object_inspection,
+    sketch_analysis,
     sketch_centered_rectangle_creation,
     sketch_constraint_creation,
     sketch_creation,
@@ -57,6 +58,8 @@ from freecad_mcp.models import (
     ObjectDetail,
     ObjectSummary,
     OriginPlane,
+    SketchAnalysisRequestInput,
+    SketchAnalysisResult,
     SketchCenteredRectangleCreationResult,
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
@@ -65,7 +68,10 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchOpenVerticesResult,
     SketchPolygonCreationResult,
+    SketchProfileAnalysisRequestInput,
+    SketchProfileValidationResult,
     SketchRectangleCreationResult,
     SketchRectangleRequestInput,
     SketchRoundedRectangleCreationResult,
@@ -149,6 +155,24 @@ class FreeCADDocumentAdapter:
     def get_sketch(self, document_name: str, sketch_name: str) -> SketchInspectionResult:
         """Return a controlled read-only snapshot of one sketch."""
         return sketch_inspection.get_sketch(document_name, sketch_name)
+
+    def analyze_sketch(self, request: SketchAnalysisRequestInput) -> SketchAnalysisResult:
+        """Return a broad read-only topology and solver summary."""
+        return sketch_analysis.analyze_sketch(request)
+
+    def validate_sketch_profile(
+        self,
+        request: SketchProfileAnalysisRequestInput,
+    ) -> SketchProfileValidationResult:
+        """Validate all or selected sketch geometry as profile regions."""
+        return sketch_analysis.validate_sketch_profile(request)
+
+    def list_sketch_open_vertices(
+        self,
+        request: SketchProfileAnalysisRequestInput,
+    ) -> SketchOpenVerticesResult:
+        """Return only degree-one endpoints from shared topology analysis."""
+        return sketch_analysis.list_sketch_open_vertices(request)
 
     def add_sketch_geometry(
         self,

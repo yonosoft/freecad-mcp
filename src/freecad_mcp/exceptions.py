@@ -457,6 +457,23 @@ class SketchInspectionError(RuntimeError):
         super().__init__(reason)
 
 
+class InvalidGeometrySelectionError(RuntimeError):
+    """Raised when requested internal sketch geometry indices do not exist."""
+
+    def __init__(self, *, missing_indices: tuple[int, ...]) -> None:
+        self.missing_indices = missing_indices
+        super().__init__("selected_geometry_index_not_found")
+
+
+class SketchAnalysisError(RuntimeError):
+    """Raised when one read-only sketch-analysis phase cannot complete."""
+
+    def __init__(self, *, phase: str, reason: str) -> None:
+        self.phase = phase
+        self.reason = reason
+        super().__init__(reason)
+
+
 class BodyNotFoundError(RuntimeError):
     """Raised when a requested PartDesign::Body is not found in a document."""
 
@@ -510,11 +527,13 @@ __all__ = [
     "FileSystemCheckError",
     "FreeCADDocumentError",
     "InvalidFilePathError",
+    "InvalidGeometrySelectionError",
     "ObjectAlreadyExistsError",
     "ObjectNotFoundError",
     "OriginPlaneNotFoundError",
     "ParentDirectoryNotFoundError",
     "RedoNotAvailableError",
+    "SketchAnalysisError",
     "SketchCenteredRectangleCreationError",
     "SketchCenteredRectangleRollbackError",
     "SketchCenteredRectangleVerificationError",

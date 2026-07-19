@@ -242,7 +242,7 @@ def test_add_sketch_constraints_remains_exactly_tool_twelve() -> None:
         "add_sketch_geometry",
         "add_sketch_constraints",
     ]
-    assert actual[12:] == [
+    assert actual[12:21] == [
         "get_document_history",
         "undo_document",
         "redo_document",
@@ -252,6 +252,11 @@ def test_add_sketch_constraints_remains_exactly_tool_twelve() -> None:
         "create_sketch_regular_polygon",
         "create_sketch_slot",
         "create_sketch_rounded_rectangle",
+    ]
+    assert actual[21:] == [
+        "analyze_sketch",
+        "validate_sketch_profile",
+        "list_sketch_open_vertices",
     ]
     assert actual == list(REGISTERED_TOOL_NAMES)
     assert actual[:11] == list(REGISTERED_TOOL_NAMES[:11])

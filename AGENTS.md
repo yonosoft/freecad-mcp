@@ -91,6 +91,21 @@ local MCP server inside FreeCAD.
   handlers, verification, errors, and history labels. Never route one through
   the other, primitive MCP tools, rectangle MCP tools, or GUI commands.
 - Provide inspection, validation, and recovery tools alongside mutating tools.
+- Use `analyze_sketch` for a broad read-only topology and solver summary,
+  `validate_sketch_profile` to decide whether all or selected geometry forms
+  usable closed profiles, `list_sketch_open_vertices` to locate openings, and
+  `get_sketch` for detailed controlled geometry and constraints. Choose the one
+  primary inspection tool that answers the question; zero solver conflicts
+  alone do not prove a valid profile.
+- The three analysis tools share the pure sketch-topology engine. Construction
+  and external geometry are excluded from profile topology unless explicitly
+  requested. Preserve the fixed controlled tolerance, result-local vertex and
+  profile identifiers, structured findings, and controlled external indices;
+  never expose them as persistent or native identity.
+- Sketch analysis is strictly read-only: do not recompute or solve, open a
+  transaction, move history, save, activate a document, enter edit mode,
+  change selection, repair geometry, or route one analysis MCP tool through
+  another. Use existing mutation tools for creation or repair.
 - After a successful modelling mutation, recompute and inspect the result. If
   it is technically valid but expresses the wrong design intent, inspect the
   named document's history and undo the known top transaction before retrying

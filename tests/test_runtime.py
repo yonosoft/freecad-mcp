@@ -10,6 +10,7 @@ from freecad_mcp.application import Application
 from freecad_mcp.commands import (
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
+    AnalyzeSketchHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
@@ -25,10 +26,12 @@ from freecad_mcp.commands import (
     GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
+    ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
     SaveDocumentHandler,
     UndoDocumentHandler,
+    ValidateSketchProfileHandler,
 )
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.runtime import Runtime, _build_runtime
@@ -91,6 +94,9 @@ def test_build_runtime_wires_create_sketch_handler(
         "create_body": CreateBodyHandler,
         "create_sketch": CreateSketchHandler,
         "get_sketch": GetSketchHandler,
+        "analyze_sketch": AnalyzeSketchHandler,
+        "validate_sketch_profile": ValidateSketchProfileHandler,
+        "list_sketch_open_vertices": ListSketchOpenVerticesHandler,
         "add_sketch_geometry": AddSketchGeometryHandler,
         "add_sketch_constraints": AddSketchConstraintsHandler,
         "create_sketch_rectangle": CreateSketchRectangleHandler,

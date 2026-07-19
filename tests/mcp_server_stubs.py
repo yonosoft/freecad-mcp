@@ -9,6 +9,7 @@ from typing import Any, TypeVar, cast
 from freecad_mcp.commands import (
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
+    AnalyzeSketchHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
@@ -24,12 +25,15 @@ from freecad_mcp.commands import (
     GetSketchHandler,
     ListDocumentsHandler,
     ListObjectsHandler,
+    ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
     SaveDocumentHandler,
     UndoDocumentHandler,
+    ValidateSketchProfileHandler,
 )
 from freecad_mcp.commands.sketch import CreateSketchHandler
+from freecad_mcp.freecad import sketch_topology
 from freecad_mcp.models import (
     AttachmentInfo,
     DocumentCollection,
@@ -43,6 +47,8 @@ from freecad_mcp.models import (
     PlacementData,
     PlacementPosition,
     PlacementRotation,
+    SketchAnalysisRequestInput,
+    SketchAnalysisResult,
     SketchCenteredRectangleCreationResult,
     SketchCenteredRectangleProfile,
     SketchCenteredRectangleRequestInput,
@@ -52,14 +58,17 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchOpenVerticesResult,
     SketchPolygonCircumcircleReference,
     SketchPolygonCreationResult,
     SketchPolygonEdge,
     SketchPolygonProfile,
     SketchPolygonVertex,
     SketchPolygonVertexReference,
+    SketchProfileAnalysisRequestInput,
     SketchProfileCenter,
     SketchProfilePointReference,
+    SketchProfileValidationResult,
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
@@ -97,6 +106,9 @@ class AdapterStub:
         self.create_body_calls: list[tuple[str, str, str | None]] = []
         self.create_sketch_calls: list[tuple[str, str, str, str | None, OriginPlane | None]] = []
         self.get_sketch_calls: list[tuple[str, str]] = []
+        self.analyze_sketch_calls: list[SketchAnalysisRequestInput] = []
+        self.validate_sketch_profile_calls: list[SketchProfileAnalysisRequestInput] = []
+        self.list_sketch_open_vertices_calls: list[SketchProfileAnalysisRequestInput] = []
         self.add_sketch_geometry_calls: list[tuple[str, str, tuple[SketchGeometryInput, ...]]] = []
         self.add_sketch_constraints_calls: list[
             tuple[str, str, tuple[SketchConstraintInput, ...]]
@@ -280,6 +292,34 @@ class AdapterStub:
                 partially_redundant_constraint_indices=None,
                 malformed_constraint_indices=None,
             ),
+        )
+
+    def analyze_sketch(self, request: SketchAnalysisRequestInput) -> SketchAnalysisResult:
+        self.analyze_sketch_calls.append(request)
+        return sketch_topology.analyze_sketch(
+            self.get_sketch(request.document_name, request.sketch_name),
+            self.document,
+            request,
+        )
+
+    def validate_sketch_profile(
+        self, request: SketchProfileAnalysisRequestInput
+    ) -> SketchProfileValidationResult:
+        self.validate_sketch_profile_calls.append(request)
+        return sketch_topology.validate_sketch_profile(
+            self.get_sketch(request.document_name, request.sketch_name),
+            self.document,
+            request,
+        )
+
+    def list_sketch_open_vertices(
+        self, request: SketchProfileAnalysisRequestInput
+    ) -> SketchOpenVerticesResult:
+        self.list_sketch_open_vertices_calls.append(request)
+        return sketch_topology.list_sketch_open_vertices(
+            self.get_sketch(request.document_name, request.sketch_name),
+            self.document,
+            request,
         )
 
     def add_sketch_geometry(
@@ -477,6 +517,12 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             create_body=CreateBodyHandler(actual_adapter, dispatcher),
             create_sketch=CreateSketchHandler(actual_adapter, dispatcher),
             get_sketch=GetSketchHandler(actual_adapter, dispatcher),
+            analyze_sketch=AnalyzeSketchHandler(actual_adapter, dispatcher),
+            validate_sketch_profile=ValidateSketchProfileHandler(actual_adapter, dispatcher),
+            list_sketch_open_vertices=ListSketchOpenVerticesHandler(
+                actual_adapter,
+                dispatcher,
+            ),
             add_sketch_geometry=AddSketchGeometryHandler(actual_adapter, dispatcher),
             add_sketch_constraints=AddSketchConstraintsHandler(actual_adapter, dispatcher),
             create_sketch_rectangle=CreateSketchRectangleHandler(actual_adapter, dispatcher),

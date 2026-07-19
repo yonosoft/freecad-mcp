@@ -173,58 +173,7 @@ def _inspect_geometry(sketch: Any, part: Any) -> tuple[SketchGeometry, ...]:
             ) from exc
 
         try:
-            if _part_instance(item, part, "LineSegment"):
-                result.append(
-                    SketchLineGeometry(
-                        index=index,
-                        construction=construction,
-                        start=_point_from_vector(item.StartPoint, index),
-                        end=_point_from_vector(item.EndPoint, index),
-                    )
-                )
-            elif _part_instance(item, part, "Circle"):
-                result.append(
-                    SketchCircleGeometry(
-                        index=index,
-                        construction=construction,
-                        center=_point_from_vector(item.Center, index),
-                        radius=_radius(item.Radius, index),
-                    )
-                )
-            elif _part_instance(item, part, "ArcOfCircle"):
-                result.append(
-                    SketchArcGeometry(
-                        index=index,
-                        construction=construction,
-                        center=_point_from_vector(item.Center, index),
-                        radius=_radius(item.Radius, index),
-                        start=_point_from_vector(item.StartPoint, index),
-                        end=_point_from_vector(item.EndPoint, index),
-                        start_angle_degrees=math.degrees(
-                            _geometry_number(item.FirstParameter, index)
-                        ),
-                        end_angle_degrees=math.degrees(_geometry_number(item.LastParameter, index)),
-                    )
-                )
-            elif _part_instance(item, part, "Point"):
-                result.append(
-                    SketchPointGeometry(
-                        index=index,
-                        construction=construction,
-                        point=SketchPoint2D(
-                            x=_geometry_number(item.X, index),
-                            y=_geometry_number(item.Y, index),
-                        ),
-                    )
-                )
-            else:
-                result.append(
-                    UnsupportedSketchGeometry(
-                        index=index,
-                        construction=construction,
-                        freecad_type=_controlled_type_name(type(item).__name__),
-                    )
-                )
+            result.append(_inspect_geometry_item(item, index, construction, part))
         except SketchGeometryMalformedError:
             raise
         except Exception as exc:
@@ -232,6 +181,54 @@ def _inspect_geometry(sketch: Any, part: Any) -> tuple[SketchGeometry, ...]:
                 index=index, reason="geometry_attributes_unreadable"
             ) from exc
     return tuple(result)
+
+
+def _inspect_geometry_item(
+    item: Any,
+    index: int,
+    construction: bool,
+    part: Any,
+) -> SketchGeometry:
+    """Convert one native geometry item into the existing controlled union."""
+    if _part_instance(item, part, "LineSegment"):
+        return SketchLineGeometry(
+            index=index,
+            construction=construction,
+            start=_point_from_vector(item.StartPoint, index),
+            end=_point_from_vector(item.EndPoint, index),
+        )
+    if _part_instance(item, part, "Circle"):
+        return SketchCircleGeometry(
+            index=index,
+            construction=construction,
+            center=_point_from_vector(item.Center, index),
+            radius=_radius(item.Radius, index),
+        )
+    if _part_instance(item, part, "ArcOfCircle"):
+        return SketchArcGeometry(
+            index=index,
+            construction=construction,
+            center=_point_from_vector(item.Center, index),
+            radius=_radius(item.Radius, index),
+            start=_point_from_vector(item.StartPoint, index),
+            end=_point_from_vector(item.EndPoint, index),
+            start_angle_degrees=math.degrees(_geometry_number(item.FirstParameter, index)),
+            end_angle_degrees=math.degrees(_geometry_number(item.LastParameter, index)),
+        )
+    if _part_instance(item, part, "Point"):
+        return SketchPointGeometry(
+            index=index,
+            construction=construction,
+            point=SketchPoint2D(
+                x=_geometry_number(item.X, index),
+                y=_geometry_number(item.Y, index),
+            ),
+        )
+    return UnsupportedSketchGeometry(
+        index=index,
+        construction=construction,
+        freecad_type=_controlled_type_name(type(item).__name__),
+    )
 
 
 def _inspect_constraints(

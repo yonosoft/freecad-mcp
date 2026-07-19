@@ -14,6 +14,7 @@ from freecad_mcp.mcp.document_tools import (
     register_recompute_document_tool,
 )
 from freecad_mcp.mcp.object_tools import register_get_sketch_tool, register_object_tools
+from freecad_mcp.mcp.sketch_analysis_tools import register_sketch_analysis_tools
 from freecad_mcp.mcp.sketch_centered_rectangle_tools import (
     register_create_sketch_centered_rectangle_tool,
 )
@@ -52,6 +53,11 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             "with lower-left or direct-centre placement. Use the sharp rectangle tools when the "
             "requested corner radius is zero, and do not approximate either curved profile with "
             "regular polygons or repeated primitive calls."
+            " Use analyze_sketch for a broad read-only topology and solver summary. Use "
+            "validate_sketch_profile when deciding whether all or selected geometry forms "
+            "usable closed profiles. Use list_sketch_open_vertices when locating profile gaps, "
+            "and get_sketch for detailed controlled geometry and constraints. Analysis tools "
+            "never repair geometry and exclude construction and external geometry by default."
         ),
         host=config.host,
         port=config.port,
@@ -73,5 +79,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_create_sketch_centered_rectangle_tool(server, handlers)
     register_sketch_polygon_tools(server, handlers)
     register_sketch_curved_profile_tools(server, handlers)
+    register_sketch_analysis_tools(server, handlers)
 
     return server
