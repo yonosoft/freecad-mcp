@@ -200,6 +200,11 @@ Add tests beside the responsibility they exercise:
   `test_document_history.py`; native stack transitions, preconditions,
   verification, file state, and isolation belong in
   `test_freecad_document_history.py`;
+- semantic rectangle models, validation, serialization, handler behavior, and
+  focused error mapping belong in `test_create_sketch_rectangle.py`; native
+  construction order, all placement branches, caller-owned transactions,
+  verification injection, and exact rollback belong in
+  `test_freecad_sketch_rectangle_creation.py`;
 - MCP schemas, descriptions, and delegation belong in
   `test_mcp_document_tools.py`, `test_mcp_object_tools.py`, or
   `test_mcp_creation_tools.py`; the exact geometry union and tool-eleven
@@ -207,7 +212,9 @@ Add tests beside the responsibility they exercise:
   nested constraint union and tool-twelve contract belong in
   `test_mcp_sketch_constraint_tools.py`; strict tool 13–15 schemas,
   descriptions, recovery guidance, and MCP errors belong in
-  `test_mcp_document_history_tools.py`; server composition,
+  `test_mcp_document_history_tools.py`; tool-sixteen discovery, strict schema,
+  structured result, and selection/recovery guidance belong in
+  `test_mcp_sketch_rectangle_tools.py`; server composition,
   inventory agreement, lifecycle reporting, and HTTP transport belong in
   `test_mcp_server.py`;
 - compatibility identity belongs in `test_module_compatibility.py`, and stable
@@ -306,7 +313,7 @@ endpoint alignment; exact three- and five-argument native constructors;
 pre-transaction unsupported/self/identity/range/position failures; later-item
 prevalidation; injected native failure rollback; and controlled malformed-record
 isolation. Schema and MCP tests protect the unchanged whole-line variants,
-ordinary target `edge` readback, exact twelve-tool order, and modelling-policy
+ordinary target `edge` readback, preservation of the first twelve tools, and modelling-policy
 description.
 
 Controlled symmetry adapter tests lock both verified native constructor forms,
@@ -415,6 +422,69 @@ Headless probes establish the exact bound properties, top-first names, native
 full-GUI probe establishes that `FreeCADGui.Document.Modified` becomes true
 after a committed transaction and remains true after its undo and redo.
 
+### Semantic Rectangle Automated and Runtime Coverage
+
+Milestone 15A preserves the first fifteen tools and all 17 sketch-constraint
+variants, then explicitly registers `create_sketch_rectangle` as tool sixteen.
+Focused pure-Python coverage locks the strict lower-left schema, finite numeric
+policy, validation and error envelopes, explicit registration, handler and
+runtime delegation, exact edge/corner serialization, architecture boundaries,
+and unchanged primitive schemas. Native adapter fakes exercise exact four-line
+and constraint construction order, non-zero geometry/constraint offsets, all
+four zero/non-zero placement branches, caller-owned and owned transactions,
+wrong indices and counts, native exceptions, recompute and semantic readback
+failures, solver diagnostics, reverse cleanup, solver-moved geometry, and exact
+pre-existing geometry/constraint/construction/context restoration.
+
+FreeCAD 1.1.1 primary-source review used:
+
+- `src/Mod/Sketcher/Gui/DrawSketchHandlerRectangle.h` at the official FreeCAD
+  `1.1.1` tag for the GUI command's perimeter ordering, endpoint directions,
+  constraint choices, and transaction reference behavior;
+- `src/Mod/Sketcher/App/SketchObjectPyImp.cpp` for single and batch
+  `addGeometry`, `addConstraint`, index returns, and immediate solver behavior;
+- `src/App/Document.cpp` for transaction open/commit/abort behavior, pending
+  transaction state, active-document propagation, and undo/redo grouping;
+- the official FreeCAD Sketcher Workbench documentation for closed-profile,
+  constraint, rectangle, and recompute concepts.
+
+The production adapter does not call the GUI command. Installed-runtime probes
+on FreeCAD `1.1.1`, revision
+`0108fd4b4850cc46e625b60e53cea7a7bbe69f8d`, embedded Python `3.11.14`, verified
+single geometry and constraint index returns, endpoint order, all placement
+branches, `PointOnObject` axis placement, origin coincidence, signed X/Y
+dimensions, immediate solver movement during `addConstraint`, clean zero-DoF
+recompute, one-step undo/redo, and modified/saved behavior. The origin branch
+uses 11 constraints and every non-origin branch uses 12.
+
+Run the focused adapter smoke with the FreeCAD embedded interpreter and the
+development dependencies on `PYTHONPATH`:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_rectangle.py
+```
+
+It runs 35 isolated scenarios: origin, translated, positive, negative and
+mixed-sign placements; deterministic mappings and dimensions; closure,
+zero-DoF and clean diagnostics; no helpers/construction; non-empty and
+construction-containing sketches; Body ownership and XY attachment; unsaved
+and saved-file preservation; one-step undo/redo, name mismatch, redo
+invalidation; validation, geometry, constraint and verification failure
+rollback; cross-document isolation; Milestone 14A/14B/14B-2/14C regressions;
+and same-sketch recovery. The centred product request is expressed once as a
+30 × 20 rectangle with lower-left `(-15, -10)` and verifies the expected four
+edges without adding a `center` schema variant. The installed campaign passes
+35/35 and records version, revision, interpreter, scenario count, pass count,
+and exit status in JSON.
+
+Saved-file coverage records path, bytes, timestamp, and dirty state, then
+creates, undoes, and redoes without saving; disk bytes and timestamp stay
+unchanged. Unsaved documents remain pathless. Body ownership, XY-plane support,
+MapMode and placement survive creation and history movement. Recovery proves a
+misplaced but valid semantic rectangle can be matched and undone as one
+`Create sketch rectangle` transaction, then corrected in the same sketch with
+no abandoned geometry or replacement sketch and with the old redo invalidated.
+
 ### Native Sketch Reference Live Acceptance Plan (Not Executed Here)
 
 Use a focused AiderDesk MCP profile only after automated checks and the direct
@@ -422,9 +492,10 @@ adapter smoke pass:
 
 1. Record `git status --short --branch` and preserve the repository without
    edits, commits, pulls, pushes, or generated files.
-2. Discover tools and verify the exact unchanged twelve-tool order, with
-   `add_sketch_constraints` still tool twelve.
-3. Capture the exact updated schema: 14 constraint mappings; strict geometry
+2. Discover all sixteen tools and verify the first twelve remain unchanged,
+   with `add_sketch_constraints` still tool twelve and
+   `create_sketch_rectangle` tool sixteen.
+3. Capture the exact updated schema: 17 constraint mappings; strict geometry
    point references; exact one-field `origin`, `horizontal_axis`, and
    `vertical_axis` references; and forbidden additional fields.
 4. In separate unsaved sketches, add circle-centre, arc-centre, line-start,
@@ -631,7 +702,7 @@ sequence through the MCP client:
     count did not increase from a failed mutation.
 12. Confirm no `create_body` toolbar button, menu item, or FreeCAD GUI
     command was added.
-13. In the MCP client, confirm exactly fifteen tools are listed, including
+13. In the MCP client, confirm exactly sixteen tools are listed, including
     `create_body`, `create_sketch`, `get_sketch`, `add_sketch_geometry`, and
     `add_sketch_constraints`.
 
@@ -671,7 +742,7 @@ sequence through the MCP client:
     count did not increase from a failed mutation.
 16. Confirm no `MCP_CreateSketch` GUI command, toolbar button, or menu entry
     exists in the MCP workbench.
-17. In the MCP client, confirm exactly fifteen tools are listed, including
+17. In the MCP client, confirm exactly sixteen tools are listed, including
     `create_sketch`, `get_sketch`, `add_sketch_geometry`, and
     `add_sketch_constraints`.
 18. Call `create_sketch` with `support_plane: xy_plane` and confirm
@@ -721,7 +792,7 @@ undo, save, or timestamp state that is not exposed by an MCP inspection tool.
 1. Start a fresh FreeCAD 1.1.1 session, install the development junction,
    start MCP, connect AiderDesk only to `http://127.0.0.1:8765/mcp`, and record
    Report View from server start through completion.
-2. Discover tools and confirm the exact fifteen-name order. Confirm the first
+2. Discover tools and confirm the exact sixteen-name order. Confirm the first
    twelve remain unchanged, `get_sketch` is tenth, `add_sketch_geometry` is eleventh, and
    `add_sketch_constraints` is twelfth, with the first eleven names and schemas
    unchanged.
@@ -792,19 +863,20 @@ smoke tests. The AiderDesk transcript must show endpoint mutation and
 ### Controlled Symmetry AiderDesk live acceptance plan
 
 This Milestone 14A plan is prepared but is not executed by the implementation
-task. Use only natural-language CAD requests and the fifteen exposed MCP tools.
+task. Use only natural-language CAD requests and the sixteen exposed MCP tools.
 The FreeCAD Python console may create clean disposable fixtures or record state
 that MCP cannot expose, but it must not perform the accepted mutations. Make no
 implementation edits, commit, or push.
 
 1. Start a fresh FreeCAD 1.1.1 session, start MCP, connect AiderDesk only to the
    live endpoint, and preserve Report View plus the AiderDesk transcript.
-2. Discover tools and confirm the exact fifteen-name order, with `get_sketch`
+2. Discover tools and confirm the exact sixteen-name order, with `get_sketch`
    tenth, `add_sketch_geometry` eleventh, `add_sketch_constraints` twelfth, and
-   the three history tools at positions 13–15.
+   the three history tools at positions 13–15, and
+   `create_sketch_rectangle` at position 16.
    Compare the first eleven schemas with their compatibility snapshots.
 3. Inspect tool twelve: exactly three required top-level fields, a 1-to-100
-   array, all 14 constraint mappings, strict point/whole-line/native references,
+   array, all 17 constraint mappings, strict point/whole-line/native references,
    and forbidden extra fields. Confirm no raw native identifiers are accepted.
 4. Use one clean unsaved sketch per semantic scenario. Through natural-language
    requests, make selected points symmetric about the origin, horizontal axis,
@@ -817,9 +889,9 @@ implementation edits, commit, or push.
    indices, unchanged geometry/construction state, and no automatic save.
 7. In a new empty sketch, ask Aider to create a 30 mm × 20 mm axis-aligned
    rectangle centred on the sketch origin and fully constrain it. Do not give a
-   constraint recipe. Verify four non-construction lines, a closed profile,
-   controlled origin-symmetry readback, no helper geometry or signed corner
-   dimensions, and—after explicit recompute—zero DoF and clean conflict,
+   constraint recipe. Require one `create_sketch_rectangle` call translated to
+   lower-left `(-15, -10)`, four non-construction lines, a closed profile, no
+   helper geometry and—after explicit recompute—zero DoF and clean conflict,
    redundancy, partial-redundancy, and malformed diagnostics.
 8. In separate fixtures, test missing/additional fields, raw/negative/stale
    indices, invalid point tokens, unsupported about geometry, identical selected
@@ -842,7 +914,7 @@ implementation edits, commit, or push.
 ### General Point Relationships AiderDesk live acceptance plan
 
 This Milestone 14B plan is prepared but was not executed by the implementation
-task. During acceptance, use only the fifteen exposed MCP tools: do not use the
+task. During acceptance, use only the sixteen exposed MCP tools: do not use the
 FreeCAD Python console, edit implementation files, commit, or push. Because the
 public inventory can create only body-owned sketches, prepare any required
 standalone-sketch fixtures in the GUI before starting the recorded MCP session;
@@ -850,11 +922,11 @@ all inspection and mutation of those fixtures must then occur through MCP.
 
 1. Start a fresh FreeCAD 1.1.1 session, start MCP, connect AiderDesk, and retain
    the protocol transcript plus Report View output.
-2. Discover the raw tool inventory and confirm the exact fifteen-name order,
+2. Discover the raw tool inventory and confirm the exact sixteen-name order,
    with `get_sketch` tenth, `add_sketch_geometry` eleventh, and
    `add_sketch_constraints` twelfth. Confirm there is no new GUI command.
 3. Inspect raw tool-twelve schema separately from modelling prompts: exactly
-   three required top-level fields, a 1-to-100 array, 16 top-level variants,
+   three required top-level fields, a 1-to-100 array, 17 top-level variants,
    strict point/whole-geometry/native references, unchanged old variants, and
    forbidden additional fields, negative IDs, and native position integers.
 4. Use one clean sketch per semantic scenario. Through natural-language
@@ -930,12 +1002,12 @@ the connected FreeCAD MCP server. Do not edit the repository, run Python, use
 GUI undo/redo, commit, push, or create unrequested files. Use disposable,
 uniquely named documents and report every raw tool result needed as evidence.
 
-First request the raw tool inventory. Require exactly these fifteen tools in
+First request the raw tool inventory. Require exactly these sixteen tools in
 this order:
 create_document, list_documents, get_document, save_document, list_objects,
 get_object, recompute_document, create_body, create_sketch, get_sketch,
 add_sketch_geometry, add_sketch_constraints, get_document_history,
-undo_document, redo_document.
+undo_document, redo_document, create_sketch_rectangle.
 
 Capture the raw input schemas for tools 13–15. get_document_history must require
 only document_name. undo_document and redo_document must require document_name
@@ -1015,7 +1087,7 @@ solver diagnostics. Do not call undo after any failed atomic mutation that
 already rolled back. If history shows an unexpected GUI or user transaction,
 stop that scenario, report it, and ask for direction rather than undoing it.
 
-Finish with the raw fifteen-tool inventory, raw schemas, every structured
+Finish with the raw sixteen-tool inventory, raw schemas, every structured
 success and expected failure code, document/sketch names, before/after history,
 same-sketch recovery evidence, redo invalidation evidence, saved/unsaved and
 cross-document evidence, confirmation that no native transaction IDs appeared,
@@ -1048,12 +1120,12 @@ the connected FreeCAD MCP server. Do not edit the repository, run Python, use
 GUI undo/redo, commit, push, or create unrequested files. Use uniquely named
 disposable documents and preserve raw tool results as evidence.
 
-First request the raw tool inventory. Require exactly these fifteen tools in
+First request the raw tool inventory. Require exactly these sixteen tools in
 this order:
 create_document, list_documents, get_document, save_document, list_objects,
 get_object, recompute_document, create_body, create_sketch, get_sketch,
 add_sketch_geometry, add_sketch_constraints, get_document_history,
-undo_document, redo_document.
+undo_document, redo_document, create_sketch_rectangle.
 
 Capture the raw add_sketch_constraints schema. Require exactly seventeen
 top-level constraint discriminators and prove all sixteen established members
@@ -1062,7 +1134,7 @@ additional properties:
 {"type":"tangent","first":{"geometry_index":0},"second":{"geometry_index":1}}
 Each reference must contain only one non-negative integer geometry_index. There
 must be no point position, branch, side, contact, external/internal, or native
-identifier field and no new tool.
+identifier field and no additional tangency tool.
 
 In separate clean unsaved sketches, exercise direct line-circle, line-arc,
 circle-circle external, circle-circle internal, circle-arc, and arc-arc
@@ -1139,7 +1211,7 @@ the upper branch. The scenario FAILS if the original sketch is abandoned or a
 replacement sketch/document is created without a documented unrecoverable
 reason. It also fails if an unknown GUI/user transaction is undone.
 
-Finish with the raw fifteen-tool inventory, the seventeen discriminator names,
+Finish with the raw sixteen-tool inventory, the seventeen discriminator names,
 raw tangent schema, all supported and rejected pair evidence, construction and
 attached-sketch evidence, atomic rollback snapshots, controlled readback,
 saved/unsaved results, single and batch undo/redo, redo invalidation, solver
@@ -1152,6 +1224,124 @@ Retain the AiderDesk transcript, raw `tools/list`, raw schemas, Report View
 output, controlled before/after state, solver results, history snapshots, and
 unchanged repository status. Automated tests and the 32-scenario adapter smoke
 are supporting evidence, not a substitute for this live endpoint campaign.
+
+### Semantic Rectangle AiderDesk Live Acceptance Prompt
+
+This Milestone 15A prompt is prepared but is not executed by the implementation
+task. Use a fresh FreeCAD 1.1.1 session and a FreeCAD Engineer AiderDesk profile
+connected only to the MCP endpoint. Every CAD action and inspection must use an
+exposed MCP tool; do not use the GUI Rectangle command, Python console, mouse
+simulation, direct FreeCAD API, or repository edits.
+
+Copy this prompt into AiderDesk:
+
+```text
+Perform the semantic axis-aligned rectangle acceptance campaign entirely
+through the connected FreeCAD MCP endpoint. Preserve the repository: before
+and after, record branch, HEAD, remotes, upstream, and git status; make no file
+edit, stage, commit, push, pull, checkout, or cleanup action.
+
+First request the raw tool inventory. Require exactly these sixteen tools in
+this order: create_document, list_documents, get_document, save_document,
+list_objects, get_object, recompute_document, create_body, create_sketch,
+get_sketch, add_sketch_geometry, add_sketch_constraints,
+get_document_history, undo_document, redo_document,
+create_sketch_rectangle. Prove the first fifteen contracts are unchanged and
+the add_sketch_constraints discriminator union still contains exactly the
+established seventeen variants.
+
+Capture the raw create_sketch_rectangle input schema. Require exactly
+document_name, sketch_name, width, height, and placement; placement must contain
+exactly type=lower_left, x, and y. Require additionalProperties=false at every
+level, finite strict positive width/height, finite strict x/y, and rejection of
+booleans. Prove centre/center, upper_right, rotation, angle, construction,
+fully_constrain, helper geometry, profile IDs, and raw geometry/constraint IDs
+are unavailable.
+
+Use create_sketch_rectangle for every complete standard axis-aligned rectangle.
+Use add_sketch_geometry only for deliberate unrelated pre-existing geometry or
+an incomplete/custom arrangement, and add_sketch_constraints only to establish
+deliberate pre-existing relationships. The campaign FAILS if a standard
+rectangle is manually reconstructed with primitive calls without a documented
+unrecoverable semantic-tool failure. Never call one MCP tool from another and
+never invoke a GUI command.
+
+In isolated unsaved sketches, create a 30 × 20 rectangle at lower-left (0, 0),
+a positive non-zero placement, a negative non-zero placement, and a mixed-sign
+placement. Recompute and inspect each. Require four normal lines in exact order:
+bottom lower-left→lower-right, right lower-right→upper-right, top
+upper-right→upper-left, left upper-left→lower-left. Require the result edge map
+bottom/right/top/left and corner map lower_left/lower_right/upper_right/
+upper_left to point to those exact endpoints, including when indices are not
+zero. Require exact requested dimensions and placement, exact derived
+upper-right, closed=true, axis_aligned=true, fully_constrained=true, zero DoF,
+and empty conflicting, redundant, partially redundant, and malformed lists.
+Require no helper or construction geometry.
+
+Create a sketch containing unrelated normal and construction geometry plus a
+controlled pre-existing constraint. Snapshot complete geometry, coordinates,
+constraint readback, construction flags and indices. Append a rectangle and
+prove all earlier content is byte-for-byte-equivalent at the controlled data
+level and the profile maps only new indices. Undo exactly Create sketch
+rectangle, recompute and inspect, and prove the complete snapshot is restored;
+redo exactly that step and prove the rectangle returns fully constrained.
+
+Create a Body-owned XY-plane-attached sketch and add a rectangle. Across
+creation, exact-name undo, recompute, exact-name redo, and recompute, prove Body
+ownership, support plane, attachment, MapMode, placement, sketch identity and
+absence of a duplicate top-level sketch are preserved.
+
+For an unsaved document, prove file_path remains null across creation,
+undo and redo. For a disposable explicitly saved document, record path, file
+size, timestamp and controlled modified state. Without calling save_document,
+create, undo and redo a rectangle and prove the external bytes, size and
+timestamp never change. Report native in-memory modified state without claiming
+that undo reverses a save.
+
+After a successful rectangle, inspect history and require one top transaction
+named exactly Create sketch rectangle. Call undo_document first with a
+deliberately wrong expected name and prove zero geometry, constraint and history
+mutation. Then undo with the exact name and prove all four edges and all new
+constraints disappear in one step while the sketch and earlier content remain.
+Redo with the exact name and prove the complete profile returns. Undo again,
+perform a new controlled mutation, and prove redo is invalidated.
+
+Exercise rejected zero/negative dimensions, boolean and non-finite numbers,
+unknown placement type, missing fields, and extra top-level/nested fields.
+For every structured failed call, compare complete before/after sketch,
+document and history state and prove zero mutation and no new undo entry. Do
+not call undo after such a failure.
+
+Natural-language product test: “Create a 30 mm × 20 mm axis-aligned rectangle
+centred on the sketch origin.” Do not supply geometry indices or a primitive
+recipe. The agent must choose create_sketch_rectangle once and translate the
+intent to lower-left (-15, -10), width 30, height 20. Prove bottom
+(-15,-10)→(15,-10), right (15,-10)→(15,10), top (15,10)→(-15,10), left
+(-15,10)→(-15,-10), full constraint, clean diagnostics, no helpers, and one
+Create sketch rectangle transaction. Do not claim center placement exists.
+
+Same-sketch recovery test: create a correct-size rectangle at a deliberately
+wrong lower-left point, recompute and prove it is valid but strategically
+misplaced, inspect history, match and undo Create sketch rectangle, and prove
+all its geometry/constraints are gone while the original sketch and earlier
+content remain. Create the corrected rectangle in the same sketch, recompute
+and inspect it, prove the old redo is invalidated, and prove there is no
+replacement sketch or abandoned rectangle. The campaign FAILS if recovery
+abandons the sketch.
+
+Finish with raw tools/list and schemas, all structured success and expected
+failure results, edge/corner mappings, solver and history snapshots, attached
+and non-empty preservation evidence, saved/unsaved evidence, centred product
+and same-sketch recovery evidence, Report View output, exact repository status,
+and confirmation that no edit, commit or push occurred. Stop MCP and leave
+disposable documents clearly identified for cleanup.
+```
+
+Retain the AiderDesk transcript, raw `tools/list`, raw schemas, Report View
+output, controlled before/after snapshots, solver and history results, saved
+file metadata, and unchanged repository status. The automated suite and
+35-scenario embedded-runtime smoke are supporting evidence, not substitutes for
+this separate live endpoint campaign.
 
 ### Sketch index semantics
 

@@ -48,6 +48,14 @@ local MCP server inside FreeCAD.
   error results for every public tool.
 - Prefer high-level workflow tools for common operations while retaining focused
   mid-level tools for flexibility.
+- Use `create_sketch_rectangle` for a complete axis-aligned normal rectangle
+  defined by width, height, and lower-left placement. Do not reconstruct that
+  standard profile through repeated primitive MCP calls, call one MCP tool from
+  another, or invoke/simulate the Sketcher GUI Rectangle command.
+- Use `add_sketch_geometry` for individual lines or incomplete/custom
+  arrangements, and `add_sketch_constraints` to modify relationships on
+  existing geometry. Centred, rotated, rounded, construction, and partially
+  constrained rectangles are not `create_sketch_rectangle` request variants.
 - Provide inspection, validation, and recovery tools alongside mutating tools.
 - After a successful modelling mutation, recompute and inspect the result. If
   it is technically valid but expresses the wrong design intent, inspect the
@@ -75,6 +83,10 @@ local MCP server inside FreeCAD.
 - Document-history tools are one-step-only, must run through the Qt dispatcher,
   and must not expose native transaction IDs or objects, save implicitly, or
   wrap native undo/redo in another transaction.
+- A successful semantic rectangle is one verified `Create sketch rectangle`
+  history step. If its intent is wrong, recompute, inspect, match and undo that
+  step, then retry in the same sketch. A failed rectangle call owns its rollback
+  and must not be followed by undo.
 
 ## Python Standards
 

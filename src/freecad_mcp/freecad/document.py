@@ -11,6 +11,7 @@ from freecad_mcp.freecad import (
     sketch_creation,
     sketch_geometry_creation,
     sketch_inspection,
+    sketch_rectangle_creation,
 )
 from freecad_mcp.freecad.document_operations import (
     _active_document_name as _active_document_name,
@@ -58,6 +59,8 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchRectangleCreationResult,
+    SketchRectangleRequestInput,
 )
 
 
@@ -160,3 +163,10 @@ class FreeCADDocumentAdapter:
             sketch_name,
             constraints,
         )
+
+    def create_sketch_rectangle(
+        self,
+        request: SketchRectangleRequestInput,
+    ) -> SketchRectangleCreationResult:
+        """Create one verified semantic rectangle without GUI commands or saving."""
+        return sketch_rectangle_creation.create_sketch_rectangle(request)

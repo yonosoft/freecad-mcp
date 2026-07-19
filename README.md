@@ -14,11 +14,12 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- fifteen typed MCP tools for document creation, inspection, saving,
+- sixteen typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
-  controlled sketch-constraint addition, plus controlled document-history
-  inspection, one-step undo, and one-step redo;
+  controlled sketch-constraint addition, controlled document-history
+  inspection, one-step undo and redo, plus verified semantic axis-aligned
+  rectangle creation;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -121,6 +122,7 @@ add_sketch_constraints
 get_document_history
 undo_document
 redo_document
+create_sketch_rectangle
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -458,14 +460,11 @@ strategy in the same sketch, reapply tangency, recompute, and inspect again.
 Do not undo after a failed atomic call that already restored zero mutation, and
 do not abandon a recoverable sketch merely to obtain another branch.
 
-A centred 30 mm × 20 mm rectangle is representable with four line segments,
-four endpoint coincidences, two horizontal constraints, two vertical
-constraints, 30 mm and 20 mm whole-line dimensions, and one symmetry constraint
-between opposite corners about the origin. Direct FreeCAD 1.1.1 regression
-testing confirms that natural 11-constraint set is closed, fully constrained at
-zero degrees of freedom, and has no redundant, partially redundant,
-conflicting, or malformed constraints. It uses no helper geometry and no signed
-corner-coordinate dimensions.
+A complete axis-aligned rectangle should use `create_sketch_rectangle`, not a
+sequence of primitive geometry and constraint calls. A centred 30 mm × 20 mm
+request is translated by the calling agent to width `30`, height `20`, and
+lower-left `(-15, -10)`; `center` is not a public placement variant. The
+semantic tool creates and verifies the natural closed profile in one operation.
 
 A second direct regression uses one origin-centred 10 mm circle and two point
 geometries near `(10, 0)` and `(0, 10)`. Each point uses ordinary
@@ -551,6 +550,102 @@ internal-name lookup only; labels are not used as lookup keys. If placement is
 unavailable the ``placement`` field returns ``null`` rather than failing the
 entire tool.
 
+### Semantic axis-aligned rectangles
+
+`create_sketch_rectangle` is exactly tool 16. It targets an existing sketch
+and accepts this strict request; every object forbids additional properties:
+
+```json
+{
+  "document_name": "Model",
+  "sketch_name": "BaseSketch",
+  "width": 30.0,
+  "height": 20.0,
+  "placement": {"type": "lower_left", "x": -15.0, "y": -10.0}
+}
+```
+
+Width and height are finite strict numbers greater than zero. Coordinates are
+finite strict numbers, and booleans are never numbers. `lower_left` is the only
+placement variant. Centred, rotated, rounded, construction, and partially
+constrained rectangles remain outside this contract.
+
+The adapter appends four normal lines in explicit counter-clockwise semantic
+order: `bottom` (lower-left to lower-right), `right` (lower-right to
+upper-right), `top` (upper-right to upper-left), then `left` (upper-left to
+lower-left). Its returned corners are explicitly ordered `lower_left`,
+`lower_right`, `upper_right`, `upper_left`, with each mapped to a controlled
+line endpoint. Indices are current sketch-local indices, including when the
+sketch was already non-empty; they are not persistent profile IDs.
+
+The deterministic constraint sequence is four endpoint coincidences, four
+horizontal/vertical orientations, bottom and right whole-line dimensions, and
+natural lower-left placement. Placement at `(0, 0)` uses origin coincidence;
+`x = 0` uses the vertical axis plus Y distance; `y = 0` uses the horizontal
+axis plus X distance; otherwise it uses X and Y distances. It creates no
+helper or construction geometry and does not rely on automatic constraints.
+The existing `add_sketch_geometry` and `add_sketch_constraints` tools remain
+appropriate for incomplete/custom arrangements and relationships on existing
+geometry. Their schemas, including all 17 constraint variants, are unchanged.
+
+Success returns the normal command envelope with code
+`sketch_rectangle_created`, a `profile` containing geometry and constraint
+indices, explicit edge/corner mappings, requested dimensions and placement,
+and verified `closed`, `axis_aligned`, and `fully_constrained` flags. It also
+returns the existing complete controlled `sketch` inspection and `document`
+summary. The result describes ordinary sketch geometry and constraints, not a
+persistent FreeCAD profile object.
+
+```json
+{
+  "ok": true,
+  "code": "sketch_rectangle_created",
+  "profile": {
+    "type": "rectangle",
+    "geometry_indices": [4, 5, 6, 7],
+    "constraint_indices": [10, 11, 12],
+    "edges": {"bottom": 4, "right": 5, "top": 6, "left": 7},
+    "corners": {
+      "lower_left": {"geometry_index": 4, "position": "start"},
+      "lower_right": {"geometry_index": 4, "position": "end"},
+      "upper_right": {"geometry_index": 5, "position": "end"},
+      "upper_left": {"geometry_index": 6, "position": "end"}
+    },
+    "width": 30.0,
+    "height": 20.0,
+    "placement": {"type": "lower_left", "x": -15.0, "y": -10.0},
+    "closed": true,
+    "axis_aligned": true,
+    "fully_constrained": true
+  },
+  "sketch": {"...": "existing controlled sketch inspection"},
+  "document": {"...": "existing controlled document summary"},
+  "message": "Created and verified an axis-aligned sketch rectangle."
+}
+```
+
+All lines and constraints are created through core Sketcher APIs inside one
+`Create sketch rectangle` transaction. After recompute, the adapter verifies
+the exact append ranges, geometry/order/endpoints, closure relationships,
+dimensions, placement, zero degrees of freedom, clean solver diagnostics, and
+unchanged Body ownership, attachment, MapMode, placement, and document state.
+It commits only after verification. Any geometry, constraint, recompute, or
+semantic-verification failure removes the appended tail, aborts its owned
+transaction, restores solver-moved geometry and construction/constraint state,
+and verifies the complete pre-call snapshot. A structured failed call therefore
+needs no undo and creates no history entry.
+
+One successful call is one history step. Matching one-step undo removes the
+whole rectangle while preserving the sketch and its earlier content; redo
+restores it. Recompute and inspect after either movement. If a valid rectangle
+has the wrong design placement, inspect history, undo the exact `Create sketch
+rectangle` step, and create the corrected profile in the same sketch; do not
+create a replacement sketch. A new mutation invalidates the prior redo entry.
+Standalone, Body-owned, and supported attached sketches are preserved. Unsaved
+documents remain without a path, and saved files are not written until an
+explicit `save_document` call. The implementation calls neither another MCP
+tool nor a GUI Rectangle command.
+
 ### Controlled document history
 
 `get_document_history`, `undo_document`, and `redo_document` are tools 13–15.
@@ -576,8 +671,8 @@ History inspection returns the controlled document summary plus:
 It does not return complete native stacks, native transaction objects, or
 transaction IDs. Transaction names are current-step safety labels, not durable
 history identifiers. The controlled transaction names produced by current MCP
-model mutations are `Create body`, `Create sketch`, `Add sketch geometry`, and
-`Add sketch constraints`.
+model mutations are `Create body`, `Create sketch`, `Add sketch geometry`,
+`Add sketch constraints`, and `Create sketch rectangle`.
 
 Undo has this strict input shape; redo uses the same shape:
 

@@ -79,6 +79,7 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         "freecad/sketch_creation.py",
         "freecad/sketch_geometry_creation.py",
         "freecad/sketch_constraint_creation.py",
+        "freecad/sketch_rectangle_creation.py",
         "freecad/sketch_inspection.py",
         "freecad/document_history.py",
         "freecad/history_guard.py",
@@ -108,6 +109,7 @@ def test_mcp_registration_does_not_depend_on_freecad_implementation() -> None:
         "mcp/sketch_geometry_tools.py",
         "mcp/sketch_constraint_tools.py",
         "mcp/document_history_tools.py",
+        "mcp/sketch_rectangle_tools.py",
         "mcp/server.py",
     )
     for relative_path in registration_modules:
@@ -127,6 +129,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "mcp/sketch_geometry_tools.py",
         "mcp/sketch_constraint_tools.py",
         "mcp/document_history_tools.py",
+        "mcp/sketch_rectangle_tools.py",
     )
     registered_constants: list[str] = []
     for relative_path in registration_modules:
@@ -166,6 +169,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "GET_DOCUMENT_HISTORY_TOOL",
         "UNDO_DOCUMENT_TOOL",
         "REDO_DOCUMENT_TOOL",
+        "CREATE_SKETCH_RECTANGLE_TOOL",
     ]
     assert _imported_modules("tool_registry.py") == set()
 
@@ -191,6 +195,11 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "DocumentHistoryInspectionResult",
             "DocumentHistoryTransaction",
             "DocumentHistoryOperationResult",
+            "LowerLeftRectanglePlacementInput",
+            "SketchRectangleCornerReference",
+            "SketchRectangleCreationResult",
+            "SketchRectangleProfile",
+            "SketchRectangleRequestInput",
         },
         "protocols.py": {
             "Dispatcher",
@@ -234,6 +243,9 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "SketchGeometryRollbackError",
             "SketchConstraintRollbackError",
             "SketchInspectionError",
+            "SketchRectangleCreationError",
+            "SketchRectangleRollbackError",
+            "SketchRectangleVerificationError",
             "SketchTypeMismatchError",
         },
         "validation.py": {
@@ -244,6 +256,7 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "validate_add_sketch_constraints_request",
             "validate_document_reference",
             "validate_document_history_request",
+            "validate_create_sketch_rectangle_request",
             "validate_object_reference",
         },
         "freecad/document.py": {"FreeCADDocumentAdapter"},
@@ -267,6 +280,7 @@ def test_representative_modules_import_in_clean_processes() -> None:
         "freecad_mcp.mcp.sketch_geometry_tools",
         "freecad_mcp.mcp.sketch_constraint_tools",
         "freecad_mcp.mcp.document_history_tools",
+        "freecad_mcp.mcp.sketch_rectangle_tools",
         "freecad_mcp.mcp.server",
         "freecad_mcp.runtime",
     )
@@ -283,3 +297,38 @@ def test_representative_modules_import_in_clean_processes() -> None:
             text=True,
         )
         assert result.returncode == 0, f"{module}: {result.stderr}"
+
+
+def test_semantic_rectangle_uses_native_adapter_without_gui_commands() -> None:
+    native_tree = _tree("freecad/sketch_rectangle_creation.py")
+    forbidden_calls = {"runCommand", "doCommand", "doCommandGui"}
+    assert not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in forbidden_calls
+        for node in ast.walk(native_tree)
+    )
+
+
+def test_semantic_rectangle_command_has_no_native_dependencies() -> None:
+    forbidden = {"FreeCAD", "FreeCADGui", "Part", "Sketcher", "freecad_mcp.freecad"}
+    violations = {
+        module
+        for module in _imported_modules("commands/sketch_rectangle.py")
+        if _matches_prefix(module, forbidden)
+    }
+    assert violations == set()
+
+
+def test_semantic_rectangle_transport_calls_only_its_handler() -> None:
+    transport_tree = _tree("mcp/sketch_rectangle_tools.py")
+    handler_calls = {
+        node.func.attr
+        for node in ast.walk(transport_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Attribute)
+        and isinstance(node.func.value.value, ast.Name)
+        and node.func.value.value.id == "handlers"
+    }
+    assert handler_calls == {"execute"}

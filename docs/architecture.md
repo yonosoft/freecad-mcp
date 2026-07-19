@@ -43,6 +43,10 @@ placement extraction; and `freecad.body_creation` and
 Atomic geometry addition belongs to `freecad.sketch_geometry_creation`, while
 read-only sketch state belongs to `freecad.sketch_inspection`. Both remain
 separate from sketch creation and behind the same public adapter facade.
+Semantic axis-aligned rectangle creation belongs to
+`freecad.sketch_rectangle_creation`; it composes the established internal
+geometry/constraint translators, but owns complete-profile verification and
+rollback.
 Controlled history inspection and one-step mutation belong to
 `freecad.document_history`; `freecad.history_guard` makes MCP-owned undo, redo,
 and rollback visible to re-entrant calls without exposing that state publicly.
@@ -195,14 +199,16 @@ the separate `get_sketch` registration; and `mcp.creation_tools` registers body
 and sketch creation. `mcp.sketch_geometry_tools` explicitly registers the
 atomic geometry mutation, and `mcp.sketch_constraint_tools` explicitly
 registers atomic constraint mutation. `mcp.document_history_tools` explicitly
-registers controlled history inspection, undo, and redo. `mcp.server` is the
-small composition
+registers controlled history inspection, undo, and redo.
+`mcp.sketch_rectangle_tools` explicitly registers the first semantic profile.
+`mcp.server` is the small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
 `add_sketch_geometry` follows as exactly tool eleven, and
 `add_sketch_constraints` follows as exactly tool twelve. History inspection,
-undo, and redo are exactly tools thirteen through fifteen; no registration
-loop is used.
+undo, and redo are exactly tools thirteen through fifteen;
+`create_sketch_rectangle` is exactly tool sixteen. No registration loop is
+used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
 
@@ -214,11 +220,102 @@ The registry currently exposes `create_document`, `list_documents`,
 `get_document`, `save_document`, `list_objects`, `get_object`,
 `recompute_document`, `create_body`, `create_sketch`, `get_sketch`,
 `add_sketch_geometry`, `add_sketch_constraints`, `get_document_history`,
-`undo_document`, and `redo_document`, in that order.
+`undo_document`, `redo_document`, and `create_sketch_rectangle`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
 document, object, constraint, geometry, and error data.
+
+## Semantic Rectangle Profile
+
+Milestone 15A establishes the semantic-profile dependency direction without a
+generic profile union:
+
+```text
+create_sketch_rectangle MCP registration
+→ CreateSketchRectangleHandler / application
+→ DocumentAdapter.create_sketch_rectangle protocol
+→ Qt main-thread dispatcher
+→ FreeCADDocumentAdapter facade
+→ freecad.sketch_rectangle_creation
+→ shared geometry and constraint translators
+→ SketchObject.addGeometry / addConstraint
+→ recompute and controlled semantic inspection
+```
+
+No layer invokes `add_sketch_geometry` or `add_sketch_constraints` through MCP,
+and the native adapter has no dependency on command, application, or MCP
+layers. The production path does not activate the Sketcher GUI Rectangle
+command, edit mode, selection, mouse input, auto-constraint preferences, or
+construction-mode state.
+
+The strict request requires exact internal `document_name` and `sketch_name`,
+finite positive `width` and `height`, and one strict placement object:
+
+```json
+{"type": "lower_left", "x": 0.0, "y": 0.0}
+```
+
+`lower_left` is the entire initial placement union. All request levels reject
+additional properties, booleans, NaN, and infinity. This milestone does not
+expose centre, rotation, construction, partial-constraint, helper, profile-ID,
+editing, or deletion controls.
+
+The adapter precomputes four normal `LineSegment` inputs and the complete
+constraint plan before opening a transaction. Geometry order and orientation
+are explicit: bottom lower-left→lower-right, right lower-right→upper-right, top
+upper-right→upper-left, and left upper-left→lower-left. Public corner order is
+lower-left, lower-right, upper-right, upper-left. The response serializes those
+names explicitly instead of deriving public meaning from mapping iteration or
+assuming geometry index zero.
+
+Constraint order is four endpoint coincidences, horizontal/vertical on all
+four edges, whole-line length on bottom and right, then lower-left placement.
+At the origin, placement is one origin coincidence. On only the vertical axis,
+it is vertical-axis `PointOnObject` plus signed Y distance; on only the
+horizontal axis, it is horizontal-axis `PointOnObject` plus signed X distance;
+away from both axes, it is signed X and Y distances. This is the smallest
+deterministic natural set for the four branches and adds no helper geometry.
+The pre-existing 17 public constraint variants and primitive tool contracts are
+unchanged.
+
+The semantic adapter snapshots the complete geometry/constraint signatures,
+construction and constraint flags, cached solver facts, Body/attachment/MapMode
+context, sketch placement, document summary, and history state. If it owns the
+transaction, it temporarily makes the target document active before opening
+`Create sketch rectangle`; this prevents FreeCAD's native transaction
+propagation from adding a step to another active document. A caller-owned
+transaction remains open and is neither nested nor committed by the operation.
+
+Four lines and every constraint are appended individually so assigned indices
+and incremental/final counts can be checked. After recompute, controlled
+readback must prove exact types, normal construction state, order, endpoints,
+closed coincident chain, axis alignment, dimensions, requested lower-left and
+derived upper-right, expected constraint records, zero degrees of freedom,
+full constraint, and empty conflicting, redundant, partially redundant, and
+malformed diagnostics. The exact document and sketch must remain readable;
+Body ownership, attachment, MapMode, placement, pre-existing content, file
+path, and unrelated documents must be unchanged. Only then is an owned
+transaction committed.
+
+Any failure removes appended constraints and geometry in reverse, aborts an
+owned transaction, restores solver-moved geometry, construction and constraint
+flags, recomputes when the original solver snapshot was fresh, restores the GUI
+modified flag, and verifies exact restoration plus unchanged history. A failed
+call returns a controlled rectangle geometry, constraint, verification, or
+rollback error and intentionally creates no undo step. It must not be followed
+by `undo_document`.
+
+A successful call returns a `SketchRectangleProfile` plus the existing
+controlled sketch inspection and document summary. The profile contains current
+sketch-local geometry and constraint indices, explicit edge/corner mappings,
+dimensions, placement, and verified closed/axis-aligned/fully-constrained
+facts. It does not claim a persistent FreeCAD profile object. One owned call is
+one history entry. Matching undo removes the entire rectangle, redo restores
+it, and a new mutation after undo invalidates redo. A strategically misplaced
+success is corrected by matching and undoing `Create sketch rectangle`, then
+retrying in the same sketch. Saved files are never written by creation,
+rollback, undo, or redo; unsaved documents remain pathless.
 
 ## Document Tools
 
@@ -305,8 +402,9 @@ reported as `document_history_verification_failed`; the adapter does not hide
 it with an automatic compensating history operation.
 
 Model mutations use the central safety labels `Create body`, `Create sketch`,
-`Add sketch geometry`, and `Add sketch constraints`. Document creation, saving,
-recomputation, and inspection do not create an MCP-owned undo transaction.
+`Add sketch geometry`, `Add sketch constraints`, and `Create sketch rectangle`.
+Document creation, saving, recomputation, and inspection do not create an
+MCP-owned undo transaction.
 Atomic-operation rollback remains separate from controlled undo: rollback
 removes a failed call's partial mutation, while undo removes one successful but
 unwanted transaction. Rollback paths enter the same process-local activity guard

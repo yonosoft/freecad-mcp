@@ -11,6 +11,7 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
+    CreateSketchRectangleHandler,
     DocumentHandlers,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
@@ -43,6 +44,9 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchRectangleCreationResult,
+    SketchRectangleProfile,
+    SketchRectangleRequestInput,
     SketchSolverData,
 )
 
@@ -76,6 +80,7 @@ class AdapterStub:
         self.add_sketch_constraints_calls: list[
             tuple[str, str, tuple[SketchConstraintInput, ...]]
         ] = []
+        self.create_sketch_rectangle_calls: list[SketchRectangleRequestInput] = []
         self.undo_names = ["Add sketch constraints"]
         self.redo_names: list[str] = []
 
@@ -280,6 +285,23 @@ class AdapterStub:
             constraint_count=len(constraints),
         )
 
+    def create_sketch_rectangle(
+        self,
+        request: SketchRectangleRequestInput,
+    ) -> SketchRectangleCreationResult:
+        self.create_sketch_rectangle_calls.append(request)
+        return SketchRectangleCreationResult(
+            profile=SketchRectangleProfile(
+                geometry_indices=(0, 1, 2, 3),
+                constraint_indices=tuple(range(12)),
+                width=float(request.width),
+                height=float(request.height),
+                placement=request.placement,
+            ),
+            sketch=self.get_sketch(request.document_name, request.sketch_name),
+            document=self.document,
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -305,6 +327,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             get_sketch=GetSketchHandler(actual_adapter, dispatcher),
             add_sketch_geometry=AddSketchGeometryHandler(actual_adapter, dispatcher),
             add_sketch_constraints=AddSketchConstraintsHandler(actual_adapter, dispatcher),
+            create_sketch_rectangle=CreateSketchRectangleHandler(actual_adapter, dispatcher),
             recompute=RecomputeDocumentHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,

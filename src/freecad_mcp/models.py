@@ -339,6 +339,30 @@ SketchGeometryBatch = Annotated[
 ]
 
 
+RectangleDimension = Annotated[
+    float,
+    Field(strict=True, allow_inf_nan=False, gt=0.0),
+]
+
+
+class LowerLeftRectanglePlacementInput(_SketchGeometryInputModel):
+    """Lower-left placement intent for an axis-aligned rectangle."""
+
+    type: Literal["lower_left"]
+    x: float = Field(strict=True, allow_inf_nan=False)
+    y: float = Field(strict=True, allow_inf_nan=False)
+
+
+class SketchRectangleRequestInput(_SketchGeometryInputModel):
+    """Complete strict semantic request for one axis-aligned rectangle."""
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    width: RectangleDimension
+    height: RectangleDimension
+    placement: LowerLeftRectanglePlacementInput
+
+
 class SketchPointPosition(StrEnum):
     """Controlled public sketch-point selectors."""
 
@@ -681,6 +705,60 @@ class SketchConstraintAdditionResult:
 
 
 @dataclass(frozen=True, slots=True)
+class SketchRectangleCornerReference:
+    """One stable semantic rectangle corner expressed through an edge point."""
+
+    geometry_index: int
+    position: Literal["start", "end"]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "geometry_index": self.geometry_index,
+            "position": self.position,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchRectangleProfile:
+    """Verified semantic mapping for ordinary rectangle geometry and constraints."""
+
+    geometry_indices: tuple[int, int, int, int]
+    constraint_indices: tuple[int, ...]
+    width: float
+    height: float
+    placement: LowerLeftRectanglePlacementInput
+    closed: bool = True
+    axis_aligned: bool = True
+    fully_constrained: bool = True
+
+    def to_dict(self) -> dict[str, object]:
+        bottom, right, top, left = self.geometry_indices
+        return {
+            "type": "rectangle",
+            "geometry_indices": list(self.geometry_indices),
+            "constraint_indices": list(self.constraint_indices),
+            "edges": {
+                "bottom": bottom,
+                "right": right,
+                "top": top,
+                "left": left,
+            },
+            "corners": {
+                "lower_left": SketchRectangleCornerReference(bottom, "start").to_dict(),
+                "lower_right": SketchRectangleCornerReference(bottom, "end").to_dict(),
+                "upper_right": SketchRectangleCornerReference(right, "end").to_dict(),
+                "upper_left": SketchRectangleCornerReference(top, "end").to_dict(),
+            },
+            "width": self.width,
+            "height": self.height,
+            "placement": self.placement.model_dump(mode="json"),
+            "closed": self.closed,
+            "axis_aligned": self.axis_aligned,
+            "fully_constrained": self.fully_constrained,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SketchLineGeometry:
     """Controlled line-segment geometry."""
 
@@ -965,6 +1043,22 @@ class SketchInspectionResult:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class SketchRectangleCreationResult:
+    """Verified semantic rectangle with current sketch and document readback."""
+
+    profile: SketchRectangleProfile
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "profile": self.profile.to_dict(),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
 __all__ = [
     "MAX_SKETCH_CONSTRAINT_BATCH_SIZE",
     "MAX_SKETCH_GEOMETRY_BATCH_SIZE",
@@ -996,6 +1090,7 @@ __all__ = [
     "HorizontalConstraintInput",
     "HorizontalPointsConstraintInput",
     "LineSegmentGeometryInput",
+    "LowerLeftRectanglePlacementInput",
     "ObjectDetail",
     "ObjectSummary",
     "OriginPlane",
@@ -1007,6 +1102,7 @@ __all__ = [
     "PointGeometryInput",
     "PointOnObjectConstraintInput",
     "RadiusConstraintInput",
+    "RectangleDimension",
     "SketchArcGeometry",
     "SketchAttachmentData",
     "SketchAxisReferenceInput",
@@ -1034,6 +1130,10 @@ __all__ = [
     "SketchPointGeometry",
     "SketchPointOnObjectReferenceInput",
     "SketchPointPosition",
+    "SketchRectangleCornerReference",
+    "SketchRectangleCreationResult",
+    "SketchRectangleProfile",
+    "SketchRectangleRequestInput",
     "SketchSolverData",
     "SketchVerticalAxisReferenceInput",
     "UnsupportedSketchConstraint",

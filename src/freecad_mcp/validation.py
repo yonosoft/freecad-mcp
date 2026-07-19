@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Mapping
 
@@ -31,6 +32,7 @@ from freecad_mcp.models import (
     SketchConstraintPointReferenceInput,
     SketchGeometryInput,
     SketchHorizontalAxisReferenceInput,
+    SketchRectangleRequestInput,
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
     TangentConstraintInput,
@@ -67,6 +69,9 @@ _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES = {
 _SKETCH_GEOMETRY_INPUT_ADAPTER: TypeAdapter[SketchGeometryInput] = TypeAdapter(SketchGeometryInput)
 _SKETCH_CONSTRAINT_INPUT_ADAPTER: TypeAdapter[SketchConstraintInput] = TypeAdapter(
     SketchConstraintInput
+)
+_SKETCH_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchRectangleRequestInput] = TypeAdapter(
+    SketchRectangleRequestInput
 )
 
 
@@ -242,6 +247,74 @@ def validate_create_sketch_request(
                 },
             )
     return None
+
+
+def validate_create_sketch_rectangle_request(
+    document_name: object,
+    sketch_name: object,
+    width: object,
+    height: object,
+    placement: object,
+) -> CommandResult | SketchRectangleRequestInput:
+    """Validate and parse one complete lower-left rectangle request."""
+    document_error = validate_document_reference(document_name)
+    if document_error is not None:
+        return document_error
+    sketch_error = _validate_object_name(
+        sketch_name,
+        field="sketch_name",
+        subject="Sketch",
+    )
+    if sketch_error is not None:
+        return sketch_error
+
+    try:
+        parsed = _SKETCH_RECTANGLE_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "width": width,
+                "height": height,
+                "placement": placement,
+            }
+        )
+    except ValidationError as exc:
+        first_error = exc.errors(include_url=False)[0]
+        location = ".".join(str(item) for item in first_error.get("loc", ()))
+        if location in {"width", "height"}:
+            invalid_value = width if location == "width" else height
+            return CommandResult.failure(
+                code="invalid_rectangle_dimensions",
+                message=(
+                    "Rectangle width and height must be finite strict numbers greater than zero."
+                ),
+                data={
+                    "field": location,
+                    "reason": "invalid_rectangle_dimensions",
+                    "actual_type": type(invalid_value).__name__,
+                },
+            )
+        return CommandResult.failure(
+            code="validation_error",
+            message="Rectangle placement must be a strict finite lower-left placement.",
+            data={
+                "field": location or "placement",
+                "reason": "invalid_rectangle_placement",
+            },
+        )
+
+    if not math.isfinite(parsed.placement.x + parsed.width) or not math.isfinite(
+        parsed.placement.y + parsed.height
+    ):
+        return CommandResult.failure(
+            code="invalid_rectangle_dimensions",
+            message="Rectangle dimensions and placement must produce finite corner coordinates.",
+            data={
+                "field": "placement",
+                "reason": "rectangle_coordinate_overflow",
+            },
+        )
+    return parsed
 
 
 def validate_add_sketch_geometry_request(
@@ -755,6 +828,7 @@ __all__ = [
     "validate_add_sketch_geometry_request",
     "validate_create_body_request",
     "validate_create_document_request",
+    "validate_create_sketch_rectangle_request",
     "validate_create_sketch_request",
     "validate_document_history_request",
     "validate_document_reference",

@@ -153,6 +153,23 @@ class Application:
             constraints=constraints,
         )
 
+    def create_sketch_rectangle(
+        self,
+        document_name: object,
+        sketch_name: object,
+        width: object,
+        height: object,
+        placement: object,
+    ) -> CommandResult:
+        """Create one verified semantic rectangle through the shared handler."""
+        return self.documents.create_sketch_rectangle.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            width=width,
+            height=height,
+            placement=placement,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

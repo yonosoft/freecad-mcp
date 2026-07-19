@@ -177,7 +177,12 @@ def test_add_sketch_geometry_remains_tool_eleven_without_changing_first_ten() ->
         "add_sketch_geometry",
         "add_sketch_constraints",
     ]
-    assert actual[12:] == ["get_document_history", "undo_document", "redo_document"]
+    assert actual[12:] == [
+        "get_document_history",
+        "undo_document",
+        "redo_document",
+        "create_sketch_rectangle",
+    ]
     assert actual == list(REGISTERED_TOOL_NAMES)
     assert actual[9] == "get_sketch"
     assert actual[10] == ADD_SKETCH_GEOMETRY_TOOL

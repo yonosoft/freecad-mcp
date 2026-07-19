@@ -20,6 +20,8 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchRectangleCreationResult,
+    SketchRectangleRequestInput,
 )
 
 T = TypeVar("T")
@@ -100,6 +102,12 @@ class DocumentAdapter(Protocol):
         constraints: tuple[SketchConstraintInput, ...],
     ) -> SketchConstraintAdditionResult:
         """Atomically append one controlled ordered constraint batch to a sketch."""
+
+    def create_sketch_rectangle(
+        self,
+        request: SketchRectangleRequestInput,
+    ) -> SketchRectangleCreationResult:
+        """Create and verify one semantic axis-aligned rectangle atomically."""
 
 
 class Dispatcher(Protocol):
