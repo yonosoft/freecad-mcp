@@ -41,6 +41,7 @@ from freecad_mcp.models import (
 
 _SUPPORTED_CONSTRAINTS = {
     "Coincident": "coincident",
+    "PointOnObject": "point_on_object",
     "Horizontal": "horizontal",
     "Vertical": "vertical",
     "Parallel": "parallel",
@@ -63,6 +64,7 @@ _DIMENSIONAL_CONSTRAINTS = {
 }
 _REFERENCE_COUNTS = {
     "Coincident": {2},
+    "PointOnObject": {2},
     "Horizontal": {1},
     "Vertical": {1},
     "Parallel": {2},
@@ -308,6 +310,18 @@ def _constraint_references(
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
 ) -> tuple[tuple[SketchConstraintReference, ...], bool]:
+    origin_coincidence = _coincident_origin_references(
+        constraint,
+        constraint_index,
+        geometry,
+    )
+    if origin_coincidence is not None:
+        return origin_coincidence
+
+    point_on_axis = _point_on_axis_references(constraint, constraint_index, geometry)
+    if point_on_axis is not None:
+        return point_on_axis
+
     origin_distance = _distance_to_origin_reference(constraint, constraint_index, geometry)
     if origin_distance is not None:
         return origin_distance
@@ -358,6 +372,110 @@ def _constraint_references(
             )
         )
     return tuple(references), False
+
+
+def _coincident_origin_references(
+    constraint: Any,
+    constraint_index: int,
+    geometry: tuple[SketchGeometry, ...],
+) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
+    try:
+        if constraint.Type != "Coincident":
+            return None
+        raw_references = (
+            (_required_integer(constraint.First), _required_integer(constraint.FirstPos)),
+            (_required_integer(constraint.Second), _required_integer(constraint.SecondPos)),
+        )
+    except Exception as exc:
+        raise SketchConstraintMalformedError(
+            index=constraint_index,
+            reason="reference_unreadable",
+        ) from exc
+
+    root_reference = (-1, 1)
+    if root_reference not in raw_references:
+        if any(geometry_index in _AXIS_NAMES for geometry_index, _ in raw_references):
+            return (), True
+        return None
+    if raw_references[0] == root_reference and raw_references[1] == root_reference:
+        return (), True
+
+    references: list[SketchConstraintReference] = []
+    for geometry_index, position_index in raw_references:
+        if (geometry_index, position_index) == root_reference:
+            references.append(SketchConstraintReference(reference="origin"))
+            continue
+        controlled = _geometry_point_reference(
+            geometry_index,
+            position_index,
+            constraint_index,
+            geometry,
+        )
+        if controlled is None:
+            return (), True
+        references.append(controlled)
+    return tuple(references), False
+
+
+def _point_on_axis_references(
+    constraint: Any,
+    constraint_index: int,
+    geometry: tuple[SketchGeometry, ...],
+) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
+    try:
+        if constraint.Type != "PointOnObject":
+            return None
+        geometry_index = _required_integer(constraint.First)
+        position_index = _required_integer(constraint.FirstPos)
+        axis_index = _required_integer(constraint.Second)
+        axis_position = _required_integer(constraint.SecondPos)
+    except Exception as exc:
+        raise SketchConstraintMalformedError(
+            index=constraint_index,
+            reason="reference_unreadable",
+        ) from exc
+
+    axis_references = {-1: "horizontal_axis", -2: "vertical_axis"}
+    if axis_index not in axis_references or axis_position != 0:
+        return (), True
+    point = _geometry_point_reference(
+        geometry_index,
+        position_index,
+        constraint_index,
+        geometry,
+    )
+    if point is None:
+        return (), True
+    return (
+        (
+            point,
+            SketchConstraintReference(reference=axis_references[axis_index]),
+        ),
+        False,
+    )
+
+
+def _geometry_point_reference(
+    geometry_index: int,
+    position_index: int,
+    constraint_index: int,
+    geometry: tuple[SketchGeometry, ...],
+) -> SketchConstraintReference | None:
+    if geometry_index < 0:
+        return None
+    if geometry_index >= len(geometry):
+        raise SketchConstraintMalformedError(
+            index=constraint_index,
+            reason="geometry_reference_out_of_range",
+        )
+    position = _controlled_position(geometry[geometry_index], position_index)
+    if position is None or position == "edge":
+        return None
+    return SketchConstraintReference(
+        kind="geometry",
+        geometry_index=geometry_index,
+        position=position,
+    )
 
 
 def _distance_to_origin_reference(

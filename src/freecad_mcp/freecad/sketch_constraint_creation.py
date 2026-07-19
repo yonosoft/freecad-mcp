@@ -30,16 +30,26 @@ from freecad_mcp.models import (
     HorizontalConstraintInput,
     ParallelConstraintInput,
     PerpendicularConstraintInput,
+    PointOnObjectConstraintInput,
     RadiusConstraintInput,
+    SketchAxisReferenceInput,
+    SketchCoincidentReferenceInput,
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
+    SketchHorizontalAxisReferenceInput,
+    SketchOriginReferenceInput,
     SketchPointPosition,
+    SketchVerticalAxisReferenceInput,
     VerticalConstraintInput,
 )
 
 _TRANSACTION_NAME = "MCP Add Sketch Constraints"
 _UNUSED_GEOMETRY_REFERENCE = -2000
+_SKETCH_ROOT_GEOMETRY_ID = -1
+_SKETCH_ROOT_POINT_POSITION = 1
+_HORIZONTAL_SKETCH_AXIS_ID = -1
+_VERTICAL_SKETCH_AXIS_ID = -2
 _POINT_POSITIONS = {
     SketchPointPosition.START: 1,
     SketchPointPosition.END: 2,
@@ -234,8 +244,21 @@ def _validate_geometry_compatibility(
             if not ((first_line and second_line) or (first_circular and second_circular)):
                 _incompatible(index)
         elif isinstance(item, CoincidentConstraintInput):
-            _require_point(geometry, item.first, part, index)
-            _require_point(geometry, item.second, part, index)
+            point_references = tuple(
+                reference
+                for reference in (item.first, item.second)
+                if isinstance(reference, SketchConstraintPointReferenceInput)
+            )
+            if len(point_references) != 1 and len(point_references) != 2:
+                raise SketchConstraintCreationError(
+                    index=index,
+                    reason="same_origin_reference",
+                )
+            for reference in point_references:
+                _require_point(geometry, reference, part, index)
+        elif isinstance(item, PointOnObjectConstraintInput):
+            point, _axis = _point_on_object_references(item, index)
+            _require_point(geometry, point, part, index)
         elif isinstance(item, DistanceLineLengthConstraintInput):
             _require_line(geometry, item.geometry_index, part, index)
         elif isinstance(item, DistancePointToOriginConstraintInput):
@@ -288,12 +311,22 @@ def _build_constraint(item: SketchConstraintInput, sketcher: Any, index: int) ->
                 "Equal", item.first_geometry_index, item.second_geometry_index
             )
         if isinstance(item, CoincidentConstraintInput):
+            first_geometry, first_position = _coincident_native_reference(item.first)
+            second_geometry, second_position = _coincident_native_reference(item.second)
             return sketcher.Constraint(
                 "Coincident",
-                item.first.geometry_index,
-                _point_position(item.first),
-                item.second.geometry_index,
-                _point_position(item.second),
+                first_geometry,
+                first_position,
+                second_geometry,
+                second_position,
+            )
+        if isinstance(item, PointOnObjectConstraintInput):
+            point, axis = _point_on_object_references(item, index)
+            return sketcher.Constraint(
+                "PointOnObject",
+                point.geometry_index,
+                _point_position(point),
+                _axis_geometry_id(axis),
             )
         if isinstance(item, DistanceLineLengthConstraintInput):
             return sketcher.Constraint("Distance", item.geometry_index, item.value)
@@ -302,8 +335,8 @@ def _build_constraint(item: SketchConstraintInput, sketcher: Any, index: int) ->
                 "Distance",
                 item.point.geometry_index,
                 _point_position(item.point),
-                -1,
-                1,
+                _SKETCH_ROOT_GEOMETRY_ID,
+                _SKETCH_ROOT_POINT_POSITION,
                 item.value,
             )
         if isinstance(item, DistanceBetweenPointsConstraintInput):
@@ -372,6 +405,37 @@ def _build_constraint(item: SketchConstraintInput, sketcher: Any, index: int) ->
 
 def _point_position(reference: SketchConstraintPointReferenceInput) -> int:
     return _POINT_POSITIONS[reference.position]
+
+
+def _coincident_native_reference(
+    reference: SketchCoincidentReferenceInput,
+) -> tuple[int, int]:
+    if isinstance(reference, SketchOriginReferenceInput):
+        return _SKETCH_ROOT_GEOMETRY_ID, _SKETCH_ROOT_POINT_POSITION
+    return reference.geometry_index, _point_position(reference)
+
+
+def _point_on_object_references(
+    item: PointOnObjectConstraintInput,
+    index: int,
+) -> tuple[SketchConstraintPointReferenceInput, SketchAxisReferenceInput]:
+    if isinstance(item.first, SketchConstraintPointReferenceInput) and isinstance(
+        item.second,
+        (SketchHorizontalAxisReferenceInput, SketchVerticalAxisReferenceInput),
+    ):
+        return item.first, item.second
+    if isinstance(item.second, SketchConstraintPointReferenceInput) and isinstance(
+        item.first,
+        (SketchHorizontalAxisReferenceInput, SketchVerticalAxisReferenceInput),
+    ):
+        return item.second, item.first
+    raise SketchConstraintCreationError(index=index, reason="unsupported_reference")
+
+
+def _axis_geometry_id(reference: SketchAxisReferenceInput) -> int:
+    if isinstance(reference, SketchHorizontalAxisReferenceInput):
+        return _HORIZONTAL_SKETCH_AXIS_ID
+    return _VERTICAL_SKETCH_AXIS_ID
 
 
 def _require_line(geometry: tuple[Any, ...], geometry_index: int, part: Any, index: int) -> None:

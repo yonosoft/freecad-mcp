@@ -760,7 +760,10 @@ parallel / perpendicular / equal
   first_geometry_index, second_geometry_index
 
 coincident
-  first, second point references
+  first, second: exactly one geometry point plus origin, or two geometry points
+
+point_on_object
+  first, second: exactly one geometry point plus one controlled sketch axis
 
 distance
   line_length: geometry_index, value
@@ -779,15 +782,24 @@ angle
   between_lines: first_geometry_index, second_geometry_index, value_degrees
 ```
 
-A point reference is `{geometry_index, position}`. Public position tokens map
+A geometry-point reference is `{geometry_index, position}`. Public position tokens map
 to verified FreeCAD point-position integers as `start → 1`, `end → 2`,
 `center → 3`, and `point → 1` for `Part.Point`. The adapter admits
 `start`/`end` for lines, `start`/`end`/`center` for circular arcs, `center` for
-circles, and `point` for point geometry. Negative, axis, external, internal,
-and free-form origin references are rejected. The explicit Euclidean
-`point_to_origin` mode uses FreeCAD's internal root point `(-1, 1)` without
-exposing it; sketch inspection recognizes that encoding and returns only the
-controlled geometry-point reference.
+circles, and `point` for point geometry. Strict native-sketch references add
+exactly `{"reference": "origin"}`, `{"reference": "horizontal_axis"}`, and
+`{"reference": "vertical_axis"}`. Origin is limited to `coincident`; the two
+axes are limited to `point_on_object`. Both public orders are accepted. Unknown
+literals, additional reference fields, raw negative geometry IDs, external
+geometry, and internal geometry are rejected.
+
+The focused FreeCAD layer alone translates `origin` to the native root point,
+`horizontal_axis` to the native horizontal sketch axis, and `vertical_axis` to
+the native vertical sketch axis. FreeCAD 1.1.1 verification confirmed that
+origin membership is a native `Coincident` constraint and axis membership is a
+native `PointOnObject` constraint. No construction geometry or zero-valued X/Y
+distance constraints are synthesized. The existing explicit Euclidean
+`point_to_origin` modes and their controlled inspection readback are unchanged.
 
 Lengths are public millimetres. Euclidean distances, radii, and diameters are
 strict finite positive values. Signed and zero `distance_x`/`distance_y` values
@@ -801,15 +813,16 @@ between-line orientation semantics.
 
 Pure request validation rejects malformed unions, missing/additional fields,
 unsupported discriminators or modes, non-integer or negative indices, invalid
-position tokens, same-geometry pairs, nonnumeric/non-finite values, nonpositive
-unsigned dimensions, empty batches, and batches above 100. Before opening a
-transaction, the FreeCAD adapter resolves every current index and enforces:
+position tokens, same-geometry pairs, origin-to-origin pairs, invalid native
+reference combinations, nonnumeric/non-finite values, nonpositive unsigned
+dimensions, empty batches, and batches above 100. Before opening a transaction,
+the FreeCAD adapter resolves every current index and enforces:
 
 - horizontal, vertical, parallel, perpendicular, line length, and angles:
   `Part.LineSegment` only;
 - equal: line-to-line or any circle/circular-arc pair;
-- coincident and point distances: only point tokens valid for the runtime
-  geometry type;
+- coincident, point-on-object, and point distances: only point tokens valid for
+  the runtime geometry type;
 - radius and diameter: `Part.Circle` or `Part.ArcOfCircle` only.
 
 Construction geometry is valid under the same rules. Standalone and attached
@@ -863,14 +876,16 @@ Public error codes are `validation_error`, `document_not_found`,
 `constraint_batch_too_large`, `unsupported_constraint_type`,
 `invalid_constraint_input`, `invalid_geometry_reference`,
 `geometry_reference_out_of_range`, `invalid_position_reference`,
-`same_geometry_reference`, `invalid_constraint_value`, and
+`same_geometry_reference`, `same_origin_reference`, `unsupported_reference`,
+`invalid_point_reference`, `invalid_constraint_value`, and
 `incompatible_geometry_type`, plus focused transaction/index/count/rollback
 reasons. Raw FreeCAD exception text is never public.
 
 Version one creates only active driving dimensional constraints. Tangency,
-point-on-object, symmetry, block, internal alignment, angle-via-point,
-B-spline-specific and reference constraints; expressions, names, editing and
-deletion; and external/axis/internal geometry references remain unsupported.
+symmetry, block, internal alignment, angle-via-point, B-spline-specific and
+arbitrary reference constraints; expressions, names, editing and deletion; and
+external/internal geometry references remain unsupported. Axis references are
+limited to native `point_on_object`.
 
 ## Sketch Inspection
 
@@ -914,6 +929,16 @@ normalized to `millimeter` and angles to `degree`. The `solver` object contains
 conflicting, redundant, partially redundant, and malformed constraint-index
 lists. When FreeCAD's cached sketch state is stale, `available` remains true
 but the cached facts are null; inspection does not recompute them.
+
+Constraint inspection preserves the existing ordered `references` array. A
+native origin coincidence is returned with the geometry-point reference plus
+`{"reference": "origin"}` in the order stored by FreeCAD. Native
+`PointOnObject` axis membership is returned as the geometry point plus
+`{"reference": "horizontal_axis"}` or `{"reference": "vertical_axis"}`.
+Private root/axis IDs never cross the adapter boundary. Constraint type is
+interpreted together with point position: an axis-like native ID in a
+`Coincident` record is not misreported as origin or as controlled
+`point_on_object`.
 
 #### Unsupported and Malformed Data
 

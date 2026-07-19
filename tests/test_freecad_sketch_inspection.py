@@ -343,6 +343,121 @@ def test_get_sketch_hides_internal_root_point_for_created_distance_to_origin(
     assert constraint["value"] == {"value": 5.0, "unit": "millimeter"}
 
 
+@pytest.mark.parametrize(
+    ("first", "first_pos", "second", "second_pos", "expected"),
+    [
+        (
+            0,
+            3,
+            -1,
+            1,
+            [
+                {"kind": "geometry", "geometry_index": 0, "position": "center"},
+                {"reference": "origin"},
+            ],
+        ),
+        (
+            -1,
+            1,
+            0,
+            3,
+            [
+                {"reference": "origin"},
+                {"kind": "geometry", "geometry_index": 0, "position": "center"},
+            ],
+        ),
+    ],
+)
+def test_get_sketch_returns_controlled_origin_reference_in_native_order(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    first: int,
+    first_pos: int,
+    second: int,
+    second_pos: int,
+    expected: list[dict[str, object]],
+) -> None:
+    sketch = SketchStub(
+        geometry=[Circle(Vector(0.0, 0.0), 10.0)],
+        constraints=[
+            ConstraintStub(
+                "Coincident",
+                first=first,
+                first_pos=first_pos,
+                second=second,
+                second_pos=second_pos,
+            )
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    result = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()
+
+    constraint = result["constraints"][0]  # type: ignore[index]
+    assert constraint["type"] == "coincident"
+    assert constraint["references"] == expected
+    assert all(reference.get("geometry_index") != -1 for reference in expected)
+
+
+@pytest.mark.parametrize(
+    ("axis_index", "expected_reference"),
+    [(-1, "horizontal_axis"), (-2, "vertical_axis")],
+)
+def test_get_sketch_returns_native_point_on_axis_semantics(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    axis_index: int,
+    expected_reference: str,
+) -> None:
+    sketch = SketchStub(
+        geometry=[Point(0.0, 0.0)],
+        constraints=[
+            ConstraintStub(
+                "PointOnObject",
+                first=0,
+                first_pos=1,
+                second=axis_index,
+                second_pos=0,
+            )
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    result = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()
+
+    constraint = result["constraints"][0]  # type: ignore[index]
+    assert constraint["type"] == "point_on_object"
+    assert constraint["references"] == [
+        {"kind": "geometry", "geometry_index": 0, "position": "point"},
+        {"reference": expected_reference},
+    ]
+
+
+def test_get_sketch_does_not_misreport_axis_coincident_as_origin(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+) -> None:
+    sketch = SketchStub(
+        geometry=[Point(0.0, 0.0)],
+        constraints=[
+            ConstraintStub(
+                "Coincident",
+                first=0,
+                first_pos=1,
+                second=-1,
+                second_pos=0,
+            )
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    result = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()
+
+    constraint = result["constraints"][0]  # type: ignore[index]
+    assert constraint["type"] == "unsupported"
+    assert "references" not in constraint
+
+
 def test_get_sketch_reports_stale_solver_cache_without_values(
     monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
 ) -> None:

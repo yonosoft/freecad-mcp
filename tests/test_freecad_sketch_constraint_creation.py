@@ -92,6 +92,10 @@ class ConstraintStub:
             self.Second = int(args[1])
         elif constraint_type == "Coincident":
             self.First, self.FirstPos, self.Second, self.SecondPos = map(int, args)
+        elif constraint_type == "PointOnObject":
+            self.First = int(args[0])
+            self.FirstPos = int(args[1])
+            self.Second = int(args[2])
         elif constraint_type in {"Radius", "Diameter"}:
             self.First = int(args[0])
             self.Value = float(args[1])
@@ -398,6 +402,140 @@ def test_mixed_batch_adds_every_verified_constructor_in_order(
     assert sketch._construction == [True, False, False, False, True, False]
 
 
+def test_native_sketch_references_use_verified_constructors_without_extra_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    construction = [True, False, False, False, True, True]
+    sketch = SketchStub(_geometry(), construction=construction)
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    payload: list[dict[str, object]] = [
+        {
+            "type": "coincident",
+            "first": {"geometry_index": 3, "position": "center"},
+            "second": {"reference": "origin"},
+        },
+        {
+            "type": "coincident",
+            "first": {"reference": "origin"},
+            "second": {"geometry_index": 4, "position": "center"},
+        },
+        {
+            "type": "point_on_object",
+            "first": {"geometry_index": 0, "position": "start"},
+            "second": {"reference": "horizontal_axis"},
+        },
+        {
+            "type": "point_on_object",
+            "first": {"reference": "vertical_axis"},
+            "second": {"geometry_index": 1, "position": "end"},
+        },
+        {
+            "type": "coincident",
+            "first": {"geometry_index": 5, "position": "point"},
+            "second": {"reference": "origin"},
+        },
+    ]
+
+    result = FreeCADDocumentAdapter().add_sketch_constraints(
+        "Bracket",
+        "Sketch",
+        _parsed(payload),
+    )
+
+    assert result.added_indices == (0, 1, 2, 3, 4)
+    assert result.constraint_count == 5
+    assert [
+        (item.Type, item.First, item.FirstPos, item.Second, item.SecondPos)
+        for item in sketch._constraints
+    ] == [
+        ("Coincident", 3, 3, -1, 1),
+        ("Coincident", -1, 1, 4, 3),
+        ("PointOnObject", 0, 1, -1, 0),
+        ("PointOnObject", 1, 2, -2, 0),
+        ("Coincident", 5, 1, -1, 1),
+    ]
+    assert sketch.GeometryCount == 6
+    assert sketch._construction == construction
+    assert not any(item.Type in {"DistanceX", "DistanceY"} for item in sketch._constraints)
+    assert document.recompute_calls == 0
+    assert document.save_calls == 0
+    assert sketch.solve_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("geometry_index", "position"),
+    [
+        (0, "start"),
+        (0, "end"),
+        (3, "center"),
+        (4, "start"),
+        (4, "end"),
+        (4, "center"),
+        (5, "point"),
+    ],
+)
+def test_all_compatible_geometry_points_can_coincide_with_origin(
+    monkeypatch: pytest.MonkeyPatch,
+    geometry_index: int,
+    position: str,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+
+    result = FreeCADDocumentAdapter().add_sketch_constraints(
+        "Bracket",
+        "Sketch",
+        _parsed(
+            [
+                {
+                    "type": "coincident",
+                    "first": {"geometry_index": geometry_index, "position": position},
+                    "second": {"reference": "origin"},
+                }
+            ]
+        ),
+    )
+
+    assert result.added_indices == (0,)
+    assert sketch.ConstraintCount == 1
+    assert sketch.GeometryCount == 6
+
+
+@pytest.mark.parametrize("reference", ["horizontal_axis", "vertical_axis"])
+@pytest.mark.parametrize(
+    ("geometry_index", "position"),
+    [(0, "start"), (3, "center"), (4, "end"), (5, "point")],
+)
+def test_all_compatible_geometry_points_can_lie_on_native_axes(
+    monkeypatch: pytest.MonkeyPatch,
+    reference: str,
+    geometry_index: int,
+    position: str,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+
+    result = FreeCADDocumentAdapter().add_sketch_constraints(
+        "Bracket",
+        "Sketch",
+        _parsed(
+            [
+                {
+                    "type": "point_on_object",
+                    "first": {"geometry_index": geometry_index, "position": position},
+                    "second": {"reference": reference},
+                }
+            ]
+        ),
+    )
+
+    assert result.added_indices == (0,)
+    assert sketch._constraints[0].Type == "PointOnObject"
+
+
 def test_existing_constraint_indices_continue_and_state_is_preserved(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -450,6 +588,22 @@ def test_standalone_and_attached_sketches_use_the_same_constraint_path(
                 "second": {"geometry_index": 0, "position": "end"},
             },
             "invalid_position_reference",
+        ),
+        (
+            {
+                "type": "coincident",
+                "first": {"geometry_index": 3, "position": "start"},
+                "second": {"reference": "origin"},
+            },
+            "invalid_position_reference",
+        ),
+        (
+            {
+                "type": "coincident",
+                "first": {"geometry_index": 99, "position": "start"},
+                "second": {"reference": "origin"},
+            },
+            "geometry_reference_out_of_range",
         ),
         ({"type": "radius", "geometry_index": 0, "value": 5.0}, "incompatible_geometry_type"),
         (
@@ -560,6 +714,38 @@ def test_caller_owned_failure_cleans_up_but_leaves_transaction_open(
     assert document.commit_calls == 0
     assert document.abort_calls == 0
     assert document.HasPendingTransaction is True
+
+
+def test_origin_constraint_internal_failure_restores_native_solver_movement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(_geometry(), failure_at=1)
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    original_end = sketch._geometry[0].EndPoint.clone()
+    batch = _parsed(
+        [
+            {
+                "type": "coincident",
+                "first": {"geometry_index": 0, "position": "end"},
+                "second": {"reference": "origin"},
+            },
+            {"type": "radius", "geometry_index": 3, "value": 5.0},
+        ]
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert raised.value.index == 1
+    assert sketch.ConstraintCount == 0
+    assert sketch._geometry[0].EndPoint.x == original_end.x
+    assert sketch._geometry[0].EndPoint.y == original_end.y
+    assert document.abort_calls == 1
+    assert document.commit_calls == 0
+    assert document.recompute_calls == 0
+    assert document.save_calls == 0
+    assert sketch.solve_calls == 0
 
 
 def test_commit_failure_rolls_back_without_partial_indices(

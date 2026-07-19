@@ -22,11 +22,14 @@ def register_add_sketch_constraints_tool(
         description=(
             "Atomically append 1 to 100 controlled constraints to a sketch by exact "
             "internal document and sketch name. Supports horizontal, vertical, parallel, "
-            "perpendicular, equal, coincident, distance, distance_x, distance_y, radius, "
-            "diameter and angle in request order. Lengths are millimetres; angles are "
-            "degrees and are passed without normalization. The tool does not call solve, "
-            "recompute or save. Returned indices describe only the immediate sketch state "
-            "and may be renumbered by later mutations; call get_sketch for readback."
+            "perpendicular, equal, coincident, point_on_object, distance, distance_x, "
+            "distance_y, radius, diameter and angle in request order. Coincident accepts "
+            "the controlled sketch origin reference; point_on_object accepts controlled "
+            "horizontal and vertical sketch-axis references. Lengths are millimetres; "
+            "angles are degrees and are passed without normalization. The tool does not "
+            "call solve, recompute or save. Returned indices describe only the immediate "
+            "sketch state and may be renumbered by later mutations; call get_sketch for "
+            "readback."
         ),
         structured_output=True,
     )

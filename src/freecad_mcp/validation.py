@@ -24,8 +24,12 @@ from freecad_mcp.models import (
     ParallelConstraintInput,
     PerpendicularConstraintInput,
     PointGeometryInput,
+    PointOnObjectConstraintInput,
     SketchConstraintInput,
+    SketchConstraintPointReferenceInput,
     SketchGeometryInput,
+    SketchHorizontalAxisReferenceInput,
+    SketchVerticalAxisReferenceInput,
 )
 
 _INTERNAL_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
@@ -47,6 +51,7 @@ _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES = {
     "horizontal",
     "parallel",
     "perpendicular",
+    "point_on_object",
     "radius",
     "vertical",
 }
@@ -344,7 +349,7 @@ def validate_add_sketch_constraints_request(
         try:
             parsed = _SKETCH_CONSTRAINT_INPUT_ADAPTER.validate_python(item)
         except ValidationError as exc:
-            return _constraint_model_validation_error(index, exc)
+            return _constraint_model_validation_error(index, item, exc)
 
         semantic_error = _validate_constraint_semantics(index, parsed)
         if semantic_error is not None:
@@ -384,7 +389,11 @@ def _geometry_model_validation_error(index: int, exc: ValidationError) -> Comman
     )
 
 
-def _constraint_model_validation_error(index: int, exc: ValidationError) -> CommandResult:
+def _constraint_model_validation_error(
+    index: int,
+    item: object,
+    exc: ValidationError,
+) -> CommandResult:
     error = exc.errors(include_url=False, include_context=False, include_input=False)[0]
     raw_location = [str(part) for part in error.get("loc", ())]
     location = [
@@ -400,7 +409,10 @@ def _constraint_model_validation_error(index: int, exc: ValidationError) -> Comm
 
     leaf = location[-1] if location else ""
     validation_type = str(error.get("type", "invalid_constraint_input"))
-    if validation_type == "missing":
+    reference_reason = _malformed_reference_reason(item)
+    if reference_reason is not None:
+        reason = reference_reason
+    elif validation_type == "missing":
         reason = "invalid_constraint_input"
     elif leaf == "position":
         reason = "invalid_position_reference"
@@ -422,6 +434,34 @@ def _constraint_model_validation_error(index: int, exc: ValidationError) -> Comm
     )
 
 
+def _malformed_reference_reason(item: object) -> str | None:
+    if not isinstance(item, Mapping):
+        return None
+    constraint_type = item.get("type")
+    allowed_references: set[str] = set()
+    if constraint_type == "coincident":
+        allowed_references = {"origin"}
+    elif constraint_type == "point_on_object":
+        allowed_references = {"horizontal_axis", "vertical_axis"}
+
+    for field in ("first", "second", "point"):
+        reference = item.get(field)
+        if not isinstance(reference, Mapping):
+            continue
+        if "reference" in reference:
+            if set(reference) != {"reference"}:
+                return "invalid_point_reference"
+            literal = reference.get("reference")
+            if not isinstance(literal, str) or literal not in allowed_references:
+                return "unsupported_reference"
+            continue
+        if not {"geometry_index", "position"}.issubset(reference):
+            return "invalid_point_reference"
+        if set(reference) != {"geometry_index", "position"}:
+            return "invalid_point_reference"
+    return None
+
+
 def _validate_constraint_semantics(
     index: int,
     item: SketchConstraintInput,
@@ -440,13 +480,57 @@ def _validate_constraint_semantics(
     elif isinstance(
         item,
         (
-            CoincidentConstraintInput,
             DistanceBetweenPointsConstraintInput,
             DistanceXBetweenPointsConstraintInput,
             DistanceYBetweenPointsConstraintInput,
         ),
     ):
         pair = (item.first.geometry_index, item.second.geometry_index)
+
+    if isinstance(item, CoincidentConstraintInput):
+        first_is_point = isinstance(item.first, SketchConstraintPointReferenceInput)
+        second_is_point = isinstance(item.second, SketchConstraintPointReferenceInput)
+        if not first_is_point and not second_is_point:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Constraint item {index} cannot reference the origin twice.",
+                data={
+                    "field": f"constraints[{index}]",
+                    "constraint_index": index,
+                    "reason": "same_origin_reference",
+                },
+            )
+        if isinstance(item.first, SketchConstraintPointReferenceInput) and isinstance(
+            item.second,
+            SketchConstraintPointReferenceInput,
+        ):
+            pair = (item.first.geometry_index, item.second.geometry_index)
+
+    if isinstance(item, PointOnObjectConstraintInput):
+        references = (item.first, item.second)
+        point_count = sum(
+            isinstance(reference, SketchConstraintPointReferenceInput) for reference in references
+        )
+        axis_count = sum(
+            isinstance(
+                reference,
+                (SketchHorizontalAxisReferenceInput, SketchVerticalAxisReferenceInput),
+            )
+            for reference in references
+        )
+        if point_count != 1 or axis_count != 1:
+            return CommandResult.failure(
+                code="validation_error",
+                message=(
+                    f"Constraint item {index} must reference one geometry point "
+                    "and one sketch axis."
+                ),
+                data={
+                    "field": f"constraints[{index}]",
+                    "constraint_index": index,
+                    "reason": "unsupported_reference",
+                },
+            )
 
     if pair is not None and pair[0] == pair[1]:
         return CommandResult.failure(

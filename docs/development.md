@@ -265,7 +265,10 @@ supported type and overload, semantic point tokens, exact required/additional
 fields, the 1-to-100 limit, direct angle policy, signed X/Y distances, positive
 Euclidean dimensions, controlled result serialization, handler dispatch and
 error translation, application/runtime wiring, public adapter delegation, and
-architecture boundaries.
+architecture boundaries. Native-reference coverage locks the exact one-field
+`origin`, `horizontal_axis`, and `vertical_axis` models, both public orderings,
+origin-to-origin and invalid-scope rejection, raw-negative-ID rejection, and
+the exact 13-member top-level constraint schema.
 
 Adapter stubs exercise all verified `Sketcher.Constraint` constructors in one
 mixed ordered batch, construction geometry, standalone and attached sketches,
@@ -277,7 +280,64 @@ driving/active/virtual flags, geometry restoration after internal solver
 movement, rollback verification failure, and absence of explicit solve,
 recompute, or save calls. `get_sketch` coverage also locks controlled readback
 of point geometry and the private root-point encoding used by Euclidean
-point-to-origin distance.
+point-to-origin distance. Focused native-reference tests cover circle and arc
+centres, both line endpoints, arc endpoints, `Part.Point`, construction
+geometry, origin coincidence, horizontal/vertical `PointOnObject`, controlled
+inspection, axis/origin disambiguation, later-item atomic rejection, and
+rollback after FreeCAD-like immediate geometry movement.
+
+The reusable direct runtime check is
+`scripts/smoke_sketch_native_references.py`. Run it with FreeCAD 1.1's Python
+and the development environment's site-packages on `PYTHONPATH`. It creates
+only unsaved disposable documents, exercises native origin and axis references
+through `FreeCADDocumentAdapter`, verifies immediate movement and controlled
+readback, and checks the two-circle/four-constraint/zero-construction/zero-DoF
+regression plus one-step undo and redo. It does not connect to or exercise the
+live MCP endpoint.
+
+### Native Sketch Reference Live Acceptance Plan (Not Executed Here)
+
+Use a focused AiderDesk MCP profile only after automated checks and the direct
+adapter smoke pass:
+
+1. Record `git status --short --branch` and preserve the repository without
+   edits, commits, pulls, pushes, or generated files.
+2. Discover tools and verify the exact unchanged twelve-tool order, with
+   `add_sketch_constraints` still tool twelve.
+3. Capture the exact updated schema: 13 constraint mappings; strict geometry
+   point references; exact one-field `origin`, `horizontal_axis`, and
+   `vertical_axis` references; and forbidden additional fields.
+4. In separate unsaved sketches, add circle-centre, arc-centre, line-start,
+   line-end, and `Part.Point` coincidences to `origin`; repeat one with origin
+   first in the request.
+5. Add line and representative curved/point geometry references to both native
+   axes with `point_on_object`; verify the resulting FreeCAD type is
+   `PointOnObject`, never `Coincident`.
+6. Verify each successful item adds exactly one constraint, adds no geometry,
+   creates no zero-valued `DistanceX`/`DistanceY`, and returns one index.
+7. Use `get_sketch` to verify controlled `origin` and axis references and that
+   no private negative native ID appears.
+8. Create two initially off-origin circles of radii 10 mm and 15 mm. Submit
+   exactly two origin coincidences and two radius constraints.
+9. Verify exactly two geometries, zero construction geometries, exactly four
+   constraints in request order, both centres at origin, and radii 10 and 15.
+10. Record stale solver state immediately after mutation; explicitly recompute,
+    then verify fresh state, zero degrees of freedom, and fully constrained.
+11. Verify `origin` to `origin`, origin under `point_on_object`, axes under
+    `coincident`, unknown literals, extra reference fields, raw negative IDs,
+    incompatible positions, and out-of-range geometry all fail controllably.
+12. Submit a valid origin coincidence followed by a later invalid item and
+    compare a full before/after snapshot to confirm zero mutation and no partial
+    indices.
+13. With undo enabled, verify one undo removes the complete successful batch
+    and one redo restores its exact order, types, values, and references.
+14. Repeat representative checks on standalone and body-attached sketches and
+    with construction geometry where the point selector is valid.
+15. Confirm an unsaved document remains unsaved. In a separately saved
+    disposable document, verify path, timestamp, and bytes remain unchanged.
+16. Close disposable documents without saving, stop MCP, retain the AiderDesk
+    transcript/schema/state snapshots, and confirm final repository status
+    exactly matches step 1.
 
 ## Report View Verification
 
@@ -623,16 +683,16 @@ or install a temporary deterministic failure hook that is restored in
    `add_sketch_constraints`; compare the first eleven schemas to their saved
    compatibility snapshots.
 3. Inspect tool twelve's exact schema: three required top-level fields, a
-   1-to-100 array, all 12 type mappings, every nested mode mapping, strict point
-   references, finite numeric fields, positive unsigned dimensions, signed
-   X/Y values, and forbidden additional item fields.
+   1-to-100 array, all 13 type mappings, every nested mode mapping, strict point
+   and native-sketch references, finite numeric fields, positive unsigned
+   dimensions, signed X/Y values, and forbidden additional item fields.
 4. Create separate unsaved standalone and body-origin-plane-attached sketches.
    Add line, circle, circular-arc, point, and construction geometry suitable for
    every supported constraint and record a full `get_sketch` baseline.
 5. Exercise `horizontal`, `vertical`, `parallel`, `perpendicular`, `equal`,
-   `coincident`, `radius`, and `diameter` individually. Verify exact assigned
-   indices, constraint ordering, geometry compatibility, driving/active/virtual
-   state, and `get_sketch` parity after each mutation.
+   `coincident`, `point_on_object`, `radius`, and `diameter` individually.
+   Verify exact assigned indices, constraint ordering, geometry compatibility,
+   driving/active/virtual state, and `get_sketch` parity after each mutation.
 6. Exercise all `distance` modes (`line_length`, `point_to_origin`, and
    `between_points`), all `distance_x`/`distance_y` modes, and both `angle`
    modes. Verify millimetre/degree readback and that the internal root-point
@@ -682,10 +742,11 @@ or install a temporary deterministic failure hook that is restored in
 19. Confirm an unsaved document remains unsaved. For a separately saved
     disposable file, record path and filesystem timestamp before mutation and
     verify both are unchanged afterward.
-20. Confirm unsupported tangent, point-on-object, symmetric, block, internal
-    alignment, angle-via-point, B-spline/reference constraints, expressions,
-    names, deletion/editing, and external/axis/internal references remain
-    rejected while pre-existing unsupported constraints stay inspectable.
+20. Confirm unsupported tangent, symmetric, block, internal alignment,
+    angle-via-point, B-spline/arbitrary reference constraints, expressions,
+    names, deletion/editing, and external/internal references remain rejected;
+    confirm axis references are accepted only for native `point_on_object` while
+    pre-existing unsupported constraints stay inspectable.
     Close disposable documents without saving, stop MCP, and retain the
     AiderDesk transcript, Report View, schema snapshot, and state comparisons.
 

@@ -21,6 +21,8 @@ _REQUEST_REASONS = {
     "geometry_reference_out_of_range",
     "incompatible_geometry_type",
     "invalid_position_reference",
+    "same_origin_reference",
+    "unsupported_reference",
 }
 
 

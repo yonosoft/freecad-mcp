@@ -145,9 +145,10 @@ Version-one geometry support is `line_segment`, `circle`, `arc_of_circle`, and
 `point`. Geometry remains in current sketch-index order and includes its
 construction state. The supported constraint discriminators are `coincident`,
 `horizontal`, `vertical`, `parallel`, `perpendicular`, `equal`, `distance`,
-`distance_x`, `distance_y`, `radius`, `diameter`, and `angle`. Valid geometry or
-constraints outside those sets are returned as controlled `unsupported`
-records rather than failing the entire sketch.
+`distance_x`, `distance_y`, `radius`, `diameter`, `angle`, and
+`point_on_object`. Valid geometry or constraints outside those sets are
+returned as controlled `unsupported` records rather than failing the entire
+sketch.
 
 Lengths use `millimeter` and angles use `degree`. Solver facts come only from
 FreeCAD's cached properties: they are populated when the sketch state is up to
@@ -269,7 +270,10 @@ member with no additional fields. Version one supports:
 - `parallel` and `perpendicular` between distinct line segments;
 - `equal` between distinct line segments, or between any distinct pair of
   circles and circular arcs;
-- `coincident` between distinct controlled point references;
+- `coincident` between distinct geometry-point references, or between one
+  geometry point and the native sketch origin;
+- `point_on_object` between one geometry point and the native horizontal or
+  vertical sketch axis;
 - `distance` modes `line_length`, `point_to_origin`, and `between_points`;
 - `distance_x` and `distance_y` modes `point_to_origin` and `between_points`;
 - `radius` and `diameter` on circles or circular arcs;
@@ -300,10 +304,55 @@ For example:
 Point references use semantic tokens rather than FreeCAD integers:
 `start → 1`, `end → 2`, `center → 3`, and `point → 1` for `Part.Point`
 geometry. Lines allow `start`/`end`, arcs allow `start`/`end`/`center`, circles
-allow `center`, and point geometry allows `point`. Negative geometry indices,
-axes, external geometry, origin references as free-form references, and
-internal geometry are not accepted. The explicit `point_to_origin` modes do
-not expose FreeCAD's internal root-point encoding.
+allow `center`, and point geometry allows `point`. Native sketch references
+are strict one-field objects:
+
+```json
+{"reference": "origin"}
+{"reference": "horizontal_axis"}
+{"reference": "vertical_axis"}
+```
+
+`origin` is accepted only as the non-geometry side of `coincident`.
+`horizontal_axis` and `vertical_axis` are accepted only as the non-geometry
+side of `point_on_object`; either public reference order is accepted. Negative
+geometry indices, external geometry, internal geometry, and other reference
+literals are rejected. The existing `point_to_origin` distance modes remain
+unchanged and do not expose FreeCAD's internal root-point encoding.
+
+For example, a circle can be centered natively on the sketch origin without an
+artificial anchor point:
+
+```json
+{
+  "document_name": "BearingSketch",
+  "sketch_name": "Sketch",
+  "constraints": [
+    {
+      "type": "coincident",
+      "first": {
+        "geometry_index": 0,
+        "position": "center"
+      },
+      "second": {
+        "reference": "origin"
+      }
+    },
+    {
+      "type": "radius",
+      "geometry_index": 0,
+      "value": 10.0
+    }
+  ]
+}
+```
+
+This creates one native `Coincident` constraint for the origin reference. It
+does not create construction geometry or zero-valued X/Y distance constraints.
+Axis membership creates native `PointOnObject`, not `Coincident`, even though
+FreeCAD's GUI exposes both through its unified coincidence command. Native
+negative reference IDs remain private to the FreeCAD layer. These operations
+are not a composite `lock` constraint.
 
 Length values are millimetres. Euclidean `distance`, `radius`, and `diameter`
 values must be finite and positive. `distance_x` and `distance_y` preserve
@@ -344,13 +393,13 @@ Success has this exact shape:
 ```
 
 Indices are temporary current-state indices. Only driving dimensional
-constraints are created. Tangent, point-on-object, symmetric, block, internal
-alignment, angle-via-point, B-spline-specific and reference constraints;
-constraint names, expressions, editing, and deletion; axis/external/internal
+constraints are created. Tangent, symmetric, block, internal alignment,
+angle-via-point, B-spline-specific and arbitrary reference constraints;
+constraint names, expressions, editing, and deletion; external/internal
 geometry references; and arbitrary `Sketcher.Constraint` passthrough remain
-unsupported. Existing unsupported constraints remain inspectable through
-`get_sketch`; redundancy and conflicts are assessed only after explicit
-recompute.
+unsupported. Controlled axis references are limited to `point_on_object`.
+Existing unsupported constraints remain inspectable through `get_sketch`;
+redundancy and conflicts are assessed only after explicit recompute.
 
 These document, object, and sketch-inspection tools are MCP-only capabilities.
 They do not add workbench commands or toolbar icons. `get_object` performs exact

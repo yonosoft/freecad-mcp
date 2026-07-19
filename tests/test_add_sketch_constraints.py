@@ -33,9 +33,13 @@ from freecad_mcp.models import (
     HorizontalConstraintInput,
     ParallelConstraintInput,
     PerpendicularConstraintInput,
+    PointOnObjectConstraintInput,
     RadiusConstraintInput,
     SketchConstraintAdditionResult,
     SketchConstraintInput,
+    SketchHorizontalAxisReferenceInput,
+    SketchOriginReferenceInput,
+    SketchVerticalAxisReferenceInput,
     VerticalConstraintInput,
 )
 from freecad_mcp.validation import validate_add_sketch_constraints_request
@@ -45,6 +49,10 @@ T = TypeVar("T")
 
 def _point(geometry_index: int, position: str = "end") -> dict[str, object]:
     return {"geometry_index": geometry_index, "position": position}
+
+
+def _reference(value: str) -> dict[str, object]:
+    return {"reference": value}
 
 
 VALID_CASES: list[tuple[dict[str, object], type[object]]] = [
@@ -69,6 +77,18 @@ VALID_CASES: list[tuple[dict[str, object], type[object]]] = [
     (
         {"type": "coincident", "first": _point(0), "second": _point(1, "start")},
         CoincidentConstraintInput,
+    ),
+    (
+        {"type": "coincident", "first": _point(0, "center"), "second": _reference("origin")},
+        CoincidentConstraintInput,
+    ),
+    (
+        {
+            "type": "point_on_object",
+            "first": _point(0, "start"),
+            "second": _reference("horizontal_axis"),
+        },
+        PointOnObjectConstraintInput,
     ),
     (
         {"type": "distance", "mode": "line_length", "geometry_index": 0, "value": 4.0},
@@ -194,6 +214,97 @@ def test_constraint_batch_accepts_exact_maximum_and_preserves_order() -> None:
             "same_geometry_reference",
         ),
         (
+            [
+                {
+                    "type": "coincident",
+                    "first": _reference("origin"),
+                    "second": _reference("origin"),
+                }
+            ],
+            "same_origin_reference",
+        ),
+        (
+            [
+                {
+                    "type": "coincident",
+                    "first": _point(0, "center"),
+                    "second": {"reference": "origin", "position": "start"},
+                }
+            ],
+            "invalid_point_reference",
+        ),
+        (
+            [
+                {
+                    "type": "coincident",
+                    "first": _point(0, "center"),
+                    "second": _reference("datum_plane"),
+                }
+            ],
+            "unsupported_reference",
+        ),
+        (
+            [
+                {
+                    "type": "distance",
+                    "mode": "point_to_origin",
+                    "point": _reference("origin"),
+                    "value": 5.0,
+                }
+            ],
+            "unsupported_reference",
+        ),
+        (
+            [
+                {
+                    "type": "coincident",
+                    "first": {"position": "origin"},
+                    "second": _reference("origin"),
+                }
+            ],
+            "invalid_point_reference",
+        ),
+        (
+            [
+                {
+                    "type": "coincident",
+                    "first": _point(0, "center"),
+                    "second": _reference("horizontal_axis"),
+                }
+            ],
+            "unsupported_reference",
+        ),
+        (
+            [
+                {
+                    "type": "point_on_object",
+                    "first": _point(0, "start"),
+                    "second": _reference("origin"),
+                }
+            ],
+            "unsupported_reference",
+        ),
+        (
+            [
+                {
+                    "type": "point_on_object",
+                    "first": _reference("horizontal_axis"),
+                    "second": _reference("vertical_axis"),
+                }
+            ],
+            "unsupported_reference",
+        ),
+        (
+            [
+                {
+                    "type": "coincident",
+                    "first": {"geometry_index": -1, "position": "start"},
+                    "second": _reference("origin"),
+                }
+            ],
+            "invalid_geometry_reference",
+        ),
+        (
             [{"type": "radius", "geometry_index": 0, "value": 0.0}],
             "invalid_constraint_value",
         ),
@@ -247,6 +358,38 @@ def test_signed_axis_distances_accept_negative_zero_and_positive(
 
     assert isinstance(result, tuple)
     assert result[0].value == value  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(
+    ("constraint_type", "native_reference", "expected_reference_type"),
+    [
+        ("coincident", "origin", SketchOriginReferenceInput),
+        ("point_on_object", "horizontal_axis", SketchHorizontalAxisReferenceInput),
+        ("point_on_object", "vertical_axis", SketchVerticalAxisReferenceInput),
+    ],
+)
+@pytest.mark.parametrize("reverse", [False, True])
+def test_native_sketch_references_parse_in_both_public_orders(
+    constraint_type: str,
+    native_reference: str,
+    expected_reference_type: type[object],
+    reverse: bool,
+) -> None:
+    point = _point(0, "center")
+    reference = _reference(native_reference)
+    first, second = (reference, point) if reverse else (point, reference)
+
+    result = validate_add_sketch_constraints_request(
+        "Bracket",
+        "Sketch",
+        [{"type": constraint_type, "first": first, "second": second}],
+    )
+
+    assert isinstance(result, tuple)
+    parsed = result[0]
+    assert isinstance(parsed, (CoincidentConstraintInput, PointOnObjectConstraintInput))
+    native = parsed.first if reverse else parsed.second
+    assert isinstance(native, expected_reference_type)
 
 
 @pytest.mark.parametrize("value", [-540.0, -360.0, -180.0, 0.0, 180.0, 360.0, 540.0])
@@ -367,4 +510,32 @@ def test_handler_validates_exact_internal_names_before_dispatch() -> None:
     )
 
     assert result.code == "validation_error"
+    assert adapter.calls == []
+
+
+def test_later_invalid_reference_rejects_entire_batch_before_dispatch() -> None:
+    adapter = AdapterStub()
+    handler = AddSketchConstraintsHandler(adapter=adapter, dispatcher=DispatcherStub())  # type: ignore[arg-type]
+
+    result = handler.execute(
+        "Bracket",
+        "Sketch",
+        [
+            {
+                "type": "coincident",
+                "first": {"geometry_index": 0, "position": "center"},
+                "second": {"reference": "origin"},
+            },
+            {
+                "type": "coincident",
+                "first": {"reference": "origin"},
+                "second": {"reference": "origin"},
+            },
+        ],
+    )
+
+    assert result.ok is False
+    assert result.code == "validation_error"
+    assert result.data["constraint_index"] == 1
+    assert result.data["reason"] == "same_origin_reference"
     assert adapter.calls == []

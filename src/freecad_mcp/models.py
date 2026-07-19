@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -287,6 +287,35 @@ class SketchConstraintPointReferenceInput(_SketchConstraintInputModel):
     position: SketchPointPosition
 
 
+class SketchOriginReferenceInput(_SketchConstraintInputModel):
+    """Controlled reference to the native sketch origin."""
+
+    reference: Literal["origin"]
+
+
+class SketchHorizontalAxisReferenceInput(_SketchConstraintInputModel):
+    """Controlled reference to the native horizontal sketch axis."""
+
+    reference: Literal["horizontal_axis"]
+
+
+class SketchVerticalAxisReferenceInput(_SketchConstraintInputModel):
+    """Controlled reference to the native vertical sketch axis."""
+
+    reference: Literal["vertical_axis"]
+
+
+SketchCoincidentReferenceInput: TypeAlias = (
+    SketchConstraintPointReferenceInput | SketchOriginReferenceInput
+)
+SketchAxisReferenceInput: TypeAlias = (
+    SketchHorizontalAxisReferenceInput | SketchVerticalAxisReferenceInput
+)
+SketchPointOnObjectReferenceInput: TypeAlias = (
+    SketchConstraintPointReferenceInput | SketchAxisReferenceInput
+)
+
+
 class HorizontalConstraintInput(_SketchConstraintInputModel):
     """Make one line segment horizontal."""
 
@@ -326,11 +355,19 @@ class EqualConstraintInput(_SketchConstraintInputModel):
 
 
 class CoincidentConstraintInput(_SketchConstraintInputModel):
-    """Make two controlled geometry points coincident."""
+    """Make two geometry points, or one point and the origin, coincident."""
 
     type: Literal["coincident"]
-    first: SketchConstraintPointReferenceInput
-    second: SketchConstraintPointReferenceInput
+    first: SketchCoincidentReferenceInput
+    second: SketchCoincidentReferenceInput
+
+
+class PointOnObjectConstraintInput(_SketchConstraintInputModel):
+    """Constrain one geometry point to one native sketch axis."""
+
+    type: Literal["point_on_object"]
+    first: SketchPointOnObjectReferenceInput
+    second: SketchPointOnObjectReferenceInput
 
 
 class DistanceLineLengthConstraintInput(_SketchConstraintInputModel):
@@ -467,6 +504,7 @@ SketchConstraintInput = Annotated[
     | PerpendicularConstraintInput
     | EqualConstraintInput
     | CoincidentConstraintInput
+    | PointOnObjectConstraintInput
     | DistanceConstraintInput
     | DistanceXConstraintInput
     | DistanceYConstraintInput
@@ -631,12 +669,15 @@ SketchGeometry = (
 class SketchConstraintReference:
     """Controlled reference to sketch geometry or a built-in sketch axis."""
 
-    kind: str
-    position: str
+    kind: str | None = None
+    position: str | None = None
     geometry_index: int | None = None
     axis: str | None = None
+    reference: str | None = None
 
     def to_dict(self) -> dict[str, object]:
+        if self.reference is not None:
+            return {"reference": self.reference}
         result: dict[str, object] = {
             "kind": self.kind,
             "position": self.position,
@@ -836,10 +877,13 @@ __all__ = [
     "PlacementPosition",
     "PlacementRotation",
     "PointGeometryInput",
+    "PointOnObjectConstraintInput",
     "RadiusConstraintInput",
     "SketchArcGeometry",
     "SketchAttachmentData",
+    "SketchAxisReferenceInput",
     "SketchCircleGeometry",
+    "SketchCoincidentReferenceInput",
     "SketchConstraint",
     "SketchConstraintAdditionResult",
     "SketchConstraintBatch",
@@ -853,13 +897,17 @@ __all__ = [
     "SketchGeometryAdditionResult",
     "SketchGeometryBatch",
     "SketchGeometryInput",
+    "SketchHorizontalAxisReferenceInput",
     "SketchInspectionResult",
     "SketchLineGeometry",
+    "SketchOriginReferenceInput",
     "SketchPoint2D",
     "SketchPoint2DInput",
     "SketchPointGeometry",
+    "SketchPointOnObjectReferenceInput",
     "SketchPointPosition",
     "SketchSolverData",
+    "SketchVerticalAxisReferenceInput",
     "UnsupportedSketchConstraint",
     "UnsupportedSketchGeometry",
     "VerticalConstraintInput",
