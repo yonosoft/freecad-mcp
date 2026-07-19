@@ -151,7 +151,8 @@ Version-one geometry support is `line_segment`, `circle`, `arc_of_circle`, and
 construction state. The supported constraint discriminators are `coincident`,
 `horizontal`, `vertical`, `parallel`, `perpendicular`, `equal`, `distance`,
 `distance_x`, `distance_y`, `radius`, `diameter`, `angle`, and
-`point_on_object`, `horizontal_points`, `vertical_points`, and `symmetric`.
+`point_on_object`, `horizontal_points`, `vertical_points`, `symmetric`, and
+`tangent`.
 Ordinary `point_on_object` targets read back as a controlled geometry reference
 with `position: edge`; point-pair alignment reads back with its two semantic
 point tokens and remains distinct from whole-line orientation. Valid geometry
@@ -272,7 +273,7 @@ inspection support.
 constraints to an existing sketch. Its required top-level inputs are exactly
 `document_name`, `sketch_name`, and `constraints`; lookup uses exact internal
 names and never visible-label aliases. Each constraint is a strict typed union
-member with no additional fields. The top-level discriminator has exactly 16
+member with no additional fields. The top-level discriminator has exactly 17
 variants. Version one supports:
 
 - `horizontal` and `vertical` on line segments;
@@ -289,6 +290,8 @@ variants. Version one supports:
   coordinate;
 - `symmetric` between two distinct geometry points, about the sketch origin,
   either native sketch axis, another distinct geometry point, or a line segment;
+- `tangent` between two distinct whole geometries for line-circle, line-arc,
+  circle-circle, circle-arc, and arc-arc pairs, in either heterogeneous order;
 - `distance` modes `line_length`, `point_to_origin`, and `between_points`;
 - `distance_x` and `distance_y` modes `point_to_origin` and `between_points`;
 - `radius` and `diameter` on circles or circular arcs;
@@ -372,6 +375,34 @@ segment. Circles, arcs, external/datum geometry, raw native identifiers,
 identical selected points, a selected point reused as the centre, and a
 selected point taken from its own symmetry line are rejected before mutation.
 
+Direct tangency uses exactly two strict whole-geometry references:
+
+```json
+{
+  "type": "tangent",
+  "first": {"geometry_index": 1},
+  "second": {"geometry_index": 0}
+}
+```
+
+Each accepted item creates exactly one native
+`Sketcher.Constraint("Tangent", first_index, second_index)` in request order.
+The supported matrix is line segment-circle, line segment-circular arc,
+circle-circle, circle-circular arc, and circular arc-circular arc. Reversing a
+heterogeneous pair is supported and retained in controlled readback.
+Construction state does not change compatibility. Same-geometry references,
+line-line, point geometry, unsupported curves, out-of-range indices, selected
+point references, sketch axes, origin references, and any branch or contact
+field are rejected before a transaction.
+
+FreeCAD chooses external versus internal circle tangency, and the side of a
+line, from the geometry's current placement. Place geometry near the intended
+solution before adding the constraint, then explicitly recompute and inspect
+actual coordinates and solver diagnostics. For an arc, native direct tangency
+constrains its underlying support circle; the mathematical contact can lie
+outside the visible bounded arc. Verify that the visible arc contains the
+intended contact rather than assuming it does.
+
 For example, a circle can be centered natively on the sketch origin without an
 artificial anchor point:
 
@@ -418,6 +449,15 @@ substitute constraints. After explicit recompute, require no redundant,
 partially redundant, conflicting, or malformed constraints. The tool exposes
 these controlled choices but does not choose a strategy for the calling agent.
 
+Use `tangent` only for the supported whole-edge relationship. It does not join
+selected endpoints and is not a substitute for `coincident`,
+`point_on_object`, `parallel`, `perpendicular`, or collinearity. If a
+successful call chooses the wrong branch, inspect document history, undo the
+known `Add sketch constraints` transaction, correct the initial placement or
+strategy in the same sketch, reapply tangency, recompute, and inspect again.
+Do not undo after a failed atomic call that already restored zero mutation, and
+do not abandon a recoverable sketch merely to obtain another branch.
+
 A centred 30 mm × 20 mm rectangle is representable with four line segments,
 four endpoint coincidences, two horizontal constraints, two vertical
 constraints, 30 mm and 20 mm whole-line dimensions, and one symmetry constraint
@@ -436,6 +476,17 @@ constraint, and empty conflict, redundant, partially-redundant, and malformed
 diagnostics. The sketch contains no helper geometry, remains unsaved, reads
 back only controlled references, and the six-constraint batch is one undo/redo
 step.
+
+A direct upper-tangent regression uses one origin-centred circle of radius
+10 mm and one 30 mm line initially above it. The smallest natural set is five
+constraints: centre-to-origin coincidence, circle radius, line length, line
+endpoint symmetry about the vertical sketch axis, and direct line-circle
+tangency. Endpoint symmetry already forces the line horizontal, so adding a
+separate horizontal constraint is redundant. FreeCAD 1.1.1 reports the line at
+`y = +10 mm`, zero DoF, full constraint, and empty conflict, redundant,
+partially-redundant, and malformed diagnostics. The sketch has exactly two
+geometry elements, no helper or coordinate-offset dimension, controlled
+tangent readback, and remains unsaved.
 
 Length values are millimetres. Euclidean `distance`, `radius`, and `diameter`
 values must be finite and positive. `distance_x` and `distance_y` preserve
@@ -476,8 +527,9 @@ Success has this exact shape:
 ```
 
 Indices are temporary current-state indices. Only driving dimensional
-constraints are created. Tangent, block, internal alignment,
-angle-via-point, B-spline-specific and arbitrary reference constraints;
+constraints are created. Point-specific tangency, line-line tangency, block,
+internal alignment, angle-via-point, B-spline-specific and arbitrary reference
+constraints;
 constraint names, expressions, editing, and deletion; external/internal
 geometry references; and arbitrary `Sketcher.Constraint` passthrough remain
 unsupported. Controlled axes are accepted only by `point_on_object` and as the
@@ -486,7 +538,10 @@ controlled references in `first`, `second`, `about` order; private negative IDs
 and native point-position integers are never returned. Ordinary
 `PointOnObject` and point-pair `Horizontal`/`Vertical` read back as
 `point_on_object`, `horizontal_points`, and `vertical_points` without exposing
-their native constructor fields. Existing unsupported
+their native constructor fields. Supported native direct `Tangent` records
+read back as `tangent` with exactly two non-negative geometry edge references
+in stored order; point-specific, line-line, degenerate, or malformed tangent
+records remain controlled `unsupported` entries. Existing unsupported
 constraints remain inspectable through `get_sketch`; redundancy and conflicts
 are assessed only after explicit recompute.
 

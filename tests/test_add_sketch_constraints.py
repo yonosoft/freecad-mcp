@@ -43,6 +43,7 @@ from freecad_mcp.models import (
     SketchOriginReferenceInput,
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
+    TangentConstraintInput,
     VerticalConstraintInput,
     VerticalPointsConstraintInput,
 )
@@ -118,6 +119,14 @@ VALID_CASES: list[tuple[dict[str, object], type[object]]] = [
             "about": _reference("origin"),
         },
         SymmetricConstraintInput,
+    ),
+    (
+        {
+            "type": "tangent",
+            "first": {"geometry_index": 0},
+            "second": {"geometry_index": 1},
+        },
+        TangentConstraintInput,
     ),
     (
         {
@@ -253,7 +262,67 @@ def test_constraint_batch_accepts_exact_maximum_and_preserves_order() -> None:
             [{"type": "horizontal", "geometry_index": 0}] * (MAX_SKETCH_CONSTRAINT_BATCH_SIZE + 1),
             "constraint_batch_too_large",
         ),
-        ([{"type": "tangent", "geometry_index": 0}], "unsupported_constraint_type"),
+        (
+            [
+                {
+                    "type": "tangent",
+                    "first": {"geometry_index": 0},
+                    "second": {"geometry_index": 0},
+                }
+            ],
+            "identical_tangent_geometry",
+        ),
+        (
+            [
+                {
+                    "type": "tangent",
+                    "first": {"geometry_index": 0, "position": "edge"},
+                    "second": {"geometry_index": 1},
+                }
+            ],
+            "invalid_geometry_reference",
+        ),
+        (
+            [
+                {
+                    "type": "tangent",
+                    "first": {"geometry_index": 0},
+                    "second": {"reference": "horizontal_axis"},
+                }
+            ],
+            "invalid_geometry_reference",
+        ),
+        (
+            [
+                {
+                    "type": "tangent",
+                    "first": {"geometry_index": True},
+                    "second": {"geometry_index": 1},
+                }
+            ],
+            "invalid_geometry_reference",
+        ),
+        (
+            [
+                {
+                    "type": "tangent",
+                    "first": {"geometry_index": -1},
+                    "second": {"geometry_index": 1},
+                }
+            ],
+            "invalid_geometry_reference",
+        ),
+        (
+            [
+                {
+                    "type": "tangent",
+                    "first": {"geometry_index": 0},
+                    "second": {"geometry_index": 1},
+                    "internal": False,
+                }
+            ],
+            "invalid_constraint_input",
+        ),
         ([{"type": "horizontal"}], "invalid_constraint_input"),
         ([{"type": "horizontal", "geometry_index": 0, "extra": True}], "invalid_constraint_input"),
         ([{"type": "horizontal", "geometry_index": True}], "invalid_geometry_reference"),
@@ -748,6 +817,21 @@ def test_handler_dispatches_exact_typed_arguments_and_success() -> None:
         ),
         (
             SketchConstraintCreationError(index=0, reason="geometry_reference_out_of_range"),
+            "validation_error",
+        ),
+        (
+            SketchConstraintCreationError(index=0, reason="identical_tangent_geometry"),
+            "validation_error",
+        ),
+        (
+            SketchConstraintCreationError(
+                index=0,
+                reason="incompatible_tangent_geometry_pair",
+            ),
+            "validation_error",
+        ),
+        (
+            SketchConstraintCreationError(index=0, reason="unsupported_tangent_geometry"),
             "validation_error",
         ),
         (

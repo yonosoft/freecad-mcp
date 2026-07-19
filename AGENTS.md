@@ -55,6 +55,11 @@ local MCP server inside FreeCAD.
   in the same sketch or model. Supply the expected transaction name when known.
 - Prefer controlled in-place recovery over abandoning a recoverable sketch,
   duplicating geometry, or creating replacement sketches or documents.
+- Direct tangency is a whole-geometry relationship. Place supported geometry
+  near the intended branch, recompute and inspect the actual result, and verify
+  that arc contact lies on the intended visible bounded arc. Do not use
+  tangency as endpoint coincidence, point-on-object, parallel, perpendicular,
+  or collinearity, and do not synthesize hidden helper geometry for it.
 - Do not undo after a failed atomic MCP operation whose rollback restored zero
   mutation. Do not undo an unexpected GUI or user transaction; reinspect and
   ask for direction. Redo only to restore the most recently undone step, before

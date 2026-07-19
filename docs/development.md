@@ -274,12 +274,14 @@ error translation, application/runtime wiring, public adapter delegation, and
 architecture boundaries. Native-reference coverage locks the exact one-field
 `origin`, `horizontal_axis`, and `vertical_axis` models, both public orderings,
 origin-to-origin and invalid-scope rejection, raw-negative-ID rejection, and
-the original axis-target request order. Milestone 14B coverage locks the exact
-16-member top-level constraint schema, strict ordinary whole-geometry targets,
+the original axis-target request order. Milestone 14B coverage locks its
+established constraint members and strict ordinary whole-geometry targets,
 `horizontal_points`, and `vertical_points`. Symmetric coverage locks all
 five `about` forms, every supported point token, strict whole-line references,
 degenerate-reference rejection, and preservation of every preceding union
-member.
+member. Milestone 14C coverage locks the resulting exact 17-member top-level
+schema and the strict two-whole-geometry `tangent` member without changing any
+of the preceding variants.
 
 Adapter stubs exercise all verified `Sketcher.Constraint` constructors in one
 mixed ordered batch, construction geometry, standalone and attached sketches,
@@ -315,6 +317,16 @@ four endpoint coincidences, two horizontal and two vertical constraints, 30 mm
 and 20 mm whole-line dimensions, and one origin symmetry. The direct FreeCAD
 run proves zero DoF and clean conflict/redundancy/malformed diagnostics.
 
+Controlled direct-tangency tests lock the exact native two-index constructor,
+all five supported pair classes, both heterogeneous orders, normal and
+construction geometry, exact request-order fields, and one native constraint
+per public item. Negative coverage proves same-geometry, line-line, point,
+unsupported, out-of-range, position-qualified, axis/origin, and branch-field
+requests fail before mutation. Batch tests cover later invalid items, injected
+native failure, reverse rollback, mixed valid batches, and exact counts.
+Inspection tests cover controlled order-preserving readback and isolation of
+point-specific, line-line, degenerate, and malformed native tangent records.
+
 The reusable direct runtime check is
 `scripts/smoke_sketch_native_references.py`. Run it with FreeCAD 1.1's Python
 and the development environment's site-packages on `PYTHONPATH`. It creates
@@ -344,6 +356,20 @@ cardinal-point product regression. Only the explicit saved-file case writes a
 temporary file. The product regression verifies a 10 mm origin-centred circle,
 two on-circle aligned points, zero DoF, clean solver diagnostics, no helper
 geometry, controlled references, one-step undo/redo, and unsaved state.
+
+Milestone 14C's focused direct runtime campaign is
+`scripts/smoke_sketch_tangent.py`. Run it with FreeCAD 1.1's embedded Python
+and the development environment's site-packages on `PYTHONPATH`. It executes
+32 scenarios covering the full compatibility matrix and reverse orders,
+construction geometry, strict rejections, later-item and injected-failure
+atomic rollback, mixed batches, controlled and malformed-native readback,
+standalone/attached and saved/unsaved states, single/batch undo and redo, redo
+invalidation, solver freshness, same-sketch wrong-branch recovery, the natural
+fully constrained upper-tangent product, and symmetry plus Milestone 14B point
+relationships. It also proves that direct arc tangency can be valid on the
+underlying support circle while the contact lies outside the visible arc. The
+installed campaign passes 32/32 on FreeCAD 1.1.1 revision
+`0108fd4b4850cc46e625b60e53cea7a7bbe69f8d` with embedded Python 3.11.14.
 
 ### Controlled Document History Automated Coverage
 
@@ -1003,6 +1029,129 @@ status. Automated and direct-adapter smokes are supporting evidence, not a
 substitute for this endpoint campaign. Future acceptance campaigns should use
 these MCP history tools for covered undo/redo checks and should not require
 manual GUI history actions.
+
+### Controlled Direct Tangency AiderDesk Live Acceptance Prompt
+
+This Milestone 14C prompt is prepared but is not executed by the implementation
+task. Run it in a fresh FreeCAD 1.1.1 session with a dedicated FreeCAD Engineer
+AiderDesk profile connected only to the MCP endpoint. Every document and sketch
+operation must use an exposed MCP tool. Do not use the Python console, GUI
+undo/redo, arbitrary Python, implementation edits, or unlisted tools. Record
+`git status --short --branch` before and after; the repository, commits,
+branches, and remotes must remain unchanged.
+
+Copy this prompt into AiderDesk:
+
+```text
+Perform the controlled direct-tangency acceptance campaign entirely through
+the connected FreeCAD MCP server. Do not edit the repository, run Python, use
+GUI undo/redo, commit, push, or create unrequested files. Use uniquely named
+disposable documents and preserve raw tool results as evidence.
+
+First request the raw tool inventory. Require exactly these fifteen tools in
+this order:
+create_document, list_documents, get_document, save_document, list_objects,
+get_object, recompute_document, create_body, create_sketch, get_sketch,
+add_sketch_geometry, add_sketch_constraints, get_document_history,
+undo_document, redo_document.
+
+Capture the raw add_sketch_constraints schema. Require exactly seventeen
+top-level constraint discriminators and prove all sixteen established members
+are unchanged. The tangent member must have exactly this shape and no
+additional properties:
+{"type":"tangent","first":{"geometry_index":0},"second":{"geometry_index":1}}
+Each reference must contain only one non-negative integer geometry_index. There
+must be no point position, branch, side, contact, external/internal, or native
+identifier field and no new tool.
+
+In separate clean unsaved sketches, exercise direct line-circle, line-arc,
+circle-circle external, circle-circle internal, circle-arc, and arc-arc
+tangency. Exercise circle-line, arc-line, and arc-circle reverse heterogeneous
+orders. Include a supported pair with construction geometry. Inspect after
+explicit recompute and prove every public tangent item creates exactly one
+native relationship, preserves request order and construction state, returns
+one index, adds no helper geometry or substitute constraint, and reads back as
+type tangent with exactly two controlled non-negative edge references in the
+stored order. No result may expose a native geometry or point-position ID.
+
+In fresh disposable sketches, require controlled zero-mutation failures for
+same geometry, line-line, point geometry, unsupported pair/type if available,
+out-of-range and negative indices, selected-point references, origin or axis
+references, Boolean indices, additional fields, and branch/contact fields.
+Submit a batch whose first item is valid tangent and whose later item is
+invalid; compare complete before/after geometry, constraints, history, saved
+state, and solver state and prove the whole request failed before mutation with
+no partial indices. Do not call undo after this failed atomic request.
+
+Create a second rollback batch where a later valid-looking tangent cannot be
+accepted by the current sketch state. Require the controlled error and exact
+restoration of every pre-existing geometry, construction flag, constraint,
+history count, attachment fact, and saved/unsaved fact. If the endpoint cannot
+inject a native constructor exception, report that limitation rather than
+simulating arbitrary Python.
+
+Repeat representative success, rejection, readback, and one-step history cases
+in a body-owned sketch attached to a controlled origin plane. Prove Body
+ownership, attachment kind, plane, map mode, and existing state survive. Keep
+one campaign document unsaved and require file_path null and saved false. Save
+a separate disposable document using save_document, then add tangency and
+undo/redo it; prove the in-memory history operations do not invoke another save
+or change the controlled path. Do not claim history reverses filesystem saves.
+
+For one tangent operation, inspect Add sketch constraints at the top of
+history, undo it with that exact expected name, and redo it with that exact
+expected name. Prove exact geometry and controlled tangent restoration. Repeat
+with a multi-tangent batch and prove the entire ordered batch is one undo/redo
+step. Separately perform operation A, undo A, confirm redo A, perform operation
+B, prove redo was invalidated, and require redo_document to return
+redo_not_available. After every undo or redo, show stale solver facts before
+recompute_document and fresh, clean facts after recompute.
+
+Run an arc-domain case in which a line is tangent to the arc's underlying
+circle but the mathematical contact is outside the arc's visible bounded
+parameter interval. Use controlled geometry and solver readback to demonstrate
+both facts. Report explicitly that direct arc tangency constrains the support
+circle and that visible contact must be verified; do not infer endpoint joining.
+
+Run this product test from engineering intent only. Devise the modelling
+strategy yourself; do not treat this paragraph as a sequence of MCP calls:
+"Create a circle of radius 10 mm centred on the sketch origin. Create a
+horizontal line 30 mm long, centred on the vertical sketch axis, tangent to the
+upper side of the circle. Fully constrain the sketch without helper geometry
+or a coordinate offset dimension."
+Accept it only with exactly two geometry elements, radius 10 mm, centre at the
+origin, line length 30 mm, a horizontal line centred on the vertical axis at
+y = +10 mm, top contact equivalent to (0, 10), zero DoF, fully constrained,
+fresh clean solver diagnostics, one controlled tangent readback, no native IDs,
+no helper or coordinate-offset dimension, and an unsaved document. Use the
+smallest natural constraint set and explain any candidate constraint omitted as
+redundant.
+
+Run wrong-branch recovery in one fresh sketch. Add a circle and a line initially
+below it, apply direct tangency, recompute, inspect coordinates, and prove the
+lower branch is technically valid but violates upper-tangent intent. Inspect
+history and undo the known Add sketch constraints transaction. If controlled
+geometry replacement is needed because there is no geometry-edit tool, undo
+the known Add sketch geometry transaction and add the corrected line above the
+circle in the same sketch. Before the corrective mutation, show the available
+redo; afterward prove it was invalidated. Reapply tangency, recompute, and prove
+the upper branch. The scenario FAILS if the original sketch is abandoned or a
+replacement sketch/document is created without a documented unrecoverable
+reason. It also fails if an unknown GUI/user transaction is undone.
+
+Finish with the raw fifteen-tool inventory, the seventeen discriminator names,
+raw tangent schema, all supported and rejected pair evidence, construction and
+attached-sketch evidence, atomic rollback snapshots, controlled readback,
+saved/unsaved results, single and batch undo/redo, redo invalidation, solver
+freshness, arc-domain finding, upper-tangent product result, same-sketch branch
+recovery, and confirmation that no repository edit, commit, or push occurred.
+Stop MCP and leave disposable documents clearly identified for cleanup.
+```
+
+Retain the AiderDesk transcript, raw `tools/list`, raw schemas, Report View
+output, controlled before/after state, solver results, history snapshots, and
+unchanged repository status. Automated tests and the 32-scenario adapter smoke
+are supporting evidence, not a substitute for this live endpoint campaign.
 
 ### Sketch index semantics
 

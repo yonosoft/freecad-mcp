@@ -43,6 +43,7 @@ _SUPPORTED_CONSTRAINTS = {
     "Coincident": "coincident",
     "PointOnObject": "point_on_object",
     "Symmetric": "symmetric",
+    "Tangent": "tangent",
     "Horizontal": "horizontal",
     "Vertical": "vertical",
     "Parallel": "parallel",
@@ -67,6 +68,7 @@ _REFERENCE_COUNTS = {
     "Coincident": {2},
     "PointOnObject": {2},
     "Symmetric": {3},
+    "Tangent": {2},
     "Horizontal": {1, 2},
     "Vertical": {1, 2},
     "Parallel": {2},
@@ -312,6 +314,10 @@ def _constraint_references(
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
 ) -> tuple[tuple[SketchConstraintReference, ...], bool]:
+    tangent = _tangent_references(constraint, geometry)
+    if tangent is not None:
+        return tangent
+
     symmetric = _symmetric_references(constraint, constraint_index, geometry)
     if symmetric is not None:
         return symmetric
@@ -382,6 +388,61 @@ def _constraint_references(
             )
         )
     return tuple(references), False
+
+
+def _tangent_references(
+    constraint: Any,
+    geometry: tuple[SketchGeometry, ...],
+) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
+    try:
+        if constraint.Type != "Tangent":
+            return None
+        first = _required_integer(constraint.First)
+        first_position = _required_integer(constraint.FirstPos)
+        second = _required_integer(constraint.Second)
+        second_position = _required_integer(constraint.SecondPos)
+        third = _required_integer(constraint.Third)
+        third_position = _required_integer(constraint.ThirdPos)
+    except Exception:
+        return (), True
+
+    if (
+        first_position != 0
+        or second_position != 0
+        or third != _UNUSED_GEOMETRY_REFERENCE
+        or third_position != 0
+        or first == second
+        or first < 0
+        or second < 0
+        or first >= len(geometry)
+        or second >= len(geometry)
+    ):
+        return (), True
+
+    supported = (SketchLineGeometry, SketchCircleGeometry, SketchArcGeometry)
+    first_geometry = geometry[first]
+    second_geometry = geometry[second]
+    if not isinstance(first_geometry, supported) or not isinstance(second_geometry, supported):
+        return (), True
+    if isinstance(first_geometry, SketchLineGeometry) and isinstance(
+        second_geometry, SketchLineGeometry
+    ):
+        return (), True
+    return (
+        (
+            SketchConstraintReference(
+                kind="geometry",
+                geometry_index=first,
+                position="edge",
+            ),
+            SketchConstraintReference(
+                kind="geometry",
+                geometry_index=second,
+                position="edge",
+            ),
+        ),
+        False,
+    )
 
 
 def _controlled_constraint_type(

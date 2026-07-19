@@ -21,6 +21,7 @@ from freecad_mcp.models import (
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
     SketchPointPosition,
+    TangentConstraintInput,
 )
 from freecad_mcp.validation import validate_add_sketch_constraints_request
 
@@ -98,7 +99,7 @@ class ConstraintStub:
                 self.First, self.FirstPos, self.Second, self.SecondPos = map(int, args)
             else:
                 raise TypeError("unsupported point-alignment constructor")
-        elif constraint_type in {"Parallel", "Perpendicular", "Equal"}:
+        elif constraint_type in {"Parallel", "Perpendicular", "Equal", "Tangent"}:
             self.First = int(args[0])
             self.Second = int(args[1])
         elif constraint_type == "Coincident":
@@ -891,6 +892,225 @@ def test_standalone_and_attached_sketches_use_the_same_constraint_path(
     )
 
     assert result.added_indices == (0,)
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        (0, 1),
+        (1, 0),
+        (0, 2),
+        (2, 0),
+        (1, 3),
+        (1, 2),
+        (2, 1),
+        (2, 4),
+    ],
+)
+def test_tangent_uses_exact_whole_geometry_constructor_for_every_supported_order(
+    monkeypatch: pytest.MonkeyPatch,
+    first: int,
+    second: int,
+) -> None:
+    geometry = [
+        LineSegmentStub(VectorStub(-10.0, 5.0), VectorStub(10.0, 5.0)),
+        CircleStub(VectorStub(0.0, 0.0), 5.0),
+        ArcOfCircleStub(VectorStub(15.0, 0.0), 5.0, 0.0, math.pi),
+        CircleStub(VectorStub(10.0, 0.0), 5.0),
+        ArcOfCircleStub(VectorStub(25.0, 0.0), 5.0, math.pi, 2 * math.pi),
+    ]
+    sketch = SketchStub(geometry, construction=[True, False, False, False, True])
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+
+    result = FreeCADDocumentAdapter().add_sketch_constraints(
+        "Bracket",
+        "Sketch",
+        _parsed(
+            [
+                {
+                    "type": "tangent",
+                    "first": {"geometry_index": first},
+                    "second": {"geometry_index": second},
+                }
+            ]
+        ),
+    )
+
+    assert result.added_indices == (0,)
+    assert result.constraint_count == 1
+    assert document.open_calls == ["Add sketch constraints"]
+    constraint = sketch._constraints[0]
+    assert (
+        constraint.Type,
+        constraint.First,
+        constraint.FirstPos,
+        constraint.Second,
+        constraint.SecondPos,
+        constraint.Third,
+        constraint.ThirdPos,
+    ) == ("Tangent", first, 0, second, 0, -2000, 0)
+    assert sketch._construction == [True, False, False, False, True]
+
+
+def test_mixed_tangent_batch_preserves_order_indices_and_one_to_one_creation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(_geometry(), construction=[True, False, False, False, True, False])
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    batch = _parsed(
+        [
+            {
+                "type": "tangent",
+                "first": {"geometry_index": 0},
+                "second": {"geometry_index": 3},
+            },
+            {"type": "radius", "geometry_index": 3, "value": 5.0},
+            {
+                "type": "tangent",
+                "first": {"geometry_index": 4},
+                "second": {"geometry_index": 3},
+            },
+        ]
+    )
+
+    result = FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert result.added_indices == (0, 1, 2)
+    assert result.constraint_count == 3
+    assert [item.Type for item in sketch._constraints] == ["Tangent", "Radius", "Tangent"]
+    assert [(item.First, item.Second) for item in sketch._constraints[::2]] == [(0, 3), (4, 3)]
+    assert sketch._construction == [True, False, False, False, True, False]
+    assert document.open_calls == ["Add sketch constraints"]
+    assert document.commit_calls == 1
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "reason"),
+    [
+        (0, 1, "incompatible_tangent_geometry_pair"),
+        (5, 0, "unsupported_tangent_geometry"),
+        (0, 99, "geometry_reference_out_of_range"),
+    ],
+)
+def test_tangent_incompatible_pairs_fail_before_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+    first: int,
+    second: int,
+    reason: str,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints(
+            "Bracket",
+            "Sketch",
+            _parsed(
+                [
+                    {
+                        "type": "tangent",
+                        "first": {"geometry_index": first},
+                        "second": {"geometry_index": second},
+                    }
+                ]
+            ),
+        )
+
+    assert raised.value.reason == reason
+    assert document.open_calls == []
+    assert sketch.ConstraintCount == 0
+
+
+def test_tangent_same_geometry_is_defensively_rejected_before_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    constraint = TangentConstraintInput(
+        type="tangent",
+        first=SketchConstraintGeometryReferenceInput(geometry_index=3),
+        second=SketchConstraintGeometryReferenceInput(geometry_index=3),
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints(
+            "Bracket",
+            "Sketch",
+            (constraint,),
+        )
+
+    assert raised.value.reason == "identical_tangent_geometry"
+    assert document.open_calls == []
+    assert sketch.ConstraintCount == 0
+
+
+def test_later_invalid_tangent_rejects_complete_batch_before_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    batch = _parsed(
+        [
+            {
+                "type": "tangent",
+                "first": {"geometry_index": 0},
+                "second": {"geometry_index": 3},
+            },
+            {
+                "type": "tangent",
+                "first": {"geometry_index": 5},
+                "second": {"geometry_index": 0},
+            },
+        ]
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert raised.value.index == 1
+    assert raised.value.reason == "unsupported_tangent_geometry"
+    assert sketch.add_calls == []
+    assert sketch.ConstraintCount == 0
+    assert document.open_calls == []
+
+
+def test_native_failure_after_tangent_restores_complete_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(
+        _geometry(),
+        construction=[True, False, False, False, True, False],
+        failure_at=1,
+    )
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    before_geometry = sketch.Geometry
+    batch = _parsed(
+        [
+            {
+                "type": "tangent",
+                "first": {"geometry_index": 0},
+                "second": {"geometry_index": 3},
+            },
+            {"type": "radius", "geometry_index": 3, "value": 5.0},
+        ]
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert raised.value.index == 1
+    assert raised.value.reason == "constraint_add_failed"
+    assert sketch.ConstraintCount == 0
+    assert sketch._geometry[0].EndPoint.y == before_geometry[0].EndPoint.y
+    assert sketch._construction == [True, False, False, False, True, False]
+    assert document.abort_calls == 1
+    assert document.commit_calls == 0
 
 
 @pytest.mark.parametrize(

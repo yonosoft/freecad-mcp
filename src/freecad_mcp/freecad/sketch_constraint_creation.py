@@ -45,6 +45,7 @@ from freecad_mcp.models import (
     SketchPointPosition,
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
+    TangentConstraintInput,
     VerticalConstraintInput,
     VerticalPointsConstraintInput,
 )
@@ -285,6 +286,8 @@ def _validate_geometry_compatibility(
                 _require_point_on_object_target(geometry, target.geometry_index, part, index)
         elif isinstance(item, SymmetricConstraintInput):
             _validate_symmetric_compatibility(item, geometry, part, index)
+        elif isinstance(item, TangentConstraintInput):
+            _validate_tangent_compatibility(item, geometry, part, index)
         elif isinstance(item, DistanceLineLengthConstraintInput):
             _require_line(geometry, item.geometry_index, part, index)
         elif isinstance(item, DistancePointToOriginConstraintInput):
@@ -404,6 +407,12 @@ def _build_constraint(item: SketchConstraintInput, sketcher: Any, index: int) ->
                 item.second.geometry_index,
                 second_position,
                 symmetry_line,
+            )
+        if isinstance(item, TangentConstraintInput):
+            return sketcher.Constraint(
+                "Tangent",
+                item.first.geometry_index,
+                item.second.geometry_index,
             )
         if isinstance(item, DistanceLineLengthConstraintInput):
             return sketcher.Constraint("Distance", item.geometry_index, item.value)
@@ -553,6 +562,32 @@ def _validate_symmetric_compatibility(
             item.second.geometry_index,
         }:
             raise SketchConstraintCreationError(index=index, reason="degenerate_symmetry_line")
+
+
+def _validate_tangent_compatibility(
+    item: TangentConstraintInput,
+    geometry: tuple[Any, ...],
+    part: Any,
+    index: int,
+) -> None:
+    first_index = item.first.geometry_index
+    second_index = item.second.geometry_index
+    if first_index == second_index:
+        raise SketchConstraintCreationError(index=index, reason="identical_tangent_geometry")
+
+    first = _geometry_at(geometry, first_index, index)
+    second = _geometry_at(geometry, second_index, index)
+    first_line = _part_instance(first, part, "LineSegment")
+    second_line = _part_instance(second, part, "LineSegment")
+    first_circular = _is_circular(first, part)
+    second_circular = _is_circular(second, part)
+    if not (first_line or first_circular) or not (second_line or second_circular):
+        raise SketchConstraintCreationError(index=index, reason="unsupported_tangent_geometry")
+    if first_line and second_line:
+        raise SketchConstraintCreationError(
+            index=index,
+            reason="incompatible_tangent_geometry_pair",
+        )
 
 
 def _require_line(geometry: tuple[Any, ...], geometry_index: int, part: Any, index: int) -> None:

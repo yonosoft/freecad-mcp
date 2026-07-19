@@ -33,6 +33,7 @@ from freecad_mcp.models import (
     SketchHorizontalAxisReferenceInput,
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
+    TangentConstraintInput,
     VerticalPointsConstraintInput,
 )
 
@@ -59,6 +60,7 @@ _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES = {
     "point_on_object",
     "radius",
     "symmetric",
+    "tangent",
     "vertical",
     "vertical_points",
 }
@@ -473,6 +475,13 @@ def _malformed_reference_reason(item: object) -> str | None:
     if not isinstance(item, Mapping):
         return None
     constraint_type = item.get("type")
+    if constraint_type == "tangent":
+        for field in ("first", "second"):
+            reference = item.get(field)
+            if isinstance(reference, Mapping) and set(reference) != {"geometry_index"}:
+                return "invalid_geometry_reference"
+        return None
+
     allowed_references: set[str] = set()
     if constraint_type == "coincident":
         allowed_references = {"origin"}
@@ -533,6 +542,20 @@ def _validate_constraint_semantics(
         ),
     ):
         pair = (item.first.geometry_index, item.second.geometry_index)
+    elif (
+        isinstance(item, TangentConstraintInput)
+        and item.first.geometry_index == item.second.geometry_index
+    ):
+        return CommandResult.failure(
+            code="validation_error",
+            message=f"Constraint item {index} must reference distinct tangent geometry.",
+            data={
+                "field": f"constraints[{index}]",
+                "constraint_index": index,
+                "geometry_index": item.first.geometry_index,
+                "reason": "identical_tangent_geometry",
+            },
+        )
 
     if (
         isinstance(item, (HorizontalPointsConstraintInput, VerticalPointsConstraintInput))

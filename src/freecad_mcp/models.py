@@ -481,6 +481,14 @@ class SymmetricConstraintInput(_SketchConstraintInputModel):
     about: SketchSymmetryAboutReferenceInput
 
 
+class TangentConstraintInput(_SketchConstraintInputModel):
+    """Make two distinct supported whole geometries directly tangent."""
+
+    type: Literal["tangent"]
+    first: SketchConstraintGeometryReferenceInput
+    second: SketchConstraintGeometryReferenceInput
+
+
 class DistanceLineLengthConstraintInput(_SketchConstraintInputModel):
     """Constrain one line segment's unsigned length in millimetres."""
 
@@ -619,6 +627,7 @@ SketchConstraintInput = Annotated[
     | CoincidentConstraintInput
     | PointOnObjectConstraintInput
     | SymmetricConstraintInput
+    | TangentConstraintInput
     | DistanceConstraintInput
     | DistanceXConstraintInput
     | DistanceYConstraintInput

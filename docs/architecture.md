@@ -829,7 +829,7 @@ registration loop, arbitrary property mutation, or raw constructor passthrough.
 
 The top-level schema requires exactly `document_name`, `sketch_name`, and a
 `constraints` array with 1 to 100 items. Both names use exact internal-name
-lookup. The strict nested discriminated union has 16 top-level variants and
+lookup. The strict nested discriminated union has 17 top-level variants and
 supports:
 
 ```text
@@ -853,6 +853,9 @@ symmetric
   first, second: two distinct geometry points
   about: origin, horizontal axis, vertical axis, a distinct geometry point,
          or one line-segment geometry reference
+
+tangent
+  first, second: two distinct strict whole-geometry references
 
 distance
   line_length: geometry_index, value
@@ -915,6 +918,18 @@ The solver source admits more curve targets than this controlled contract, but
 the adapter deliberately limits ordinary targets to lines, circles, and
 circular arcs.
 
+Controlled direct tangency uses exactly the native two-index constructor
+`Tangent(first_geometry, second_geometry)`. The accepted compatibility matrix
+is line-circle, line-circular-arc, circle-circle, circle-circular-arc, and
+circular-arc-circular-arc, with both orders accepted for heterogeneous pairs.
+No selected point, contact point, branch flag, or helper constraint is exposed
+or synthesized. Official FreeCAD 1.1.1 source and the installed build confirm
+that line tangency is a centre-to-infinite-line/radius relationship and curved
+pairs use centre/radius circumferential tangency. The solver chooses the branch
+from initial placement. For circular arcs, direct native tangency constrains
+the underlying support circle rather than requiring the contact point to lie in
+the visible parameter interval.
+
 For controlled symmetry, the FreeCAD layer selects one of the two verified
 native constructor forms: two points plus a third point for origin/geometry
 point symmetry, or two points plus a whole line for axis/line-segment symmetry.
@@ -941,7 +956,9 @@ unsupported discriminators or modes, non-integer or negative indices, invalid
 position tokens, same-geometry pairs, origin-to-origin pairs, invalid native
 reference combinations, nonnumeric/non-finite values, nonpositive unsigned
 dimensions, identical symmetric points, a centre identical to either selected
-point, degenerate own-line symmetry, empty batches, and batches above 100.
+point, degenerate own-line symmetry, identical tangent geometries, tangent
+references with positions or additional fields, empty batches, and batches
+above 100.
 Before opening a transaction,
 the FreeCAD adapter resolves every current index and enforces:
 
@@ -958,6 +975,9 @@ the FreeCAD adapter resolves every current index and enforces:
   preferred for simple line orientation;
 - symmetric: both selected points and any point-centre must use valid tokens;
   a whole-line centre must resolve specifically to `Part.LineSegment`;
+- tangent: both references resolve to line, circle, or circular arc; two lines,
+  point/unsupported geometry, identical indices, and out-of-range indices fail
+  before a transaction, while construction state has no effect;
 - radius and diameter: `Part.Circle` or `Part.ArcOfCircle` only.
 
 Construction geometry is valid under the same rules. Standalone and attached
@@ -1000,6 +1020,13 @@ solve. The document remains touched and `get_sketch` treats solver facts as
 stale until the client explicitly calls `recompute_document`. Redundancy and
 conflicts are not speculative request failures.
 
+A successfully solved but unintended tangent branch is likewise not an atomic
+creation failure. The controlled recovery path is to inspect history, undo the
+known top `Add sketch constraints` transaction, correct placement or strategy
+in the same sketch, reapply tangency, recompute, and inspect. The next mutation
+invalidates the abandoned redo branch. Failed atomic creation already restores
+zero mutation and must not be followed by an extra undo.
+
 #### Result, Errors, and Non-Goals
 
 Success code `sketch_constraints_added` returns `document_name`, `sketch_name`,
@@ -1020,11 +1047,14 @@ Public error codes are `validation_error`, `document_not_found`,
 `identical_symmetric_points`, `identical_symmetry_centre`, and
 `degenerate_symmetry_line`, plus `identical_point_references`,
 `point_on_object_self_target`, and `unsupported_point_on_object_target`, plus
+`identical_tangent_geometry`, `incompatible_tangent_geometry_pair`, and
+`unsupported_tangent_geometry`, plus
 transaction/index/count/rollback
 reasons. Raw FreeCAD exception text is never public.
 
-Version one creates only active driving dimensional constraints. Tangency,
-block, internal alignment, angle-via-point, B-spline-specific and
+Version one creates only active driving dimensional constraints. Point-specific
+tangency, line-line tangency, block, internal alignment, angle-via-point,
+B-spline-specific and
 arbitrary reference constraints; expressions, names, editing and deletion; and
 external/internal geometry references remain unsupported. Axis references are
 limited to native `point_on_object` and the `about` side of `symmetric`.
@@ -1089,6 +1119,13 @@ reference is reconstructed as `origin`, either native axis, a geometry point,
 or a line geometry reference with `position: edge`. Incompatible or degenerate
 native symmetric records become controlled `unsupported` records without
 breaking inspection of the remaining constraints.
+Supported native two-index `Tangent` records return `type: tangent` and exactly
+two non-negative controlled geometry references with `position: edge` in
+stored first/second order. Inspection admits only the public line-circle,
+line-arc, circle-circle, circle-arc, and arc-arc matrix. Point-specific,
+line-line, identical, out-of-range, position-qualified, and otherwise malformed
+tangent records become one controlled `unsupported` record without exposing
+native fields or interrupting inspection of later constraints.
 Degenerate, unsupported-target, or out-of-range records in the new point
 relationship forms likewise become one controlled `unsupported` record so the
 following native constraints remain inspectable.

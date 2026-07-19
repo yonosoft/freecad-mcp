@@ -232,7 +232,7 @@ def test_get_sketch_serializes_supported_and_unsupported_items(
     assert result["external_geometry_count"] == 1
     assert result["unsupported_geometry_count"] == 1
     assert result["constraint_count"] == 7
-    assert result["unsupported_constraint_count"] == 2
+    assert result["unsupported_constraint_count"] == 1
     assert result["geometry"] == [
         {
             "index": 0,
@@ -283,7 +283,11 @@ def test_get_sketch_serializes_supported_and_unsupported_items(
     ]
     assert serialized_constraints[3]["value"] == {"value": 10.0, "unit": "millimeter"}
     assert serialized_constraints[4]["value"] == {"value": 90.0, "unit": "degree"}
-    assert serialized_constraints[5]["type"] == "unsupported"
+    assert serialized_constraints[5]["type"] == "tangent"
+    assert serialized_constraints[5]["references"] == [
+        {"kind": "geometry", "position": "edge", "geometry_index": 0},
+        {"kind": "geometry", "position": "edge", "geometry_index": 1},
+    ]
     assert serialized_constraints[6]["type"] == "unsupported"
     assert result["solver"] == {
         "available": True,
@@ -656,6 +660,114 @@ def test_malformed_symmetric_constraint_is_controlled_unsupported_without_crashi
         constraints=[
             ConstraintStub(
                 "Symmetric",
+                first=first,
+                first_pos=first_pos,
+                second=second,
+                second_pos=second_pos,
+                third=third,
+                third_pos=third_pos,
+            ),
+            ConstraintStub("Horizontal", first=0),
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    constraints = (
+        FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()["constraints"]
+    )
+
+    assert constraints[0]["type"] == "unsupported"  # type: ignore[index]
+    assert constraints[1]["type"] == "horizontal"  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        (0, 1),
+        (1, 0),
+        (0, 2),
+        (2, 0),
+        (1, 3),
+        (1, 2),
+        (2, 1),
+        (2, 4),
+    ],
+)
+def test_get_sketch_returns_supported_direct_tangent_pairs_in_native_order(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    first: int,
+    second: int,
+) -> None:
+    geometry = [
+        LineSegment(Vector(-10.0, 5.0), Vector(10.0, 5.0)),
+        Circle(Vector(0.0, 0.0), 5.0),
+        ArcOfCircle(
+            Vector(15.0, 0.0),
+            5.0,
+            Vector(20.0, 0.0),
+            Vector(10.0, 0.0),
+            0.0,
+            math.pi,
+        ),
+        Circle(Vector(10.0, 0.0), 5.0),
+        ArcOfCircle(
+            Vector(25.0, 0.0),
+            5.0,
+            Vector(20.0, 0.0),
+            Vector(30.0, 0.0),
+            math.pi,
+            2 * math.pi,
+        ),
+    ]
+    sketch = SketchStub(
+        geometry=geometry,
+        constraints=[ConstraintStub("Tangent", first=first, second=second)],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    serialized = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()
+    constraints = cast(list[dict[str, Any]], serialized["constraints"])
+    constraint = constraints[0]
+
+    assert constraint["type"] == "tangent"
+    assert constraint["references"] == [
+        {"kind": "geometry", "geometry_index": first, "position": "edge"},
+        {"kind": "geometry", "geometry_index": second, "position": "edge"},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("first", "first_pos", "second", "second_pos", "third", "third_pos"),
+    [
+        (0, 1, 1, 0, -2000, 0),
+        (0, 0, 1, 2, -2000, 0),
+        (0, 0, 0, 0, -2000, 0),
+        (0, 0, 2, 0, -2000, 0),
+        (2, 0, 0, 0, -2000, 0),
+        (0, 0, 99, 0, -2000, 0),
+        (0, 0, 1, 0, 2, 1),
+    ],
+)
+def test_malformed_tangent_is_isolated_as_unsupported_and_later_constraints_survive(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    first: int,
+    first_pos: int,
+    second: int,
+    second_pos: int,
+    third: int,
+    third_pos: int,
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            LineSegment(Vector(-10.0, 5.0), Vector(10.0, 5.0)),
+            Circle(Vector(0.0, 0.0), 5.0),
+            Point(0.0, 0.0),
+        ],
+        constraints=[
+            ConstraintStub(
+                "Tangent",
                 first=first,
                 first_pos=first_pos,
                 second=second,
