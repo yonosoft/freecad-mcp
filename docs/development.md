@@ -1481,3 +1481,29 @@ import sys
 print(sys.version)
 print(App.getUserAppDataDir())
 ```
+
+## Milestone 15C Polygon Verification
+
+Run `scripts/smoke_sketch_polygon_profiles.py` with FreeCAD's embedded Python
+after changing semantic polygon models, generation, constraints, verification,
+history, or rollback. The campaign records exactly 68 named scenarios covering
+triangle and polygon fixtures, the 3–64 side-count bounds, all centre-placement
+branches, negative/wrapped angles, non-empty and attached sketches, saved and
+unsaved behavior, history, injected rollback, legacy profile regressions, tool
+selection, and same-sketch recovery.
+
+The native strategy deliberately appends N normal edges, a construction centre
+point, and a construction circumcircle. Verify both reference geometries are
+visible in controlled readback and restored by redo. Expected constraint counts
+are `3N+3` at an origin centre and `3N+4` otherwise. Every successful case must
+recompute to zero DoF with empty redundant, partially redundant, conflicting,
+and malformed lists. Do not replace the single circle-radius strategy with
+per-vertex coordinates, hidden helpers, GUI polygon commands, or MCP-to-MCP
+delegation.
+
+For live endpoint acceptance use
+`docs/aiderdesk-milestone-15c-acceptance.md`; it is an inspection and execution
+campaign only and must not edit the repository. Preserve raw 19-tool discovery,
+both strict schemas and controlled results, unchanged first-17 schema evidence,
+the unchanged 17-variant constraint union, solver/history snapshots, saved-file
+metadata, repository status, and Report View output.

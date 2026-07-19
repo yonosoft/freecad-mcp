@@ -187,6 +187,42 @@ class Application:
             center=center,
         )
 
+    def create_sketch_equilateral_triangle(
+        self,
+        document_name: object,
+        sketch_name: object,
+        circumradius: object,
+        center: object,
+        first_vertex_angle_degrees: object = 90.0,
+    ) -> CommandResult:
+        """Create one verified equilateral triangle through the shared polygon engine."""
+        return self.documents.create_sketch_equilateral_triangle.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            circumradius=circumradius,
+            center=center,
+            first_vertex_angle_degrees=first_vertex_angle_degrees,
+        )
+
+    def create_sketch_regular_polygon(
+        self,
+        document_name: object,
+        sketch_name: object,
+        side_count: object,
+        circumradius: object,
+        center: object,
+        first_vertex_angle_degrees: object = 0.0,
+    ) -> CommandResult:
+        """Create one verified regular polygon through the shared polygon engine."""
+        return self.documents.create_sketch_regular_polygon.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            side_count=side_count,
+            circumradius=circumradius,
+            center=center,
+            first_vertex_angle_degrees=first_vertex_angle_degrees,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

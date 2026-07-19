@@ -27,8 +27,8 @@ def _server() -> Any:
 def test_centered_rectangle_is_exactly_tool_seventeen() -> None:
     actual = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert actual[-2:] == ["create_sketch_rectangle", "create_sketch_centered_rectangle"]
-    assert len(actual) == 17
+    assert actual[15:17] == ["create_sketch_rectangle", "create_sketch_centered_rectangle"]
+    assert len(actual) == 19
     assert tuple(actual) == REGISTERED_TOOL_NAMES
 
 

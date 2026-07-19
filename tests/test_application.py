@@ -11,7 +11,9 @@ from freecad_mcp.commands import (
     CreateBodyHandler,
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
+    CreateSketchEquilateralTriangleHandler,
     CreateSketchRectangleHandler,
+    CreateSketchRegularPolygonHandler,
     DocumentHandlers,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
@@ -47,11 +49,18 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchPolygonCircumcircleReference,
+    SketchPolygonCreationResult,
+    SketchPolygonEdge,
+    SketchPolygonProfile,
+    SketchPolygonVertex,
+    SketchPolygonVertexReference,
     SketchProfileCenter,
     SketchProfilePointReference,
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
+    SketchSemanticPolygonRequest,
     SketchSolverData,
 )
 from freecad_mcp.server.config import ServerConfig
@@ -296,6 +305,46 @@ class AdapterStub:
             document=self.document,
         )
 
+    def create_sketch_polygon(
+        self,
+        request: SketchSemanticPolygonRequest,
+    ) -> SketchPolygonCreationResult:
+        indices = tuple(range(request.side_count))
+        center_index = request.side_count
+        circle_index = center_index + 1
+        return SketchPolygonCreationResult(
+            profile=SketchPolygonProfile(
+                type=request.profile_type,
+                side_count=request.side_count,
+                geometry_indices=indices,
+                reference_geometry_indices=(center_index, circle_index),
+                constraint_indices=tuple(range(3 * request.side_count + 3)),
+                edges=tuple(
+                    SketchPolygonEdge(index, index, index, (index + 1) % request.side_count)
+                    for index in indices
+                ),
+                vertices=tuple(
+                    SketchPolygonVertex(
+                        index,
+                        0.0,
+                        0.0,
+                        SketchPolygonVertexReference(index, "start"),
+                    )
+                    for index in indices
+                ),
+                center=SketchProfileCenter(
+                    float(request.center.x),
+                    float(request.center.y),
+                    SketchProfilePointReference(center_index),
+                ),
+                circumcircle_reference=SketchPolygonCircumcircleReference(circle_index),
+                circumradius=request.circumradius,
+                first_vertex_angle_degrees=request.first_vertex_angle_degrees % 360.0,
+            ),
+            sketch=self.get_sketch(request.document_name, request.sketch_name),
+            document=self.document,
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -331,6 +380,14 @@ def make_application() -> Application:
         add_sketch_constraints=AddSketchConstraintsHandler(adapter, dispatcher),
         create_sketch_rectangle=CreateSketchRectangleHandler(adapter, dispatcher),
         create_sketch_centered_rectangle=CreateSketchCenteredRectangleHandler(
+            adapter,
+            dispatcher,
+        ),
+        create_sketch_equilateral_triangle=CreateSketchEquilateralTriangleHandler(
+            adapter,
+            dispatcher,
+        ),
+        create_sketch_regular_polygon=CreateSketchRegularPolygonHandler(
             adapter,
             dispatcher,
         ),
@@ -450,3 +507,37 @@ def test_application_dispatches_add_sketch_geometry_command() -> None:
         "geometry_count": 1,
         "message": "Sketch geometry added.",
     }
+
+
+def test_application_dispatches_equilateral_triangle_with_dedicated_semantics() -> None:
+    result = make_application().create_sketch_equilateral_triangle(
+        "TestDocument",
+        "BaseSketch",
+        20.0,
+        {"x": 0.0, "y": 0.0},
+    )
+
+    assert result.ok is True
+    assert result.code == "sketch_equilateral_triangle_created"
+    profile = result.data["profile"]
+    assert profile["type"] == "equilateral_triangle"  # type: ignore[index]
+    assert profile["side_count"] == 3  # type: ignore[index]
+    assert profile["first_vertex_angle_degrees"] == 90.0  # type: ignore[index]
+
+
+def test_application_dispatches_regular_polygon_with_requested_side_count() -> None:
+    result = make_application().create_sketch_regular_polygon(
+        "TestDocument",
+        "BaseSketch",
+        6,
+        20.0,
+        {"x": 10.0, "y": -5.0},
+        390.0,
+    )
+
+    assert result.ok is True
+    assert result.code == "sketch_regular_polygon_created"
+    profile = result.data["profile"]
+    assert profile["type"] == "regular_polygon"  # type: ignore[index]
+    assert profile["side_count"] == 6  # type: ignore[index]
+    assert profile["first_vertex_angle_degrees"] == 30.0  # type: ignore[index]

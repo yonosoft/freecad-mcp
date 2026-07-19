@@ -64,6 +64,16 @@ local MCP server inside FreeCAD.
   construction point returned as semantic reference geometry. Preserve its
   direct corner symmetry, deterministic order, 12/13-constraint branches, and
   zero incidental helper geometry; do not replace the point with diagonals.
+- Use `create_sketch_equilateral_triangle` for explicit equilateral-triangle
+  intent and `create_sketch_regular_polygon` for generic regular-polygon intent,
+  including a regular polygon with three sides. Both use the shared semantic
+  polygon adapter; never route one through the other MCP tool or through a
+  rectangle tool.
+- Polygon size is circumradius (centre-to-vertex distance), not apothem or side
+  length. Preserve counter-clockwise vertex/edge order, modulo-360 angle
+  readback, the 3–64 side-count range, the construction centre and explicit
+  construction circumcircle, and the `3N+3` origin / `3N+4` non-origin natural
+  constraint formulas. Do not hide or remove either semantic reference.
 - Provide inspection, validation, and recovery tools alongside mutating tools.
 - After a successful modelling mutation, recompute and inspect the result. If
   it is technically valid but expresses the wrong design intent, inspect the
@@ -96,6 +106,10 @@ local MCP server inside FreeCAD.
   centered sketch rectangle` step. If its intent is wrong, recompute, inspect,
   match and undo that exact step, then retry in the same sketch. A failed
   rectangle call owns its rollback and must not be followed by undo.
+- A successful triangle or polygon is one verified `Create sketch equilateral
+  triangle` or `Create sketch regular polygon` history step. Correct a wrong
+  success through exact-name undo and retry in the same sketch; failed atomic
+  polygon calls own their rollback and must not be followed by undo.
 
 ## Python Standards
 

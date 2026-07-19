@@ -204,6 +204,8 @@ registers atomic constraint mutation. `mcp.document_history_tools` explicitly
 registers controlled history inspection, undo, and redo.
 `mcp.sketch_rectangle_tools` and `mcp.sketch_centered_rectangle_tools`
 explicitly register the two semantic rectangle profiles.
+`mcp.sketch_polygon_tools` explicitly appends the semantic equilateral triangle
+and regular polygon profiles.
 `mcp.server` is the small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
@@ -211,8 +213,9 @@ authoritative tool-registry order. `get_sketch` remains exactly tool ten,
 `add_sketch_constraints` follows as exactly tool twelve. History inspection,
 undo, and redo are exactly tools thirteen through fifteen;
 `create_sketch_rectangle` is exactly tool sixteen and
-`create_sketch_centered_rectangle` is exactly tool seventeen. No registration
-loop is used.
+`create_sketch_centered_rectangle` is exactly tool seventeen;
+`create_sketch_equilateral_triangle` and `create_sketch_regular_polygon` are
+exactly tools eighteen and nineteen. No registration loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
 
@@ -225,7 +228,8 @@ The registry currently exposes `create_document`, `list_documents`,
 `recompute_document`, `create_body`, `create_sketch`, `get_sketch`,
 `add_sketch_geometry`, `add_sketch_constraints`, `get_document_history`,
 `undo_document`, `redo_document`, `create_sketch_rectangle`, and
-`create_sketch_centered_rectangle`, in that order.
+`create_sketch_centered_rectangle`, `create_sketch_equilateral_triangle`, and
+`create_sketch_regular_polygon`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -397,6 +401,101 @@ pathless and explicitly saved file bytes and timestamps remain unchanged.
 Body-owned and supported attached sketches keep ownership, support, MapMode,
 placement, and identity throughout.
 
+## Semantic Polygon Profiles
+
+Milestone 15C adds two public contracts backed by one implementation path:
+
+```text
+create_sketch_equilateral_triangle MCP registration
+→ CreateSketchEquilateralTriangleHandler (forces side_count = 3)
+→ SketchPolygonAdapter protocol
+→ FreeCADDocumentAdapter.create_sketch_polygon
+→ freecad.sketch_polygon_creation
+
+create_sketch_regular_polygon MCP registration
+→ CreateSketchRegularPolygonHandler (preserves validated side_count)
+→ the same SketchPolygonAdapter and native engine
+```
+
+The public transport and commands have no FreeCAD imports. The shared adapter
+uses the existing geometry and constraint translators and core
+`SketchObject.addGeometry` / `addConstraint` bindings. It does not call either
+polygon tool, the rectangle tools, primitive MCP tools, GUI commands, edit mode,
+selection, input simulation, or automatic-constraint preferences.
+
+Both profiles are defined by centre `(cx, cy)`, circumradius `r`, first-vertex
+angle `a` in degrees, and side count `n`; triangle fixes `n = 3`. Circumradius
+is centre-to-vertex distance. The polygon contract admits strict integer values
+3–64; 64 bounds response size and native solver work while covering common
+profile use. Vertex `i` is calculated at `a + i*360/n`, positive angles are
+counter-clockwise, and public readback normalizes finite negative or wrapped
+inputs modulo 360 to `[0,360)`. Edge `i` is vertex `i` to vertex `(i+1) mod n`.
+
+Append order is N normal line segments, one construction `Part.Point` at the
+semantic centre, then one construction `Part.Circle` at that centre with the
+requested circumradius. The explicit circumcircle is not incidental or hidden:
+FreeCAD 1.1.1 source and installed-runtime probes established it as the stable
+natural mechanism for one radius dimension shared by every vertex. The result
+therefore returns the centre and circle as distinct
+`reference_geometry_indices`, plus a controlled `circumcircle_reference`.
+The reference audit used FreeCAD revision
+`0108fd4b4850cc46e625b60e53cea7a7bbe69f8d`: GUI polygon handling in
+`DrawSketchHandlerPolygon.h` and `CommandCreateGeo.cpp`, the Python profile in
+`ProfileLib/RegularPolygon.py`, bindings in `SketchObjectPyImp.cpp` and
+`ConstraintPyImp.cpp`, constraint declarations/implementation in
+`Constraint.h`/`Constraint.cpp`, solver setup in `Sketch.cpp`, document and
+sketch transaction behavior in `Document.cpp` and `SketchObject.cpp`, and
+Planegcs behavior in `planegcs/GCS.cpp`. Official Create Regular Polygon and
+Sketcher scripting documentation supplied the user-facing circumscribed-circle,
+centre/first-point, and API semantics. Installed 1.1.1 probes covered side
+counts 3, 4, 5, 6, 12, and 64, origin/arbitrary centres, -30/390-degree angles,
+native `Part.LineSegment`/`Part.Point`/`Part.Circle` constructors,
+`Sketcher.Constraint` forms, solver diagnostics, and history transitions.
+
+The exact constraint sequence is:
+
+1. N endpoint coincidences closing every adjacent edge pair.
+2. N−1 equal constraints from edge zero to each later edge.
+3. N point-on-object constraints placing each edge end on the circumcircle.
+4. One centre-point/circle-centre coincidence.
+5. Natural centre placement: one origin coincidence at `(0,0)`; otherwise an
+   axis membership and signed dimension on an axis, or signed X and Y
+   dimensions away from both axes.
+6. One radius dimension on the circumcircle.
+7. One angle dimension on edge zero, derived as `a + 90 + 180/n` degrees.
+
+Consequently, the exact count is `3N+3` at the origin and `3N+4` for every
+non-origin centre. This uses one natural radius and one orientation dimension;
+it does not constrain every vertex by calculated X/Y coordinates or dimension
+every edge or radius separately.
+
+The adapter precomputes geometry and constraints before transaction mutation,
+then verifies each assigned index, incremental count, and construction state.
+After recompute, controlled readback must prove exact append ranges and types,
+deterministic endpoint mapping, closure, positive signed area, equal side
+lengths, requested centre and circumradius, normalized first-vertex angle,
+equilateral 60-degree internal angles for the triangle contract, expected
+constraint records, zero DoF, and empty redundant, partially redundant,
+conflicting, and malformed diagnostics. Pre-existing geometry/constraints,
+Body ownership, attachment, MapMode, placement, document identity, active
+document, and file path must remain unchanged.
+
+Owned calls use exactly `Create sketch equilateral triangle` or `Create sketch
+regular polygon` and commit once only after verification. A pending
+caller-owned transaction is not nested, committed, or aborted. Failure removes
+new constraints and geometry in reverse, restores the full snapshot including
+solver-moved content and construction/constraint flags, and verifies unchanged
+history. Exact-name undo and redo remove and restore the whole semantic profile,
+including both construction references. A new mutation after undo invalidates
+redo. Recovery from a strategically wrong success occurs in the same sketch;
+create/undo/redo never save and preserve saved file bytes and unsaved path state.
+
+The profiles do not create persistent native profile objects or identifiers.
+Polygon by side length/apothem, irregular/star/self-intersecting or construction
+profiles, profile editing/removal, automatic sketch/Body creation, and automatic
+saving remain outside the contract. The existing first seventeen tools and
+seventeen constraint discriminators remain unchanged.
+
 ## Document Tools
 
 The `create_document` tool creates a FreeCAD document through the shared
@@ -483,7 +582,8 @@ it with an automatic compensating history operation.
 
 Model mutations use the central safety labels `Create body`, `Create sketch`,
 `Add sketch geometry`, `Add sketch constraints`, `Create sketch rectangle`,
-and `Create centered sketch rectangle`.
+`Create centered sketch rectangle`, `Create sketch equilateral triangle`, and
+`Create sketch regular polygon`.
 Document creation, saving, recomputation, and inspection do not create an
 MCP-owned undo transaction.
 Atomic-operation rollback remains separate from controlled undo: rollback

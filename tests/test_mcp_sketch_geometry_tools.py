@@ -183,6 +183,8 @@ def test_add_sketch_geometry_remains_tool_eleven_without_changing_first_ten() ->
         "redo_document",
         "create_sketch_rectangle",
         "create_sketch_centered_rectangle",
+        "create_sketch_equilateral_triangle",
+        "create_sketch_regular_polygon",
     ]
     assert actual == list(REGISTERED_TOOL_NAMES)
     assert actual[9] == "get_sketch"

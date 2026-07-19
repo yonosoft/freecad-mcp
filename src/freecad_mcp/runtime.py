@@ -10,7 +10,9 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
+    CreateSketchEquilateralTriangleHandler,
     CreateSketchRectangleHandler,
+    CreateSketchRegularPolygonHandler,
     DocumentHandlers,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
@@ -83,6 +85,14 @@ def _build_runtime() -> Runtime:
             dispatcher=dispatcher,
         ),
         create_sketch_centered_rectangle=CreateSketchCenteredRectangleHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        create_sketch_equilateral_triangle=CreateSketchEquilateralTriangleHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        create_sketch_regular_polygon=CreateSketchRegularPolygonHandler(
             adapter=adapter,
             dispatcher=dispatcher,
         ),

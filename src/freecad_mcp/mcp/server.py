@@ -19,6 +19,7 @@ from freecad_mcp.mcp.sketch_centered_rectangle_tools import (
 )
 from freecad_mcp.mcp.sketch_constraint_tools import register_add_sketch_constraints_tool
 from freecad_mcp.mcp.sketch_geometry_tools import register_add_sketch_geometry_tool
+from freecad_mcp.mcp.sketch_polygon_tools import register_sketch_polygon_tools
 from freecad_mcp.mcp.sketch_rectangle_tools import register_create_sketch_rectangle_tool
 from freecad_mcp.server.config import ServerConfig
 
@@ -39,7 +40,11 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             "by centre, width, and height. Use create_sketch_rectangle for a complete rectangle "
             "defined by width, height, and lower-left placement. Do not translate centre intent "
             "into a lower-left call while the dedicated centred tool is available; use primitive "
-            "sketch tools only for custom or incomplete geometry."
+            "sketch tools only for custom or incomplete geometry. Use "
+            "create_sketch_equilateral_triangle for explicit equilateral-triangle intent and "
+            "create_sketch_regular_polygon for generic regular polygons with a specified side "
+            "count. Do not substitute the polygon tool for explicit rectangle intent or manually "
+            "reconstruct matching semantic polygons with primitive calls."
         ),
         host=config.host,
         port=config.port,
@@ -59,5 +64,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_document_history_tools(server, handlers)
     register_create_sketch_rectangle_tool(server, handlers)
     register_create_sketch_centered_rectangle_tool(server, handlers)
+    register_sketch_polygon_tools(server, handlers)
 
     return server

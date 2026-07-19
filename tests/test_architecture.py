@@ -80,6 +80,8 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         "freecad/sketch_geometry_creation.py",
         "freecad/sketch_constraint_creation.py",
         "freecad/sketch_centered_rectangle_creation.py",
+        "freecad/sketch_polygon_creation.py",
+        "freecad/sketch_polygon_profile.py",
         "freecad/sketch_rectangle_creation.py",
         "freecad/sketch_rectangle_profile.py",
         "freecad/sketch_inspection.py",
@@ -113,6 +115,7 @@ def test_mcp_registration_does_not_depend_on_freecad_implementation() -> None:
         "mcp/document_history_tools.py",
         "mcp/sketch_rectangle_tools.py",
         "mcp/sketch_centered_rectangle_tools.py",
+        "mcp/sketch_polygon_tools.py",
         "mcp/server.py",
     )
     for relative_path in registration_modules:
@@ -134,6 +137,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "mcp/document_history_tools.py",
         "mcp/sketch_rectangle_tools.py",
         "mcp/sketch_centered_rectangle_tools.py",
+        "mcp/sketch_polygon_tools.py",
     )
     registered_constants: list[str] = []
     for relative_path in registration_modules:
@@ -175,6 +179,8 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "REDO_DOCUMENT_TOOL",
         "CREATE_SKETCH_RECTANGLE_TOOL",
         "CREATE_SKETCH_CENTERED_RECTANGLE_TOOL",
+        "CREATE_SKETCH_EQUILATERAL_TRIANGLE_TOOL",
+        "CREATE_SKETCH_REGULAR_POLYGON_TOOL",
     ]
     assert _imported_modules("tool_registry.py") == set()
 
@@ -211,12 +217,22 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "SketchProfileCenter",
             "SketchCenteredRectangleProfile",
             "SketchCenteredRectangleCreationResult",
+            "SketchEquilateralTriangleRequestInput",
+            "SketchRegularPolygonRequestInput",
+            "SketchSemanticPolygonRequest",
+            "SketchPolygonEdge",
+            "SketchPolygonVertexReference",
+            "SketchPolygonVertex",
+            "SketchPolygonCircumcircleReference",
+            "SketchPolygonProfile",
+            "SketchPolygonCreationResult",
         },
         "protocols.py": {
             "Dispatcher",
             "DocumentAdapter",
             "RunnerFactory",
             "ServerRunner",
+            "SketchPolygonAdapter",
             "TaskExecutor",
         },
         "exceptions.py": {
@@ -260,6 +276,9 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "SketchCenteredRectangleCreationError",
             "SketchCenteredRectangleRollbackError",
             "SketchCenteredRectangleVerificationError",
+            "SketchPolygonCreationError",
+            "SketchPolygonRollbackError",
+            "SketchPolygonVerificationError",
             "SketchTypeMismatchError",
         },
         "validation.py": {
@@ -272,6 +291,8 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "validate_document_history_request",
             "validate_create_sketch_rectangle_request",
             "validate_create_sketch_centered_rectangle_request",
+            "validate_create_sketch_equilateral_triangle_request",
+            "validate_create_sketch_regular_polygon_request",
             "validate_object_reference",
         },
         "freecad/document.py": {"FreeCADDocumentAdapter"},
@@ -295,6 +316,7 @@ def test_representative_modules_import_in_clean_processes() -> None:
         "freecad_mcp.mcp.sketch_geometry_tools",
         "freecad_mcp.mcp.sketch_constraint_tools",
         "freecad_mcp.mcp.sketch_centered_rectangle_tools",
+        "freecad_mcp.mcp.sketch_polygon_tools",
         "freecad_mcp.mcp.document_history_tools",
         "freecad_mcp.mcp.sketch_rectangle_tools",
         "freecad_mcp.mcp.server",
@@ -392,5 +414,59 @@ def test_centered_rectangle_does_not_delegate_to_lower_left_or_mcp_layers() -> N
     tree = _tree("freecad/sketch_centered_rectangle_creation.py")
     assert not any(
         isinstance(node, ast.Attribute) and node.attr == "create_sketch_rectangle"
+        for node in ast.walk(tree)
+    )
+
+
+def test_semantic_polygon_uses_one_native_engine_without_gui_commands() -> None:
+    native_tree = _tree("freecad/sketch_polygon_creation.py")
+    forbidden_calls = {"runCommand", "doCommand", "doCommandGui"}
+    assert not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in forbidden_calls
+        for node in ast.walk(native_tree)
+    )
+    assert "create_sketch_polygon" in _defined_names("freecad/sketch_polygon_creation.py")
+
+
+def test_polygon_commands_have_no_native_dependencies() -> None:
+    forbidden = {"FreeCAD", "FreeCADGui", "Part", "Sketcher", "freecad_mcp.freecad"}
+    violations = {
+        module
+        for module in _imported_modules("commands/sketch_polygon.py")
+        if _matches_prefix(module, forbidden)
+    }
+    assert violations == set()
+
+
+def test_polygon_transport_calls_only_dedicated_handlers() -> None:
+    transport_tree = _tree("mcp/sketch_polygon_tools.py")
+    handler_calls = {
+        node.func.attr
+        for node in ast.walk(transport_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Attribute)
+        and isinstance(node.func.value.value, ast.Name)
+        and node.func.value.value.id == "handlers"
+    }
+    assert handler_calls == {"execute"}
+
+
+def test_polygon_engine_does_not_delegate_to_rectangle_or_mcp_layers() -> None:
+    imports = _imported_modules("freecad/sketch_polygon_creation.py")
+    assert not any(
+        module == "freecad_mcp.mcp" or module.startswith("freecad_mcp.mcp.") for module in imports
+    )
+    tree = _tree("freecad/sketch_polygon_creation.py")
+    forbidden_attributes = {
+        "create_sketch_rectangle",
+        "create_sketch_centered_rectangle",
+        "create_sketch_equilateral_triangle",
+        "create_sketch_regular_polygon",
+    }
+    assert not any(
+        isinstance(node, ast.Attribute) and node.attr in forbidden_attributes
         for node in ast.walk(tree)
     )

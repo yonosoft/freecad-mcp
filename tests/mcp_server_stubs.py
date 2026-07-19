@@ -12,7 +12,9 @@ from freecad_mcp.commands import (
     CreateBodyHandler,
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
+    CreateSketchEquilateralTriangleHandler,
     CreateSketchRectangleHandler,
+    CreateSketchRegularPolygonHandler,
     DocumentHandlers,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
@@ -48,11 +50,18 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchPolygonCircumcircleReference,
+    SketchPolygonCreationResult,
+    SketchPolygonEdge,
+    SketchPolygonProfile,
+    SketchPolygonVertex,
+    SketchPolygonVertexReference,
     SketchProfileCenter,
     SketchProfilePointReference,
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
+    SketchSemanticPolygonRequest,
     SketchSolverData,
 )
 
@@ -88,6 +97,7 @@ class AdapterStub:
         ] = []
         self.create_sketch_rectangle_calls: list[SketchRectangleRequestInput] = []
         self.create_sketch_centered_rectangle_calls: list[SketchCenteredRectangleRequestInput] = []
+        self.create_sketch_polygon_calls: list[SketchSemanticPolygonRequest] = []
         self.undo_names = ["Add sketch constraints"]
         self.redo_names: list[str] = []
 
@@ -331,6 +341,52 @@ class AdapterStub:
             document=self.document,
         )
 
+    def create_sketch_polygon(
+        self,
+        request: SketchSemanticPolygonRequest,
+    ) -> SketchPolygonCreationResult:
+        self.create_sketch_polygon_calls.append(request)
+        geometry_indices = tuple(range(request.side_count))
+        center_index = request.side_count
+        circle_index = center_index + 1
+        return SketchPolygonCreationResult(
+            profile=SketchPolygonProfile(
+                type=request.profile_type,
+                side_count=request.side_count,
+                geometry_indices=geometry_indices,
+                reference_geometry_indices=(center_index, circle_index),
+                constraint_indices=tuple(range(3 * request.side_count + 3)),
+                edges=tuple(
+                    SketchPolygonEdge(
+                        edge_number=index,
+                        geometry_index=index,
+                        start_vertex=index,
+                        end_vertex=(index + 1) % request.side_count,
+                    )
+                    for index in range(request.side_count)
+                ),
+                vertices=tuple(
+                    SketchPolygonVertex(
+                        vertex_number=index,
+                        x=0.0,
+                        y=0.0,
+                        reference=SketchPolygonVertexReference(index, "start"),
+                    )
+                    for index in range(request.side_count)
+                ),
+                center=SketchProfileCenter(
+                    x=float(request.center.x),
+                    y=float(request.center.y),
+                    reference=SketchProfilePointReference(center_index),
+                ),
+                circumcircle_reference=SketchPolygonCircumcircleReference(circle_index),
+                circumradius=request.circumradius,
+                first_vertex_angle_degrees=request.first_vertex_angle_degrees % 360.0,
+            ),
+            sketch=self.get_sketch(request.document_name, request.sketch_name),
+            document=self.document,
+        )
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -358,6 +414,14 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             add_sketch_constraints=AddSketchConstraintsHandler(actual_adapter, dispatcher),
             create_sketch_rectangle=CreateSketchRectangleHandler(actual_adapter, dispatcher),
             create_sketch_centered_rectangle=CreateSketchCenteredRectangleHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            create_sketch_equilateral_triangle=CreateSketchEquilateralTriangleHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            create_sketch_regular_polygon=CreateSketchRegularPolygonHandler(
                 actual_adapter,
                 dispatcher,
             ),

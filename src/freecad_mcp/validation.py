@@ -31,9 +31,11 @@ from freecad_mcp.models import (
     SketchConstraintGeometryReferenceInput,
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
+    SketchEquilateralTriangleRequestInput,
     SketchGeometryInput,
     SketchHorizontalAxisReferenceInput,
     SketchRectangleRequestInput,
+    SketchRegularPolygonRequestInput,
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
     TangentConstraintInput,
@@ -76,6 +78,12 @@ _SKETCH_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchRectangleRequestInput] = Ty
 )
 _SKETCH_CENTERED_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchCenteredRectangleRequestInput] = (
     TypeAdapter(SketchCenteredRectangleRequestInput)
+)
+_SKETCH_EQUILATERAL_TRIANGLE_REQUEST_ADAPTER: TypeAdapter[SketchEquilateralTriangleRequestInput] = (
+    TypeAdapter(SketchEquilateralTriangleRequestInput)
+)
+_SKETCH_REGULAR_POLYGON_REQUEST_ADAPTER: TypeAdapter[SketchRegularPolygonRequestInput] = (
+    TypeAdapter(SketchRegularPolygonRequestInput)
 )
 
 
@@ -394,6 +402,117 @@ def validate_create_sketch_centered_rectangle_request(
             },
         )
     return parsed
+
+
+def validate_create_sketch_equilateral_triangle_request(
+    document_name: object,
+    sketch_name: object,
+    circumradius: object,
+    center: object,
+    first_vertex_angle_degrees: object = 90.0,
+) -> CommandResult | SketchEquilateralTriangleRequestInput:
+    """Validate and parse one complete equilateral-triangle request."""
+    name_error = _validate_polygon_names(document_name, sketch_name)
+    if name_error is not None:
+        return name_error
+    try:
+        parsed = _SKETCH_EQUILATERAL_TRIANGLE_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "circumradius": circumradius,
+                "center": center,
+                "first_vertex_angle_degrees": first_vertex_angle_degrees,
+            }
+        )
+    except ValidationError as exc:
+        return _polygon_validation_failure(
+            exc,
+            profile_type="equilateral_triangle",
+            code="invalid_triangle_parameters",
+        )
+    if not _polygon_coordinates_are_finite(parsed.center.x, parsed.center.y, parsed.circumradius):
+        return CommandResult.failure(
+            code="invalid_triangle_parameters",
+            message="Triangle parameters must produce finite sketch coordinates.",
+            data={"field": "center", "reason": "triangle_coordinate_overflow"},
+        )
+    return parsed
+
+
+def validate_create_sketch_regular_polygon_request(
+    document_name: object,
+    sketch_name: object,
+    side_count: object,
+    circumradius: object,
+    center: object,
+    first_vertex_angle_degrees: object = 0.0,
+) -> CommandResult | SketchRegularPolygonRequestInput:
+    """Validate and parse one complete bounded regular-polygon request."""
+    name_error = _validate_polygon_names(document_name, sketch_name)
+    if name_error is not None:
+        return name_error
+    try:
+        parsed = _SKETCH_REGULAR_POLYGON_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "side_count": side_count,
+                "circumradius": circumradius,
+                "center": center,
+                "first_vertex_angle_degrees": first_vertex_angle_degrees,
+            }
+        )
+    except ValidationError as exc:
+        return _polygon_validation_failure(
+            exc,
+            profile_type="regular_polygon",
+            code="invalid_polygon_parameters",
+        )
+    if not _polygon_coordinates_are_finite(parsed.center.x, parsed.center.y, parsed.circumradius):
+        return CommandResult.failure(
+            code="invalid_polygon_parameters",
+            message="Polygon parameters must produce finite sketch coordinates.",
+            data={"field": "center", "reason": "polygon_coordinate_overflow"},
+        )
+    return parsed
+
+
+def _validate_polygon_names(document_name: object, sketch_name: object) -> CommandResult | None:
+    document_error = validate_document_reference(document_name)
+    if document_error is not None:
+        return document_error
+    return _validate_object_name(sketch_name, field="sketch_name", subject="Sketch")
+
+
+def _polygon_validation_failure(
+    error: ValidationError,
+    *,
+    profile_type: str,
+    code: str,
+) -> CommandResult:
+    first_error = error.errors(include_url=False)[0]
+    location = ".".join(str(item) for item in first_error.get("loc", ()))
+    return CommandResult.failure(
+        code=code,
+        message=(
+            "Triangle parameters must be strict, finite, and contain only the documented fields."
+            if profile_type == "equilateral_triangle"
+            else (
+                "Polygon parameters must be strict, finite, bounded, and contain only the "
+                "documented fields."
+            )
+        ),
+        data={
+            "field": location or "request",
+            "profile_type": profile_type,
+            "reason": str(first_error.get("type", "invalid_parameters")),
+        },
+    )
+
+
+def _polygon_coordinates_are_finite(x: float, y: float, radius: float) -> bool:
+    return all(math.isfinite(value) for value in (x - radius, x + radius, y - radius, y + radius))
 
 
 def validate_add_sketch_geometry_request(
@@ -907,7 +1026,10 @@ __all__ = [
     "validate_add_sketch_geometry_request",
     "validate_create_body_request",
     "validate_create_document_request",
+    "validate_create_sketch_centered_rectangle_request",
+    "validate_create_sketch_equilateral_triangle_request",
     "validate_create_sketch_rectangle_request",
+    "validate_create_sketch_regular_polygon_request",
     "validate_create_sketch_request",
     "validate_document_history_request",
     "validate_document_reference",

@@ -12,6 +12,7 @@ from freecad_mcp.freecad import (
     sketch_creation,
     sketch_geometry_creation,
     sketch_inspection,
+    sketch_polygon_creation,
     sketch_rectangle_creation,
 )
 from freecad_mcp.freecad.document_operations import (
@@ -62,8 +63,10 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchPolygonCreationResult,
     SketchRectangleCreationResult,
     SketchRectangleRequestInput,
+    SketchSemanticPolygonRequest,
 )
 
 
@@ -180,3 +183,10 @@ class FreeCADDocumentAdapter:
     ) -> SketchCenteredRectangleCreationResult:
         """Create one verified centre-defined rectangle without GUI commands or saving."""
         return sketch_centered_rectangle_creation.create_sketch_centered_rectangle(request)
+
+    def create_sketch_polygon(
+        self,
+        request: SketchSemanticPolygonRequest,
+    ) -> SketchPolygonCreationResult:
+        """Create either public polygon profile through the one shared engine."""
+        return sketch_polygon_creation.create_sketch_polygon(request)

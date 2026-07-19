@@ -14,12 +14,13 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- seventeen typed MCP tools for document creation, inspection, saving,
+- nineteen typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
   inspection, one-step undo and redo, plus verified semantic axis-aligned
-  lower-left and centre-defined rectangle creation;
+  lower-left and centre-defined rectangles, equilateral triangles, and regular
+  polygons;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -124,6 +125,8 @@ undo_document
 redo_document
 create_sketch_rectangle
 create_sketch_centered_rectangle
+create_sketch_equilateral_triangle
+create_sketch_regular_polygon
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -745,6 +748,65 @@ The operation calls neither another MCP tool nor a GUI command. Rotated,
 rounded, three-point, construction-edge, and partially constrained rectangles
 remain future work.
 
+### Semantic polygon profiles
+
+`create_sketch_equilateral_triangle` and `create_sketch_regular_polygon` are
+tools 18 and 19. Both target an existing sketch and use one shared internal
+regular-polygon engine; neither invokes another MCP tool or a Sketcher GUI
+command. Explicit equilateral-triangle intent selects tool 18. Generic regular
+polygon intent, including a regular polygon with three sides, selects tool 19.
+Irregular triangles use primitive geometry, while rectangle intent remains with
+tools 16 and 17.
+
+The triangle request requires `document_name`, `sketch_name`, positive finite
+`circumradius`, and strict `center: {x, y}` values. Its optional
+`first_vertex_angle_degrees` defaults to `90.0`. The polygon request adds a
+strict integer `side_count` from 3 through 64 and defaults the angle to `0.0`.
+All objects reject extra fields, booleans are not numbers, and NaN and infinity
+are rejected. Circumradius always means the distance from the centre to every
+vertex; it is not an apothem or side length.
+
+Vertex zero lies at the public angle measured from positive sketch X. Positive
+angles are counter-clockwise; negative and multi-turn inputs are accepted and
+reported modulo 360 in `[0, 360)`. Vertex `i` is
+`(cx + r*cos(a+i*360/n), cy + r*sin(a+i*360/n))`. Normal edge `i` runs from
+vertex `i` to vertex `(i+1) mod n`, so the returned edge and vertex mappings are
+deterministic and counter-clockwise even in a non-empty sketch.
+
+After the N normal edges the adapter appends an explicit construction centre
+point and an explicit construction circumcircle. Runtime probes of FreeCAD
+1.1.1 established the circle as the stable natural way to express one shared
+circumradius dimension while keeping every vertex on that radius; both
+reference indices and the circle's meaning are returned, and no helper is
+hidden. The deterministic constraints are N closure coincidences, N−1 edge
+equalities, N endpoint-on-circumcircle constraints, centre-point-to-circle-centre
+coincidence, natural centre placement, one circle radius, and one first-edge
+angle. Counts are `3N+3` at the origin and `3N+4` elsewhere.
+
+Success codes are `sketch_equilateral_triangle_created` and
+`sketch_regular_polygon_created`. The profile returns normal and reference
+indices separately, ordered edge and vertex records, controlled centre and
+circumcircle references, requested circumradius, normalized angle, and verified
+closed, regular, counter-clockwise, and fully constrained facts. The complete
+sketch readback must show zero DoF and no conflicting, redundant, partially
+redundant, or malformed constraints before commit.
+
+Owned calls create exactly one `Create sketch equilateral triangle` or `Create
+sketch regular polygon` history step. A caller-owned transaction is neither
+nested nor committed. Any append, recompute, readback, solver, or semantic
+failure restores the complete pre-call sketch and history state; no undo is
+needed after such a failed call. Matching undo/redo removes/restores the entire
+profile including construction references. A technically valid but wrong
+profile should be undone by its exact name and recreated in the same sketch;
+the new mutation invalidates the old redo branch. Body ownership, attachment,
+MapMode, placement, pre-existing content, and saved/unsaved file state are
+preserved. Creation never saves automatically.
+
+Known limits are deliberate: no polygon by side length or apothem, star or
+self-intersecting polygon, construction-edge polygon, partial constraint,
+profile editing/deletion, persistent profile identity, automatic sketch/Body
+creation, or automatic saving is exposed.
+
 ### Controlled document history
 
 `get_document_history`, `undo_document`, and `redo_document` are tools 13–15.
@@ -772,7 +834,8 @@ transaction IDs. Transaction names are current-step safety labels, not durable
 history identifiers. The controlled transaction names produced by current MCP
 model mutations are `Create body`, `Create sketch`, `Add sketch geometry`,
 `Add sketch constraints`, `Create sketch rectangle`, and `Create centered
-sketch rectangle`.
+sketch rectangle`, `Create sketch equilateral triangle`, and `Create sketch
+regular polygon`.
 
 Undo has this strict input shape; redo uses the same shape:
 

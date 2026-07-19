@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 MAX_SKETCH_GEOMETRY_BATCH_SIZE = 100
 MAX_SKETCH_CONSTRAINT_BATCH_SIZE = 100
+MAX_REGULAR_POLYGON_SIDE_COUNT = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -378,6 +379,54 @@ class SketchCenteredRectangleRequestInput(_SketchGeometryInputModel):
     width: RectangleDimension
     height: RectangleDimension
     center: SketchCenterPointInput
+
+
+Circumradius = Annotated[
+    float,
+    Field(strict=True, allow_inf_nan=False, gt=0.0),
+]
+PolygonAngleDegrees = Annotated[
+    float,
+    Field(strict=True, allow_inf_nan=False),
+]
+PolygonSideCount = Annotated[
+    int,
+    Field(strict=True, ge=3, le=MAX_REGULAR_POLYGON_SIDE_COUNT),
+]
+
+
+class SketchEquilateralTriangleRequestInput(_SketchGeometryInputModel):
+    """Strict public request for one centre-defined equilateral triangle."""
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    circumradius: Circumradius
+    center: SketchCenterPointInput
+    first_vertex_angle_degrees: PolygonAngleDegrees = 90.0
+
+
+class SketchRegularPolygonRequestInput(_SketchGeometryInputModel):
+    """Strict public request for one centre-defined regular polygon."""
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    side_count: PolygonSideCount
+    circumradius: Circumradius
+    center: SketchCenterPointInput
+    first_vertex_angle_degrees: PolygonAngleDegrees = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class SketchSemanticPolygonRequest:
+    """Internal request shared by the triangle and regular-polygon handlers."""
+
+    document_name: str
+    sketch_name: str
+    side_count: int
+    circumradius: float
+    center: SketchCenterPointInput
+    first_vertex_angle_degrees: float
+    profile_type: Literal["equilateral_triangle", "regular_polygon"]
 
 
 class SketchPointPosition(StrEnum):
@@ -850,6 +899,112 @@ class SketchCenteredRectangleProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class SketchPolygonEdge:
+    """One deterministic polygon edge and its conceptual vertex mapping."""
+
+    edge_number: int
+    geometry_index: int
+    start_vertex: int
+    end_vertex: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "edge_number": self.edge_number,
+            "geometry_index": self.geometry_index,
+            "start_vertex": self.start_vertex,
+            "end_vertex": self.end_vertex,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchPolygonVertexReference:
+    """Controlled edge endpoint reference for one polygon vertex."""
+
+    geometry_index: int
+    position: Literal["start", "end"]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "geometry_index": self.geometry_index,
+            "position": self.position,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchPolygonVertex:
+    """One deterministic conceptual polygon vertex and stable edge reference."""
+
+    vertex_number: int
+    x: float
+    y: float
+    reference: SketchPolygonVertexReference
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "vertex_number": self.vertex_number,
+            "x": self.x,
+            "y": self.y,
+            "reference": self.reference.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchPolygonCircumcircleReference:
+    """Explicit construction circle carrying the single circumradius dimension."""
+
+    geometry_index: int
+    construction: bool = True
+    type: Literal["circle"] = "circle"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "geometry_index": self.geometry_index,
+            "type": self.type,
+            "construction": self.construction,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchPolygonProfile:
+    """Verified semantic mapping shared by triangle and regular-polygon tools."""
+
+    type: Literal["equilateral_triangle", "regular_polygon"]
+    side_count: int
+    geometry_indices: tuple[int, ...]
+    reference_geometry_indices: tuple[int, int]
+    constraint_indices: tuple[int, ...]
+    edges: tuple[SketchPolygonEdge, ...]
+    vertices: tuple[SketchPolygonVertex, ...]
+    center: SketchProfileCenter
+    circumcircle_reference: SketchPolygonCircumcircleReference
+    circumradius: float
+    first_vertex_angle_degrees: float
+    closed: bool = True
+    regular: bool = True
+    counter_clockwise: bool = True
+    fully_constrained: bool = True
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "type": self.type,
+            "side_count": self.side_count,
+            "geometry_indices": list(self.geometry_indices),
+            "reference_geometry_indices": list(self.reference_geometry_indices),
+            "constraint_indices": list(self.constraint_indices),
+            "edges": [edge.to_dict() for edge in self.edges],
+            "vertices": [vertex.to_dict() for vertex in self.vertices],
+            "center": self.center.to_dict(),
+            "circumcircle_reference": self.circumcircle_reference.to_dict(),
+            "circumradius": self.circumradius,
+            "first_vertex_angle_degrees": self.first_vertex_angle_degrees,
+            "closed": self.closed,
+            "regular": self.regular,
+            "counter_clockwise": self.counter_clockwise,
+            "fully_constrained": self.fully_constrained,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SketchLineGeometry:
     """Controlled line-segment geometry."""
 
@@ -1166,7 +1321,24 @@ class SketchCenteredRectangleCreationResult:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class SketchPolygonCreationResult:
+    """Verified semantic polygon with current sketch and document readback."""
+
+    profile: SketchPolygonProfile
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "profile": self.profile.to_dict(),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
 __all__ = [
+    "MAX_REGULAR_POLYGON_SIDE_COUNT",
     "MAX_SKETCH_CONSTRAINT_BATCH_SIZE",
     "MAX_SKETCH_GEOMETRY_BATCH_SIZE",
     "AngleBetweenLinesConstraintInput",
@@ -1175,6 +1347,7 @@ __all__ = [
     "ArcOfCircleGeometryInput",
     "AttachmentInfo",
     "CircleGeometryInput",
+    "Circumradius",
     "CoincidentConstraintInput",
     "DiameterConstraintInput",
     "DistanceBetweenPointsConstraintInput",
@@ -1208,6 +1381,8 @@ __all__ = [
     "PlacementRotation",
     "PointGeometryInput",
     "PointOnObjectConstraintInput",
+    "PolygonAngleDegrees",
+    "PolygonSideCount",
     "RadiusConstraintInput",
     "RectangleDimension",
     "SketchArcGeometry",
@@ -1228,6 +1403,7 @@ __all__ = [
     "SketchConstraintReference",
     "SketchConstraintValue",
     "SketchCreationResult",
+    "SketchEquilateralTriangleRequestInput",
     "SketchGeometry",
     "SketchGeometryAdditionResult",
     "SketchGeometryBatch",
@@ -1241,12 +1417,20 @@ __all__ = [
     "SketchPointGeometry",
     "SketchPointOnObjectReferenceInput",
     "SketchPointPosition",
+    "SketchPolygonCircumcircleReference",
+    "SketchPolygonCreationResult",
+    "SketchPolygonEdge",
+    "SketchPolygonProfile",
+    "SketchPolygonVertex",
+    "SketchPolygonVertexReference",
     "SketchProfileCenter",
     "SketchProfilePointReference",
     "SketchRectangleCornerReference",
     "SketchRectangleCreationResult",
     "SketchRectangleProfile",
     "SketchRectangleRequestInput",
+    "SketchRegularPolygonRequestInput",
+    "SketchSemanticPolygonRequest",
     "SketchSolverData",
     "SketchVerticalAxisReferenceInput",
     "UnsupportedSketchConstraint",

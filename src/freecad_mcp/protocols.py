@@ -22,8 +22,10 @@ from freecad_mcp.models import (
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
+    SketchPolygonCreationResult,
     SketchRectangleCreationResult,
     SketchRectangleRequestInput,
+    SketchSemanticPolygonRequest,
 )
 
 T = TypeVar("T")
@@ -125,6 +127,16 @@ class Dispatcher(Protocol):
         """Execute a document operation on the target thread."""
 
 
+class SketchPolygonAdapter(Protocol):
+    """Single semantic polygon engine shared by both public polygon handlers."""
+
+    def create_sketch_polygon(
+        self,
+        request: SketchSemanticPolygonRequest,
+    ) -> SketchPolygonCreationResult:
+        """Create and verify one triangle or regular polygon atomically."""
+
+
 class TaskExecutor(Protocol):
     """Supplies thread detection and queued task submission."""
 
@@ -153,5 +165,6 @@ __all__ = [
     "DocumentAdapter",
     "RunnerFactory",
     "ServerRunner",
+    "SketchPolygonAdapter",
     "TaskExecutor",
 ]
