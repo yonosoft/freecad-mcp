@@ -433,6 +433,105 @@ def test_get_sketch_returns_native_point_on_axis_semantics(
     ]
 
 
+@pytest.mark.parametrize(
+    ("third", "third_pos", "expected_about"),
+    [
+        (-1, 1, {"reference": "origin"}),
+        (-1, 0, {"reference": "horizontal_axis"}),
+        (-2, 0, {"reference": "vertical_axis"}),
+        (2, 1, {"kind": "geometry", "geometry_index": 2, "position": "point"}),
+        (3, 0, {"kind": "geometry", "geometry_index": 3, "position": "edge"}),
+    ],
+)
+def test_get_sketch_returns_all_controlled_symmetric_forms(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    third: int,
+    third_pos: int,
+    expected_about: dict[str, object],
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            LineSegment(Vector(-3.0, -2.0), Vector(-1.0, -2.0)),
+            Circle(Vector(3.0, 2.0), 1.0),
+            Point(0.0, 0.0),
+            LineSegment(Vector(0.0, -5.0), Vector(0.0, 5.0)),
+        ],
+        constraints=[
+            ConstraintStub(
+                "Symmetric",
+                first=0,
+                first_pos=1,
+                second=1,
+                second_pos=3,
+                third=third,
+                third_pos=third_pos,
+            )
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    result = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()
+
+    constraint = result["constraints"][0]  # type: ignore[index]
+    assert constraint["type"] == "symmetric"
+    assert constraint["references"] == [
+        {"kind": "geometry", "geometry_index": 0, "position": "start"},
+        {"kind": "geometry", "geometry_index": 1, "position": "center"},
+        expected_about,
+    ]
+    assert all(reference.get("geometry_index", 0) >= 0 for reference in constraint["references"])
+
+
+@pytest.mark.parametrize(
+    ("first", "first_pos", "second", "second_pos", "third", "third_pos"),
+    [
+        (0, 1, 0, 1, -1, 1),
+        (0, 1, 1, 3, 0, 1),
+        (0, 1, 1, 3, 1, 0),
+        (0, 1, 1, 3, -3, 0),
+        (0, 1, 1, 3, 99, 0),
+        (99, 1, 1, 3, -1, 1),
+    ],
+)
+def test_malformed_symmetric_constraint_is_controlled_unsupported_without_crashing_sketch(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    first: int,
+    first_pos: int,
+    second: int,
+    second_pos: int,
+    third: int,
+    third_pos: int,
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            LineSegment(Vector(-3.0, -2.0), Vector(-1.0, -2.0)),
+            Circle(Vector(3.0, 2.0), 1.0),
+        ],
+        constraints=[
+            ConstraintStub(
+                "Symmetric",
+                first=first,
+                first_pos=first_pos,
+                second=second,
+                second_pos=second_pos,
+                third=third,
+                third_pos=third_pos,
+            ),
+            ConstraintStub("Horizontal", first=0),
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    constraints = (
+        FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()["constraints"]
+    )
+
+    assert constraints[0]["type"] == "unsupported"  # type: ignore[index]
+    assert constraints[1]["type"] == "horizontal"  # type: ignore[index]
+
+
 def test_get_sketch_does_not_misreport_axis_coincident_as_origin(
     monkeypatch: pytest.MonkeyPatch,
     part_module: ModuleType,

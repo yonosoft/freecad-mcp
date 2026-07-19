@@ -25,11 +25,13 @@ from freecad_mcp.models import (
     PerpendicularConstraintInput,
     PointGeometryInput,
     PointOnObjectConstraintInput,
+    SketchConstraintGeometryReferenceInput,
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
     SketchGeometryInput,
     SketchHorizontalAxisReferenceInput,
     SketchVerticalAxisReferenceInput,
+    SymmetricConstraintInput,
 )
 
 _INTERNAL_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
@@ -53,6 +55,7 @@ _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES = {
     "perpendicular",
     "point_on_object",
     "radius",
+    "symmetric",
     "vertical",
 }
 _SKETCH_GEOMETRY_INPUT_ADAPTER: TypeAdapter[SketchGeometryInput] = TypeAdapter(SketchGeometryInput)
@@ -443,8 +446,10 @@ def _malformed_reference_reason(item: object) -> str | None:
         allowed_references = {"origin"}
     elif constraint_type == "point_on_object":
         allowed_references = {"horizontal_axis", "vertical_axis"}
+    elif constraint_type == "symmetric":
+        allowed_references = {"origin", "horizontal_axis", "vertical_axis"}
 
-    for field in ("first", "second", "point"):
+    for field in ("first", "second", "point", "about"):
         reference = item.get(field)
         if not isinstance(reference, Mapping):
             continue
@@ -452,8 +457,19 @@ def _malformed_reference_reason(item: object) -> str | None:
             if set(reference) != {"reference"}:
                 return "invalid_point_reference"
             literal = reference.get("reference")
-            if not isinstance(literal, str) or literal not in allowed_references:
+            reference_allowed_here = constraint_type != "symmetric" or field == "about"
+            if (
+                not reference_allowed_here
+                or not isinstance(literal, str)
+                or literal not in allowed_references
+            ):
                 return "unsupported_reference"
+            continue
+        if (
+            constraint_type == "symmetric"
+            and field == "about"
+            and set(reference) == {"geometry_index"}
+        ):
             continue
         if not {"geometry_index", "position"}.issubset(reference):
             return "invalid_point_reference"
@@ -529,6 +545,48 @@ def _validate_constraint_semantics(
                     "field": f"constraints[{index}]",
                     "constraint_index": index,
                     "reason": "unsupported_reference",
+                },
+            )
+
+    if isinstance(item, SymmetricConstraintInput):
+        if item.first == item.second:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Constraint item {index} must reference two distinct points.",
+                data={
+                    "field": f"constraints[{index}]",
+                    "constraint_index": index,
+                    "reason": "identical_symmetric_points",
+                },
+            )
+        if isinstance(item.about, SketchConstraintPointReferenceInput) and item.about in {
+            item.first,
+            item.second,
+        }:
+            return CommandResult.failure(
+                code="validation_error",
+                message=(
+                    f"Constraint item {index} cannot use either selected point "
+                    "as its symmetry centre."
+                ),
+                data={
+                    "field": f"constraints[{index}].about",
+                    "constraint_index": index,
+                    "reason": "identical_symmetry_centre",
+                },
+            )
+        if isinstance(item.about, SketchConstraintGeometryReferenceInput) and (
+            item.about.geometry_index in {item.first.geometry_index, item.second.geometry_index}
+        ):
+            return CommandResult.failure(
+                code="validation_error",
+                message=(
+                    f"Constraint item {index} cannot select a point from its own symmetry line."
+                ),
+                data={
+                    "field": f"constraints[{index}].about",
+                    "constraint_index": index,
+                    "reason": "degenerate_symmetry_line",
                 },
             )
 

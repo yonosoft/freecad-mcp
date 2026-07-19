@@ -36,10 +36,12 @@ from freecad_mcp.models import (
     PointOnObjectConstraintInput,
     RadiusConstraintInput,
     SketchConstraintAdditionResult,
+    SketchConstraintGeometryReferenceInput,
     SketchConstraintInput,
     SketchHorizontalAxisReferenceInput,
     SketchOriginReferenceInput,
     SketchVerticalAxisReferenceInput,
+    SymmetricConstraintInput,
     VerticalConstraintInput,
 )
 from freecad_mcp.validation import validate_add_sketch_constraints_request
@@ -89,6 +91,51 @@ VALID_CASES: list[tuple[dict[str, object], type[object]]] = [
             "second": _reference("horizontal_axis"),
         },
         PointOnObjectConstraintInput,
+    ),
+    (
+        {
+            "type": "symmetric",
+            "first": _point(0, "start"),
+            "second": _point(1, "end"),
+            "about": _reference("origin"),
+        },
+        SymmetricConstraintInput,
+    ),
+    (
+        {
+            "type": "symmetric",
+            "first": _point(0, "start"),
+            "second": _point(1, "end"),
+            "about": _reference("horizontal_axis"),
+        },
+        SymmetricConstraintInput,
+    ),
+    (
+        {
+            "type": "symmetric",
+            "first": _point(0, "start"),
+            "second": _point(1, "end"),
+            "about": _reference("vertical_axis"),
+        },
+        SymmetricConstraintInput,
+    ),
+    (
+        {
+            "type": "symmetric",
+            "first": _point(0, "start"),
+            "second": _point(1, "end"),
+            "about": _point(2, "point"),
+        },
+        SymmetricConstraintInput,
+    ),
+    (
+        {
+            "type": "symmetric",
+            "first": _point(0, "start"),
+            "second": _point(1, "end"),
+            "about": {"geometry_index": 2},
+        },
+        SymmetricConstraintInput,
     ),
     (
         {"type": "distance", "mode": "line_length", "geometry_index": 0, "value": 4.0},
@@ -323,6 +370,93 @@ def test_constraint_batch_accepts_exact_maximum_and_preserves_order() -> None:
         (
             [
                 {
+                    "type": "symmetric",
+                    "first": _point(0, "start"),
+                    "second": _point(1, "end"),
+                }
+            ],
+            "invalid_constraint_input",
+        ),
+        (
+            [
+                {
+                    "type": "symmetric",
+                    "first": _point(0, "start"),
+                    "second": _point(1, "end"),
+                    "about": _reference("datum_axis"),
+                }
+            ],
+            "unsupported_reference",
+        ),
+        (
+            [
+                {
+                    "type": "symmetric",
+                    "first": _reference("origin"),
+                    "second": _point(1, "end"),
+                    "about": _reference("vertical_axis"),
+                }
+            ],
+            "unsupported_reference",
+        ),
+        (
+            [
+                {
+                    "type": "symmetric",
+                    "first": _point(0, "start"),
+                    "second": _point(1, "end"),
+                    "about": {"geometry_index": -1},
+                }
+            ],
+            "invalid_geometry_reference",
+        ),
+        (
+            [
+                {
+                    "type": "symmetric",
+                    "first": _point(0, "start"),
+                    "second": _point(1, "end"),
+                    "about": {"geometry_index": 2, "native_position": 0},
+                }
+            ],
+            "invalid_point_reference",
+        ),
+        (
+            [
+                {
+                    "type": "symmetric",
+                    "first": _point(0, "start"),
+                    "second": _point(0, "start"),
+                    "about": _reference("origin"),
+                }
+            ],
+            "identical_symmetric_points",
+        ),
+        (
+            [
+                {
+                    "type": "symmetric",
+                    "first": _point(0, "start"),
+                    "second": _point(0, "end"),
+                    "about": _point(0, "start"),
+                }
+            ],
+            "identical_symmetry_centre",
+        ),
+        (
+            [
+                {
+                    "type": "symmetric",
+                    "first": _point(0, "start"),
+                    "second": _point(1, "end"),
+                    "about": {"geometry_index": 0},
+                }
+            ],
+            "degenerate_symmetry_line",
+        ),
+        (
+            [
+                {
                     "type": "angle",
                     "mode": "line_angle",
                     "geometry_index": 0,
@@ -390,6 +524,25 @@ def test_native_sketch_references_parse_in_both_public_orders(
     assert isinstance(parsed, (CoincidentConstraintInput, PointOnObjectConstraintInput))
     native = parsed.first if reverse else parsed.second
     assert isinstance(native, expected_reference_type)
+
+
+def test_symmetric_about_line_uses_strict_controlled_geometry_reference() -> None:
+    result = validate_add_sketch_constraints_request(
+        "Bracket",
+        "Sketch",
+        [
+            {
+                "type": "symmetric",
+                "first": _point(0, "start"),
+                "second": _point(1, "end"),
+                "about": {"geometry_index": 2},
+            }
+        ],
+    )
+
+    assert isinstance(result, tuple)
+    assert isinstance(result[0], SymmetricConstraintInput)
+    assert isinstance(result[0].about, SketchConstraintGeometryReferenceInput)
 
 
 @pytest.mark.parametrize("value", [-540.0, -360.0, -180.0, 0.0, 180.0, 360.0, 540.0])

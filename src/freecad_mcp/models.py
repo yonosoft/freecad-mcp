@@ -287,6 +287,12 @@ class SketchConstraintPointReferenceInput(_SketchConstraintInputModel):
     position: SketchPointPosition
 
 
+class SketchConstraintGeometryReferenceInput(_SketchConstraintInputModel):
+    """Non-negative current sketch geometry reference without a point selector."""
+
+    geometry_index: int = Field(strict=True, ge=0)
+
+
 class SketchOriginReferenceInput(_SketchConstraintInputModel):
     """Controlled reference to the native sketch origin."""
 
@@ -313,6 +319,12 @@ SketchAxisReferenceInput: TypeAlias = (
 )
 SketchPointOnObjectReferenceInput: TypeAlias = (
     SketchConstraintPointReferenceInput | SketchAxisReferenceInput
+)
+SketchSymmetryAboutReferenceInput: TypeAlias = (
+    SketchConstraintPointReferenceInput
+    | SketchConstraintGeometryReferenceInput
+    | SketchOriginReferenceInput
+    | SketchAxisReferenceInput
 )
 
 
@@ -368,6 +380,15 @@ class PointOnObjectConstraintInput(_SketchConstraintInputModel):
     type: Literal["point_on_object"]
     first: SketchPointOnObjectReferenceInput
     second: SketchPointOnObjectReferenceInput
+
+
+class SymmetricConstraintInput(_SketchConstraintInputModel):
+    """Make two selected geometry points symmetric about one controlled reference."""
+
+    type: Literal["symmetric"]
+    first: SketchConstraintPointReferenceInput
+    second: SketchConstraintPointReferenceInput
+    about: SketchSymmetryAboutReferenceInput
 
 
 class DistanceLineLengthConstraintInput(_SketchConstraintInputModel):
@@ -505,6 +526,7 @@ SketchConstraintInput = Annotated[
     | EqualConstraintInput
     | CoincidentConstraintInput
     | PointOnObjectConstraintInput
+    | SymmetricConstraintInput
     | DistanceConstraintInput
     | DistanceXConstraintInput
     | DistanceYConstraintInput

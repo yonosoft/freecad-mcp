@@ -765,6 +765,11 @@ coincident
 point_on_object
   first, second: exactly one geometry point plus one controlled sketch axis
 
+symmetric
+  first, second: two distinct geometry points
+  about: origin, horizontal axis, vertical axis, a distinct geometry point,
+         or one line-segment geometry reference
+
 distance
   line_length: geometry_index, value
   point_to_origin: point, value
@@ -788,10 +793,13 @@ to verified FreeCAD point-position integers as `start → 1`, `end → 2`,
 `start`/`end` for lines, `start`/`end`/`center` for circular arcs, `center` for
 circles, and `point` for point geometry. Strict native-sketch references add
 exactly `{"reference": "origin"}`, `{"reference": "horizontal_axis"}`, and
-`{"reference": "vertical_axis"}`. Origin is limited to `coincident`; the two
-axes are limited to `point_on_object`. Both public orders are accepted. Unknown
-literals, additional reference fields, raw negative geometry IDs, external
-geometry, and internal geometry are rejected.
+`{"reference": "vertical_axis"}`. Origin is accepted by `coincident` and as a
+symmetry centre; the two axes are accepted by `point_on_object` and as symmetry
+lines. Both public orders are accepted by the existing two-sided reference
+constraints. A symmetric line reference is the strict
+`{"geometry_index": non_negative_integer}` shape and is resolved only in the
+FreeCAD layer. Unknown literals, additional reference fields, raw negative
+geometry IDs, external geometry, and internal geometry are rejected.
 
 The focused FreeCAD layer alone translates `origin` to the native root point,
 `horizontal_axis` to the native horizontal sketch axis, and `vertical_axis` to
@@ -800,6 +808,17 @@ origin membership is a native `Coincident` constraint and axis membership is a
 native `PointOnObject` constraint. No construction geometry or zero-valued X/Y
 distance constraints are synthesized. The existing explicit Euclidean
 `point_to_origin` modes and their controlled inspection readback are unchanged.
+
+For controlled symmetry, the FreeCAD layer selects one of the two verified
+native constructor forms: two points plus a third point for origin/geometry
+point symmetry, or two points plus a whole line for axis/line-segment symmetry.
+The matching Python-bound constraint stores the selected points as its first
+two element pairs; point-centred symmetry has a point-qualified third element,
+while line-centred symmetry has a whole-edge third element. This behavior was
+verified against FreeCAD's official `ConstraintPyImp.cpp`, the legacy/readback
+fields in `Constraint.h`, the internal solve behavior in
+`SketchObjectPyImp.cpp`, and the installed 1.1.1 build at commit
+`0108fd4b4850cc46e625b60e53cea7a7bbe69f8d`.
 
 Lengths are public millimetres. Euclidean distances, radii, and diameters are
 strict finite positive values. Signed and zero `distance_x`/`distance_y` values
@@ -815,7 +834,9 @@ Pure request validation rejects malformed unions, missing/additional fields,
 unsupported discriminators or modes, non-integer or negative indices, invalid
 position tokens, same-geometry pairs, origin-to-origin pairs, invalid native
 reference combinations, nonnumeric/non-finite values, nonpositive unsigned
-dimensions, empty batches, and batches above 100. Before opening a transaction,
+dimensions, identical symmetric points, a centre identical to either selected
+point, degenerate own-line symmetry, empty batches, and batches above 100.
+Before opening a transaction,
 the FreeCAD adapter resolves every current index and enforces:
 
 - horizontal, vertical, parallel, perpendicular, line length, and angles:
@@ -823,6 +844,8 @@ the FreeCAD adapter resolves every current index and enforces:
 - equal: line-to-line or any circle/circular-arc pair;
 - coincident, point-on-object, and point distances: only point tokens valid for
   the runtime geometry type;
+- symmetric: both selected points and any point-centre must use valid tokens;
+  a whole-line centre must resolve specifically to `Part.LineSegment`;
 - radius and diameter: `Part.Circle` or `Part.ArcOfCircle` only.
 
 Construction geometry is valid under the same rules. Standalone and attached
@@ -878,14 +901,16 @@ Public error codes are `validation_error`, `document_not_found`,
 `geometry_reference_out_of_range`, `invalid_position_reference`,
 `same_geometry_reference`, `same_origin_reference`, `unsupported_reference`,
 `invalid_point_reference`, `invalid_constraint_value`, and
-`incompatible_geometry_type`, plus focused transaction/index/count/rollback
+`incompatible_geometry_type`, plus the focused symmetric reasons
+`identical_symmetric_points`, `identical_symmetry_centre`, and
+`degenerate_symmetry_line`, plus transaction/index/count/rollback
 reasons. Raw FreeCAD exception text is never public.
 
 Version one creates only active driving dimensional constraints. Tangency,
-symmetry, block, internal alignment, angle-via-point, B-spline-specific and
+block, internal alignment, angle-via-point, B-spline-specific and
 arbitrary reference constraints; expressions, names, editing and deletion; and
 external/internal geometry references remain unsupported. Axis references are
-limited to native `point_on_object`.
+limited to native `point_on_object` and the `about` side of `symmetric`.
 
 ## Sketch Inspection
 
@@ -935,6 +960,12 @@ native origin coincidence is returned with the geometry-point reference plus
 `{"reference": "origin"}` in the order stored by FreeCAD. Native
 `PointOnObject` axis membership is returned as the geometry point plus
 `{"reference": "horizontal_axis"}` or `{"reference": "vertical_axis"}`.
+Supported native `Symmetric` constraints return `type: symmetric` and exactly
+three controlled references in stored first/second/about order. The about
+reference is reconstructed as `origin`, either native axis, a geometry point,
+or a line geometry reference with `position: edge`. Incompatible or degenerate
+native symmetric records become controlled `unsupported` records without
+breaking inspection of the remaining constraints.
 Private root/axis IDs never cross the adapter boundary. Constraint type is
 interpreted together with point position: an axis-like native ID in a
 `Coincident` record is not misreported as origin or as controlled

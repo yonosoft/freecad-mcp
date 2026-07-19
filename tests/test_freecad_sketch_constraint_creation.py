@@ -96,6 +96,16 @@ class ConstraintStub:
             self.First = int(args[0])
             self.FirstPos = int(args[1])
             self.Second = int(args[2])
+        elif constraint_type == "Symmetric":
+            self.First = int(args[0])
+            self.FirstPos = int(args[1])
+            self.Second = int(args[2])
+            self.SecondPos = int(args[3])
+            self.Third = int(args[4])
+            if len(args) == 6:
+                self.ThirdPos = int(args[5])
+            elif len(args) != 5:
+                raise TypeError("unsupported symmetric constructor")
         elif constraint_type in {"Radius", "Diameter"}:
             self.First = int(args[0])
             self.Value = float(args[1])
@@ -463,6 +473,174 @@ def test_native_sketch_references_use_verified_constructors_without_extra_mutati
     assert sketch.solve_calls == 0
 
 
+def test_symmetric_uses_exact_verified_point_and_line_native_constructors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    payload: list[dict[str, object]] = [
+        {
+            "type": "symmetric",
+            "first": {"geometry_index": 0, "position": "start"},
+            "second": {"geometry_index": 1, "position": "end"},
+            "about": {"reference": "origin"},
+        },
+        {
+            "type": "symmetric",
+            "first": {"geometry_index": 0, "position": "end"},
+            "second": {"geometry_index": 3, "position": "center"},
+            "about": {"reference": "horizontal_axis"},
+        },
+        {
+            "type": "symmetric",
+            "first": {"geometry_index": 5, "position": "point"},
+            "second": {"geometry_index": 4, "position": "center"},
+            "about": {"reference": "vertical_axis"},
+        },
+        {
+            "type": "symmetric",
+            "first": {"geometry_index": 0, "position": "end"},
+            "second": {"geometry_index": 3, "position": "center"},
+            "about": {"geometry_index": 5, "position": "point"},
+        },
+        {
+            "type": "symmetric",
+            "first": {"geometry_index": 0, "position": "start"},
+            "second": {"geometry_index": 4, "position": "center"},
+            "about": {"geometry_index": 2},
+        },
+    ]
+
+    result = FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", _parsed(payload))
+
+    assert result.added_indices == (0, 1, 2, 3, 4)
+    assert [
+        (item.First, item.FirstPos, item.Second, item.SecondPos, item.Third, item.ThirdPos)
+        for item in sketch._constraints
+    ] == [
+        (0, 1, 1, 2, -1, 1),
+        (0, 2, 3, 3, -1, 0),
+        (5, 1, 4, 3, -2, 0),
+        (0, 2, 3, 3, 5, 1),
+        (0, 1, 4, 3, 2, 0),
+    ]
+    assert document.open_calls == ["MCP Add Sketch Constraints"]
+    assert document.commit_calls == 1
+    assert document.recompute_calls == 0
+    assert document.save_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("geometry_index", "position", "native_position"),
+    [
+        (0, "start", 1),
+        (0, "end", 2),
+        (3, "center", 3),
+        (4, "start", 1),
+        (4, "end", 2),
+        (4, "center", 3),
+        (5, "point", 1),
+    ],
+)
+def test_symmetric_accepts_every_controlled_selectable_point_kind(
+    monkeypatch: pytest.MonkeyPatch,
+    geometry_index: int,
+    position: str,
+    native_position: int,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+
+    FreeCADDocumentAdapter().add_sketch_constraints(
+        "Bracket",
+        "Sketch",
+        _parsed(
+            [
+                {
+                    "type": "symmetric",
+                    "first": {"geometry_index": geometry_index, "position": position},
+                    "second": {"geometry_index": 1, "position": "end"},
+                    "about": {"reference": "origin"},
+                }
+            ]
+        ),
+    )
+
+    assert sketch._constraints[0].First == geometry_index
+    assert sketch._constraints[0].FirstPos == native_position
+
+
+def test_centred_rectangle_regression_translates_one_natural_symmetric_batch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rectangle = [
+        LineSegmentStub(VectorStub(-15.0, -10.0), VectorStub(15.0, -10.0)),
+        LineSegmentStub(VectorStub(15.0, -10.0), VectorStub(15.0, 10.0)),
+        LineSegmentStub(VectorStub(15.0, 10.0), VectorStub(-15.0, 10.0)),
+        LineSegmentStub(VectorStub(-15.0, 10.0), VectorStub(-15.0, -10.0)),
+    ]
+    sketch = SketchStub(rectangle)
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    payload: list[dict[str, object]] = [
+        {
+            "type": "coincident",
+            "first": {"geometry_index": 0, "position": "end"},
+            "second": {"geometry_index": 1, "position": "start"},
+        },
+        {
+            "type": "coincident",
+            "first": {"geometry_index": 1, "position": "end"},
+            "second": {"geometry_index": 2, "position": "start"},
+        },
+        {
+            "type": "coincident",
+            "first": {"geometry_index": 2, "position": "end"},
+            "second": {"geometry_index": 3, "position": "start"},
+        },
+        {
+            "type": "coincident",
+            "first": {"geometry_index": 3, "position": "end"},
+            "second": {"geometry_index": 0, "position": "start"},
+        },
+        {"type": "horizontal", "geometry_index": 0},
+        {"type": "horizontal", "geometry_index": 2},
+        {"type": "vertical", "geometry_index": 1},
+        {"type": "vertical", "geometry_index": 3},
+        {"type": "distance", "mode": "line_length", "geometry_index": 0, "value": 30.0},
+        {"type": "distance", "mode": "line_length", "geometry_index": 1, "value": 20.0},
+        {
+            "type": "symmetric",
+            "first": {"geometry_index": 0, "position": "start"},
+            "second": {"geometry_index": 2, "position": "start"},
+            "about": {"reference": "origin"},
+        },
+    ]
+
+    result = FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", _parsed(payload))
+
+    assert result.added_indices == tuple(range(11))
+    assert result.constraint_count == 11
+    assert sketch.GeometryCount == 4
+    assert sketch._construction == [False] * 4
+    assert [item.Type for item in sketch._constraints].count("Symmetric") == 1
+    assert not any(item.Type in {"DistanceX", "DistanceY"} for item in sketch._constraints)
+    assert (
+        sketch._constraints[10].First,
+        sketch._constraints[10].FirstPos,
+        sketch._constraints[10].Second,
+        sketch._constraints[10].SecondPos,
+        sketch._constraints[10].Third,
+        sketch._constraints[10].ThirdPos,
+    ) == (0, 1, 2, 1, -1, 1)
+    assert document.open_calls == ["MCP Add Sketch Constraints"]
+    assert document.commit_calls == 1
+    assert document.recompute_calls == 0
+    assert document.save_calls == 0
+
+
 @pytest.mark.parametrize(
     ("geometry_index", "position"),
     [
@@ -610,6 +788,24 @@ def test_standalone_and_attached_sketches_use_the_same_constraint_path(
             {"type": "equal", "first_geometry_index": 0, "second_geometry_index": 3},
             "incompatible_geometry_type",
         ),
+        (
+            {
+                "type": "symmetric",
+                "first": {"geometry_index": 0, "position": "start"},
+                "second": {"geometry_index": 1, "position": "end"},
+                "about": {"geometry_index": 3},
+            },
+            "incompatible_geometry_type",
+        ),
+        (
+            {
+                "type": "symmetric",
+                "first": {"geometry_index": 0, "position": "start"},
+                "second": {"geometry_index": 1, "position": "end"},
+                "about": {"geometry_index": 99},
+            },
+            "geometry_reference_out_of_range",
+        ),
     ],
 )
 def test_geometry_compatibility_fails_before_transaction(
@@ -627,6 +823,39 @@ def test_geometry_compatibility_fails_before_transaction(
     assert raised.value.reason == reason
     assert document.open_calls == []
     assert sketch.ConstraintCount == 0
+
+
+def test_later_invalid_symmetric_reference_rejects_complete_batch_before_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    batch = _parsed(
+        [
+            {
+                "type": "symmetric",
+                "first": {"geometry_index": 0, "position": "start"},
+                "second": {"geometry_index": 1, "position": "end"},
+                "about": {"reference": "origin"},
+            },
+            {
+                "type": "symmetric",
+                "first": {"geometry_index": 0, "position": "start"},
+                "second": {"geometry_index": 1, "position": "end"},
+                "about": {"geometry_index": 99},
+            },
+        ]
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert raised.value.index == 1
+    assert raised.value.reason == "geometry_reference_out_of_range"
+    assert sketch.ConstraintCount == 0
+    assert sketch.add_calls == []
+    assert document.open_calls == []
 
 
 @pytest.mark.parametrize("failure_at", [0, 1, 2])

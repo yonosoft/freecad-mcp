@@ -42,6 +42,7 @@ from freecad_mcp.models import (
 _SUPPORTED_CONSTRAINTS = {
     "Coincident": "coincident",
     "PointOnObject": "point_on_object",
+    "Symmetric": "symmetric",
     "Horizontal": "horizontal",
     "Vertical": "vertical",
     "Parallel": "parallel",
@@ -65,6 +66,7 @@ _DIMENSIONAL_CONSTRAINTS = {
 _REFERENCE_COUNTS = {
     "Coincident": {2},
     "PointOnObject": {2},
+    "Symmetric": {3},
     "Horizontal": {1},
     "Vertical": {1},
     "Parallel": {2},
@@ -310,6 +312,10 @@ def _constraint_references(
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
 ) -> tuple[tuple[SketchConstraintReference, ...], bool]:
+    symmetric = _symmetric_references(constraint, constraint_index, geometry)
+    if symmetric is not None:
+        return symmetric
+
     origin_coincidence = _coincident_origin_references(
         constraint,
         constraint_index,
@@ -372,6 +378,66 @@ def _constraint_references(
             )
         )
     return tuple(references), False
+
+
+def _symmetric_references(
+    constraint: Any,
+    constraint_index: int,
+    geometry: tuple[SketchGeometry, ...],
+) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
+    try:
+        if constraint.Type != "Symmetric":
+            return None
+        first = (_required_integer(constraint.First), _required_integer(constraint.FirstPos))
+        second = (_required_integer(constraint.Second), _required_integer(constraint.SecondPos))
+        third = (_required_integer(constraint.Third), _required_integer(constraint.ThirdPos))
+    except Exception:
+        return (), True
+
+    try:
+        first_reference = _geometry_point_reference(*first, constraint_index, geometry)
+        second_reference = _geometry_point_reference(*second, constraint_index, geometry)
+    except SketchConstraintMalformedError:
+        return (), True
+    if first_reference is None or second_reference is None or first == second:
+        return (), True
+
+    third_geometry, third_position = third
+    about: SketchConstraintReference | None = None
+    if third_position == 0:
+        axis_references = {-1: "horizontal_axis", -2: "vertical_axis"}
+        if third_geometry in axis_references:
+            about = SketchConstraintReference(reference=axis_references[third_geometry])
+        elif third_geometry >= 0:
+            if third_geometry >= len(geometry):
+                return (), True
+            if not isinstance(geometry[third_geometry], SketchLineGeometry):
+                return (), True
+            if third_geometry in {first[0], second[0]}:
+                return (), True
+            about = SketchConstraintReference(
+                kind="geometry",
+                geometry_index=third_geometry,
+                position="edge",
+            )
+    elif third == (-1, 1):
+        about = SketchConstraintReference(reference="origin")
+    else:
+        try:
+            about = _geometry_point_reference(
+                third_geometry,
+                third_position,
+                constraint_index,
+                geometry,
+            )
+        except SketchConstraintMalformedError:
+            return (), True
+        if third in {first, second}:
+            return (), True
+
+    if about is None:
+        return (), True
+    return ((first_reference, second_reference, about), False)
 
 
 def _coincident_origin_references(

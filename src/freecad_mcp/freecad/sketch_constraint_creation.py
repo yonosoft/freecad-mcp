@@ -35,12 +35,14 @@ from freecad_mcp.models import (
     SketchAxisReferenceInput,
     SketchCoincidentReferenceInput,
     SketchConstraintAdditionResult,
+    SketchConstraintGeometryReferenceInput,
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
     SketchHorizontalAxisReferenceInput,
     SketchOriginReferenceInput,
     SketchPointPosition,
     SketchVerticalAxisReferenceInput,
+    SymmetricConstraintInput,
     VerticalConstraintInput,
 )
 
@@ -259,6 +261,8 @@ def _validate_geometry_compatibility(
         elif isinstance(item, PointOnObjectConstraintInput):
             point, _axis = _point_on_object_references(item, index)
             _require_point(geometry, point, part, index)
+        elif isinstance(item, SymmetricConstraintInput):
+            _validate_symmetric_compatibility(item, geometry, part, index)
         elif isinstance(item, DistanceLineLengthConstraintInput):
             _require_line(geometry, item.geometry_index, part, index)
         elif isinstance(item, DistancePointToOriginConstraintInput):
@@ -327,6 +331,41 @@ def _build_constraint(item: SketchConstraintInput, sketcher: Any, index: int) ->
                 point.geometry_index,
                 _point_position(point),
                 _axis_geometry_id(axis),
+            )
+        if isinstance(item, SymmetricConstraintInput):
+            first_position = _point_position(item.first)
+            second_position = _point_position(item.second)
+            if isinstance(item.about, SketchConstraintPointReferenceInput):
+                return sketcher.Constraint(
+                    "Symmetric",
+                    item.first.geometry_index,
+                    first_position,
+                    item.second.geometry_index,
+                    second_position,
+                    item.about.geometry_index,
+                    _point_position(item.about),
+                )
+            if isinstance(item.about, SketchOriginReferenceInput):
+                return sketcher.Constraint(
+                    "Symmetric",
+                    item.first.geometry_index,
+                    first_position,
+                    item.second.geometry_index,
+                    second_position,
+                    _SKETCH_ROOT_GEOMETRY_ID,
+                    _SKETCH_ROOT_POINT_POSITION,
+                )
+            if isinstance(item.about, SketchConstraintGeometryReferenceInput):
+                symmetry_line = item.about.geometry_index
+            else:
+                symmetry_line = _axis_geometry_id(item.about)
+            return sketcher.Constraint(
+                "Symmetric",
+                item.first.geometry_index,
+                first_position,
+                item.second.geometry_index,
+                second_position,
+                symmetry_line,
             )
         if isinstance(item, DistanceLineLengthConstraintInput):
             return sketcher.Constraint("Distance", item.geometry_index, item.value)
@@ -436,6 +475,30 @@ def _axis_geometry_id(reference: SketchAxisReferenceInput) -> int:
     if isinstance(reference, SketchHorizontalAxisReferenceInput):
         return _HORIZONTAL_SKETCH_AXIS_ID
     return _VERTICAL_SKETCH_AXIS_ID
+
+
+def _validate_symmetric_compatibility(
+    item: SymmetricConstraintInput,
+    geometry: tuple[Any, ...],
+    part: Any,
+    index: int,
+) -> None:
+    _require_point(geometry, item.first, part, index)
+    _require_point(geometry, item.second, part, index)
+    if item.first == item.second:
+        raise SketchConstraintCreationError(index=index, reason="identical_symmetric_points")
+
+    if isinstance(item.about, SketchConstraintPointReferenceInput):
+        _require_point(geometry, item.about, part, index)
+        if item.about in {item.first, item.second}:
+            raise SketchConstraintCreationError(index=index, reason="identical_symmetry_centre")
+    elif isinstance(item.about, SketchConstraintGeometryReferenceInput):
+        _require_line(geometry, item.about.geometry_index, part, index)
+        if item.about.geometry_index in {
+            item.first.geometry_index,
+            item.second.geometry_index,
+        }:
+            raise SketchConstraintCreationError(index=index, reason="degenerate_symmetry_line")
 
 
 def _require_line(geometry: tuple[Any, ...], geometry_index: int, part: Any, index: int) -> None:

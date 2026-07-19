@@ -32,7 +32,7 @@ and [Codeberg](https://codeberg.org/aeromaker/freecad-mcp).
 ## Verified Environment
 
 The currently verified live environment is FreeCAD `1.1.1.20260414` with
-embedded Python `3.11.15` and PySide6 / Qt `6.8.3`. The MCP SDK uses stable v1
+embedded Python `3.11.14` and PySide6 / Qt `6.8.3`. The MCP SDK uses stable v1
 (`>=1.27.2,<2`). Pure-Python automated checks run with standalone Python 3.11;
 live FreeCAD acceptance remains a manual check.
 
@@ -146,7 +146,7 @@ Version-one geometry support is `line_segment`, `circle`, `arc_of_circle`, and
 construction state. The supported constraint discriminators are `coincident`,
 `horizontal`, `vertical`, `parallel`, `perpendicular`, `equal`, `distance`,
 `distance_x`, `distance_y`, `radius`, `diameter`, `angle`, and
-`point_on_object`. Valid geometry or constraints outside those sets are
+`point_on_object`, and `symmetric`. Valid geometry or constraints outside those sets are
 returned as controlled `unsupported` records rather than failing the entire
 sketch.
 
@@ -274,6 +274,8 @@ member with no additional fields. Version one supports:
   geometry point and the native sketch origin;
 - `point_on_object` between one geometry point and the native horizontal or
   vertical sketch axis;
+- `symmetric` between two distinct geometry points, about the sketch origin,
+  either native sketch axis, another distinct geometry point, or a line segment;
 - `distance` modes `line_length`, `point_to_origin`, and `between_points`;
 - `distance_x` and `distance_y` modes `point_to_origin` and `between_points`;
 - `radius` and `diameter` on circles or circular arcs;
@@ -313,12 +315,32 @@ are strict one-field objects:
 {"reference": "vertical_axis"}
 ```
 
-`origin` is accepted only as the non-geometry side of `coincident`.
-`horizontal_axis` and `vertical_axis` are accepted only as the non-geometry
-side of `point_on_object`; either public reference order is accepted. Negative
-geometry indices, external geometry, internal geometry, and other reference
-literals are rejected. The existing `point_to_origin` distance modes remain
-unchanged and do not expose FreeCAD's internal root-point encoding.
+`origin` is accepted by `coincident` and as `symmetric.about`.
+`horizontal_axis` and `vertical_axis` are accepted by `point_on_object` and as
+`symmetric.about`; either public order remains accepted for the two-sided
+`coincident` and `point_on_object` contracts. Negative geometry indices,
+external geometry, internal geometry, and other reference literals are
+rejected. The existing `point_to_origin` distance modes remain unchanged and
+do not expose FreeCAD's internal root-point encoding.
+
+The strict symmetric shape reuses the same point-reference model for `first`,
+`second`, and point-centred `about`. A whole line is a strict one-field geometry
+reference and is verified to be a current line segment before mutation:
+
+```json
+{
+  "type": "symmetric",
+  "first": {"geometry_index": 0, "position": "start"},
+  "second": {"geometry_index": 2, "position": "start"},
+  "about": {"reference": "origin"}
+}
+```
+
+Supported `about` values are exactly the three native reference objects, a
+controlled geometry-point reference, or `{"geometry_index": 3}` for a line
+segment. Circles, arcs, external/datum geometry, raw native identifiers,
+identical selected points, a selected point reused as the centre, and a
+selected point taken from its own symmetry line are rejected before mutation.
 
 For example, a circle can be centered natively on the sketch origin without an
 artificial anchor point:
@@ -353,6 +375,24 @@ Axis membership creates native `PointOnObject`, not `Coincident`, even though
 FreeCAD's GUI exposes both through its unified coincidence command. Native
 negative reference IDs remain private to the FreeCAD layer. These operations
 are not a composite `lock` constraint.
+
+Use symmetry when the design intent is symmetric. Prefer the sketch origin or
+native sketch axes over calculated positive and negative placement dimensions,
+and use the smallest natural constraint set. Do not add helper construction
+geometry or duplicate symmetry with coordinate, distance, or coincidence
+constraints that make the sketch redundant. After explicit recompute, require
+no redundant, partially redundant, conflicting, or malformed constraints. The
+tool exposes controlled symmetry but does not choose a constraint strategy for
+the calling agent.
+
+A centred 30 mm × 20 mm rectangle is representable with four line segments,
+four endpoint coincidences, two horizontal constraints, two vertical
+constraints, 30 mm and 20 mm whole-line dimensions, and one symmetry constraint
+between opposite corners about the origin. Direct FreeCAD 1.1.1 regression
+testing confirms that natural 11-constraint set is closed, fully constrained at
+zero degrees of freedom, and has no redundant, partially redundant,
+conflicting, or malformed constraints. It uses no helper geometry and no signed
+corner-coordinate dimensions.
 
 Length values are millimetres. Euclidean `distance`, `radius`, and `diameter`
 values must be finite and positive. `distance_x` and `distance_y` preserve
@@ -393,13 +433,16 @@ Success has this exact shape:
 ```
 
 Indices are temporary current-state indices. Only driving dimensional
-constraints are created. Tangent, symmetric, block, internal alignment,
+constraints are created. Tangent, block, internal alignment,
 angle-via-point, B-spline-specific and arbitrary reference constraints;
 constraint names, expressions, editing, and deletion; external/internal
 geometry references; and arbitrary `Sketcher.Constraint` passthrough remain
-unsupported. Controlled axis references are limited to `point_on_object`.
-Existing unsupported constraints remain inspectable through `get_sketch`;
-redundancy and conflicts are assessed only after explicit recompute.
+unsupported. Controlled axes are accepted only by `point_on_object` and as the
+`about` reference of `symmetric`. Supported native symmetry reads back as three
+controlled references in `first`, `second`, `about` order; private negative IDs
+and native point-position integers are never returned. Existing unsupported
+constraints remain inspectable through `get_sketch`; redundancy and conflicts
+are assessed only after explicit recompute.
 
 These document, object, and sketch-inspection tools are MCP-only capabilities.
 They do not add workbench commands or toolbar icons. `get_object` performs exact

@@ -11,6 +11,7 @@ from freecad_mcp.models import (
     PointOnObjectConstraintInput,
     SketchHorizontalAxisReferenceInput,
     SketchOriginReferenceInput,
+    SymmetricConstraintInput,
 )
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import ADD_SKETCH_CONSTRAINTS_TOOL, REGISTERED_TOOL_NAMES
@@ -20,13 +21,20 @@ DESCRIPTION = (
     "Atomically append 1 to 100 controlled constraints to a sketch by exact "
     "internal document and sketch name. Supports horizontal, vertical, parallel, "
     "perpendicular, equal, coincident, point_on_object, distance, distance_x, "
-    "distance_y, radius, diameter and angle in request order. Coincident accepts "
+    "distance_y, radius, diameter, angle and symmetric in request order. "
+    "Symmetric accepts two controlled geometry points about the origin, a native "
+    "sketch axis, another controlled geometry point, or a line segment. Coincident accepts "
     "the controlled sketch origin reference; point_on_object accepts controlled "
     "horizontal and vertical sketch-axis references. Lengths are millimetres; "
     "angles are degrees and are passed without normalization. The tool does not "
     "call solve, recompute or save. Returned indices describe only the immediate "
     "sketch state and may be renumbered by later mutations; call get_sketch for "
-    "readback."
+    "readback. Use symmetry when the design intent is symmetric, preferring the "
+    "sketch origin or native axes over calculated signed coordinates. Use the "
+    "smallest natural constraint set; do not add helper geometry or duplicate "
+    "symmetry with redundant coordinate, distance, or coincidence constraints. "
+    "After recompute, require no redundant, partially redundant, conflicting, or "
+    "malformed constraints."
 )
 
 
@@ -83,9 +91,10 @@ def test_add_sketch_constraints_schema_locks_all_types_modes_and_strict_models()
         "perpendicular",
         "point_on_object",
         "radius",
+        "symmetric",
         "vertical",
     ]
-    assert len(items["oneOf"]) == 13
+    assert len(items["oneOf"]) == 14
     object_definitions = [
         definition for definition in definitions.values() if definition.get("type") == "object"
     ]
@@ -138,6 +147,26 @@ def test_add_sketch_constraints_schema_locks_all_types_modes_and_strict_models()
         point_on_object["properties"]["second"]["anyOf"]
         == point_on_object["properties"]["first"]["anyOf"]
     )
+
+    symmetric = definitions["SymmetricConstraintInput"]
+    assert symmetric["required"] == ["type", "first", "second", "about"]
+    assert symmetric["properties"]["first"] == {
+        "$ref": "#/$defs/SketchConstraintPointReferenceInput"
+    }
+    assert symmetric["properties"]["second"] == symmetric["properties"]["first"]
+    assert symmetric["properties"]["about"]["anyOf"] == [
+        {"$ref": "#/$defs/SketchConstraintPointReferenceInput"},
+        {"$ref": "#/$defs/SketchConstraintGeometryReferenceInput"},
+        {"$ref": "#/$defs/SketchOriginReferenceInput"},
+        {"$ref": "#/$defs/SketchHorizontalAxisReferenceInput"},
+        {"$ref": "#/$defs/SketchVerticalAxisReferenceInput"},
+    ]
+    geometry_reference = definitions["SketchConstraintGeometryReferenceInput"]
+    assert geometry_reference["required"] == ["geometry_index"]
+    assert geometry_reference["properties"] == {
+        "geometry_index": {"minimum": 0, "title": "Geometry Index", "type": "integer"}
+    }
+    assert geometry_reference["additionalProperties"] is False
 
 
 def test_add_sketch_constraints_is_exactly_tool_twelve() -> None:
@@ -197,6 +226,12 @@ def test_add_sketch_constraints_delegates_typed_inputs_and_serializes_response()
                             "first": {"reference": "horizontal_axis"},
                             "second": {"geometry_index": 0, "position": "start"},
                         },
+                        {
+                            "type": "symmetric",
+                            "first": {"geometry_index": 0, "position": "start"},
+                            "second": {"geometry_index": 1, "position": "end"},
+                            "about": {"reference": "origin"},
+                        },
                     ],
                 },
             )
@@ -212,13 +247,15 @@ def test_add_sketch_constraints_delegates_typed_inputs_and_serializes_response()
     assert isinstance(constraints[2].second, SketchOriginReferenceInput)
     assert isinstance(constraints[3], PointOnObjectConstraintInput)
     assert isinstance(constraints[3].first, SketchHorizontalAxisReferenceInput)
+    assert isinstance(constraints[4], SymmetricConstraintInput)
+    assert isinstance(constraints[4].about, SketchOriginReferenceInput)
     assert call_result[1] == {
         "ok": True,
         "code": "sketch_constraints_added",
         "document_name": "TestDocument",
         "sketch_name": "BaseSketch",
-        "added_indices": [0, 1, 2, 3],
-        "added_count": 4,
-        "constraint_count": 4,
+        "added_indices": [0, 1, 2, 3, 4],
+        "added_count": 5,
+        "constraint_count": 5,
         "message": "Sketch constraints added.",
     }
