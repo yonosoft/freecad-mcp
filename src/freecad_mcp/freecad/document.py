@@ -18,6 +18,7 @@ from freecad_mcp.freecad import (
     sketch_inspection,
     sketch_polygon_creation,
     sketch_rectangle_creation,
+    sketch_reference_constraints,
     sketch_removal,
     sketch_rounded_rectangle_creation,
     sketch_slot_creation,
@@ -89,6 +90,8 @@ from freecad_mcp.models import (
     SketchProfileValidationResult,
     SketchRectangleCreationResult,
     SketchRectangleRequestInput,
+    SketchReferenceConstraintAdditionResult,
+    SketchReferenceConstraintInput,
     SketchRoundedRectangleCreationResult,
     SketchRoundedRectangleRequestInput,
     SketchSemanticPolygonRequest,
@@ -210,6 +213,19 @@ class FreeCADDocumentAdapter:
     ) -> SketchConstraintAdditionResult:
         """Atomically append controlled constraints without recomputing or saving."""
         return sketch_constraint_creation.add_sketch_constraints(
+            document_name,
+            sketch_name,
+            constraints,
+        )
+
+    def add_sketch_reference_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraints: tuple[SketchReferenceConstraintInput, ...],
+    ) -> SketchReferenceConstraintAdditionResult:
+        """Add one verified internal/external constraint batch atomically."""
+        return sketch_reference_constraints.add_sketch_reference_constraints(
             document_name,
             sketch_name,
             constraints,

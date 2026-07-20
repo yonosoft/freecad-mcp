@@ -1913,6 +1913,81 @@ placement, file/saved/modified state, history, active document, selection, and
 edit mode where observable. No result contains a native object, memory address,
 or negative geometry ID.
 
+## Unified Reference-Constraint Boundary
+
+Milestone 21 appends `add_sketch_reference_constraints` without changing the
+first 34 tools or the original 17-way `add_sketch_constraints` union. Its path
+is deliberately explicit:
+
+```text
+mcp/sketch_reference_constraint_tools.py
+-> commands/sketch_reference_constraints.py
+-> DocumentAdapter protocol
+-> FreeCADDocumentAdapter
+-> freecad/sketch_reference_constraints.py
+-> controlled Sketcher.Constraint construction
+-> recompute, semantic/native/solver/dependency verification
+-> SketchReferenceConstraintAdditionResult
+```
+
+The transport owns a closed, discriminated internal/external operand union and
+the application handler owns pure request validation and controlled error
+envelopes. The adapter resolves current-order-local public identities to native
+GeoIds, but those negative external IDs do not cross the boundary. It prepares
+the entire batch against `reference_constraint_capabilities.py` before opening
+a transaction. The policy is a static allowlist derived from isolated FreeCAD
+1.1.1 subprocess probes; production does not trial constraints against the
+user's sketch.
+
+The adapter snapshots internal geometry, constraint fingerprints and flags,
+construction, virtual state, external source mapping and ordering, dependencies,
+Body/attachment/placement, solver, document/history/modified state, active
+document, and observable GUI selection/edit mode. An owned success is one `Add
+sketch reference constraints` transaction. A caller-owned transaction stays
+open. Before opening an owned transaction, the adapter temporarily activates
+the exact target document; it restores the previous active document before
+context verification, return, or rollback verification. This prevents
+FreeCAD's linked transaction marker from polluting a different active
+document's history. Caller-owned calls never perform this switch. Addition
+order is request order. Any unsupported item, stale reference,
+duplicate, native mismatch, recompute failure, or unhealthy solver rejects the
+whole batch. Explicit horizontal/vertical orientation constraints provide a
+pre-transaction proof for redundant Parallel and Perpendicular requests. A
+freshly fully constrained target also permits conservative geometric redundancy
+checks for selected Coincident, Point-on-Object, Equal, and Tangent forms;
+coincidental geometry with relevant freedom is not refused.
+
+For an owned post-mutation failure, native abort runs before any compensating
+mutation. Addition, recompute, solver/native/dependency verification, and context
+verification all precede commit. The shared inverse path then deletes only any
+still-appended constraints, restores geometry and flags, recomputes a previously
+fresh solver, restores modified state, and verifies the complete snapshot. The
+observed committed undo limit is 20: an open transaction may temporarily expose
+21 names and abort exactly, while commit trims and irreversibly evicts the oldest
+name. Defensive cleanup is therefore limited to the exact uncapped
+count-plus-one leak. Same-count/changed-top history is never repaired or reported
+as exact. Cleanup activates only the target and restores the prior active
+document. Caller-owned failures use the inverse path without commit, abort, or
+internal undo.
+
+`get_sketch` inspects `ExternalGeo[2:]` only to type controlled operands. A
+native GeoId at or below `-3` is translated to `kind: external_geometry` and a
+non-negative `external_reference_number`; unsupported projections continue to
+produce the established unsupported constraint summary. Internal-only summary
+serialization is unchanged. Dependency inspection consumes the same native
+constraint slots, so external-removal and internal-geometry-removal preflight
+see exact mixed-constraint indices. Constraint removal compares external source
+identity/order while intentionally permitting the removed constraint's usage
+set to disappear. Milestone 20 replacement and datum editing inspect native
+slots and reject mixed constraints without widening their schemas.
+
+The detailed operand and geometry allowlists are maintained in
+`docs/sketch-reference-constraint-capabilities.md`. The principal semantic
+distinction is that Coincident is point-to-point, while Point-on-Object places a
+point on a whole line, arc, or circle. External geometry remains read-only even
+though it has equal public addressing. Names and expressions are outside this
+boundary and remain Milestone 22 work.
+
 ## Test Ownership
 
 The pure-Python suite mirrors the production responsibilities rather than
@@ -1930,13 +2005,19 @@ collecting all adapter or transport behavior in single modules:
   Milestone 19 preflight, remapping, transaction, construction no-op, and
   rollback behavior belong in `tests/test_freecad_sketch_removal.py`; Milestone
   20 comparison, move sequencing, editing preflight, transaction, remapping, and
-  rollback routing belong in `tests/test_freecad_sketch_editing.py`;
+  rollback routing belong in `tests/test_freecad_sketch_editing.py`; reference
+  operand preflight and the tested allowlist belong in
+  `tests/test_sketch_reference_constraint_capabilities.py`; owned/caller-owned
+  abort-versus-inverse ordering belongs in
+  `tests/test_freecad_sketch_reference_constraints.py`;
 - MCP tests are split into document, object, creation, and sketch-geometry
   registrations; tools 25--28 have exact schema and delegation coverage in
   `tests/test_mcp_sketch_external_geometry_tools.py`; tools 29–31 have strict
   schema, order, and delegation coverage in
   `tests/test_mcp_sketch_removal_tools.py`; tools 32–34 have strict schema,
   order, and delegation coverage in `tests/test_mcp_sketch_editing_tools.py`;
+  tool 35 has exact schema, order, and no-chaining coverage in
+  `tests/test_mcp_sketch_reference_constraint_tools.py`;
   server composition, authoritative
   inventory, lifecycle agreement, and HTTP transport remain together;
 - `tests/test_module_compatibility.py` exclusively owns legacy/canonical identity

@@ -1918,3 +1918,120 @@ open/close, and active-document inspection capabilities are recorded as
 capability gaps; they do not authorize native workarounds and do not make a run
 inconclusive. Retain the previously deferred broken-source reporting,
 expression-removal, save/reopen, and active-document observability notes.
+
+## Milestone 21 Unified Reference-Constraint Verification
+
+Tool 35 introduces shared constraint models, validation, external projection
+typing in `get_sketch`, dependency/removal integration, runtime composition, and
+transaction/rollback behavior. Develop with narrow tests first:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pytest -q `
+  tests\test_freecad_sketch_reference_constraints.py `
+  tests\test_sketch_reference_constraint_capabilities.py `
+  tests\test_mcp_sketch_reference_constraint_tools.py `
+  tests\test_freecad_sketch_inspection.py `
+  tests\test_freecad_sketch_removal.py `
+  tests\test_freecad_sketch_editing.py `
+  tests\test_application.py `
+  tests\test_runtime.py `
+  tests\test_mcp_server.py
+
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m ruff check `
+  src\freecad_mcp\reference_constraint_capabilities.py `
+  src\freecad_mcp\commands\sketch_reference_constraints.py `
+  src\freecad_mcp\freecad\sketch_reference_constraints.py `
+  src\freecad_mcp\mcp\sketch_reference_constraint_tools.py `
+  tests\test_sketch_reference_constraint_capabilities.py
+
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m mypy `
+  src\freecad_mcp\reference_constraint_capabilities.py `
+  src\freecad_mcp\commands\sketch_reference_constraints.py `
+  src\freecad_mcp\freecad\sketch_reference_constraints.py `
+  src\freecad_mcp\mcp\sketch_reference_constraint_tools.py
+```
+
+Capability research must remain isolated from production. The coordinator in
+`scripts/probe_sketch_reference_constraint_capabilities.py` launches one
+FreeCAD subprocess per potentially unsafe case. The completed FreeCAD 1.1.1
+campaign contains 144 cases: 126 primary cases plus 18 supplements. It recorded
+122 accepted native constructions, 22 controlled stale-index `IndexError`
+results, and zero process failures or crashes. The accepted cases verify native
+type/operands, solver return, source immutability, undo/redo, save/reopen, and
+source change where applicable. The resulting public policy is documented in
+`docs/sketch-reference-constraint-capabilities.md` and encoded statically in
+`reference_constraint_capabilities.py`; never run discovery probes on a user
+document.
+
+Run the permanent normal-risk campaign after any adapter, inspection,
+dependency, transaction, rollback, or solver change:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\smoke_sketch_reference_constraints.py
+```
+
+It covers tool order and policy inventory; internal parity; both mixed operand
+orders; point alignment, Coincident, Point-on-Object, tangent, linear
+orientation, and dimensional examples; unsupported unary/external-only/point
+selector cases; duplicate and atomic-batch refusal; dependency and removal
+correction; circumcircle and incircle source propagation; object edge/vertex
+sources; owned and caller-owned rollback; transaction name; undo/redo and redo
+invalidation; same-sketch correction; no native-ID leakage; persistence and
+no-auto-save; non-active targeting; same-name isolation; and GUI preservation.
+The isolation checks compare the complete controlled state and history in both
+directions. Owned reference-constraint transactions must open while their exact
+target document is active and must restore the previous active document;
+otherwise FreeCAD can add a linked transaction marker to the wrong undo stack.
+Crash-risk and stale-index probes stay in the isolated research harness.
+
+For rollback stabilization, run the exact equilateral circumcircle/incircle
+reproduction, rollback-order comparison, and undo-capacity probe separately:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\probe_sketch_reference_constraint_rollback.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\probe_sketch_reference_constraint_undo_capacity.py
+```
+
+The fresh headless fixtures record successful batch and sequential solves while
+the captured live campaign records failures on the circumcircle's third
+sequential Point-on-Object and the incircle's second sequential tangent. This
+process-dependent difference is why the tested static capability allowlist is
+unchanged. The permanent smoke injects both observed post-native boundaries and
+requires exact state/history restoration. Owned rollback must abort before any
+inverse mutation; caller-owned rollback must inverse only and leave the caller
+transaction open. The native regression also exercises cleanup of the one exact
+zero-effect owned history shape; broader history mismatches must remain failures.
+The capacity probe records complete ordered names at 0, 1, 19, and 20 entries,
+proves recompute does not finalize the open transaction, demonstrates irreversible
+oldest-entry eviction only after commit, and requires deterministic redundant
+Parallel refusal with exact target/non-target history at the limit.
+
+Once implementation, documentation, and the permanent smoke are green, run the
+complete quality gate exactly once:
+
+```powershell
+.\scripts\test.ps1 -PythonExe "C:\Program Files\FreeCAD 1.1\bin\python.exe"
+```
+
+The required final native neighbors are:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_reference_constraints.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_document_history.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_native_references.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_analysis.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_external_geometry.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_removal.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_editing.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_curved_profiles.py
+```
+
+Broader geometry-creation and attachment campaigns remain outside this change
+surface: Milestone 21 does not alter their construction algorithms. Review the
+full diff, run `git diff --check`, and inspect `git status`. The autonomous MCP
+client plan is prepared but not executed in
+`docs/codex-milestone-21-acceptance.md`. The shorter post-stabilization rerun is
+`docs/codex-milestone-21-stabilization-acceptance.md`.

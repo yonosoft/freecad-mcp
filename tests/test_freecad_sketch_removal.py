@@ -183,6 +183,7 @@ def _install_harness(
         native_constraints=tuple(sketch.Constraints),
         expression_state=(),
         external_state=(),
+        external_structure_state=(),
         gui_state=None,
         sketch=before,
         profile={"valid": False},

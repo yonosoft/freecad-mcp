@@ -68,6 +68,13 @@ _COMMUTATIVE_PAIR_TYPES = {
 }
 
 
+def _uses_external_geometry(state: tuple[Any, ...]) -> bool:
+    return any(
+        isinstance(state[position], int) and state[position] <= -3 and state[position] != -2000
+        for position in (1, 3, 5)
+    )
+
+
 def update_sketch_constraint_value(
     document_name: str,
     sketch_name: str,
@@ -80,7 +87,11 @@ def update_sketch_constraint_value(
     document, sketch = sketch_removal._context(App, document_name, sketch_name)
     snapshot = sketch_removal._snapshot(document, sketch, Part, App, Gui, operation)
     before = _constraint_at(snapshot, constraint_index)
-    if not isinstance(before, SketchConstraintData) or before.type not in _DIMENSIONAL_TYPES:
+    if (
+        not isinstance(before, SketchConstraintData)
+        or before.type not in _DIMENSIONAL_TYPES
+        or _uses_external_geometry(snapshot.base.constraints[constraint_index])
+    ):
         raise SketchConstraintValueUpdateUnsafeError(
             reason="unsupported_constraint_type",
             constraint_index=constraint_index,
@@ -211,7 +222,9 @@ def replace_sketch_constraint(
     document, sketch = sketch_removal._context(App, document_name, sketch_name)
     snapshot = sketch_removal._snapshot(document, sketch, Part, App, Gui, operation)
     before = _constraint_at(snapshot, constraint_index)
-    if isinstance(before, UnsupportedSketchConstraint):
+    if isinstance(before, UnsupportedSketchConstraint) or _uses_external_geometry(
+        snapshot.base.constraints[constraint_index]
+    ):
         raise SketchConstraintReplacementUnsafeError(
             reason="unsupported_constraint",
             constraint_index=constraint_index,

@@ -109,7 +109,8 @@ def get_sketch(document_name: str, sketch_name: str) -> SketchInspectionResult:
 
         body = _owning_body(sketch)
         geometry = _inspect_geometry(sketch, Part)
-        constraints = _inspect_constraints(sketch, geometry)
+        external_geometry = _inspect_external_geometry(sketch, Part)
+        constraints = _inspect_constraints(sketch, geometry, external_geometry)
         map_mode, attachment = _inspect_attachment(sketch, body)
 
         return SketchInspectionResult(
@@ -231,9 +232,21 @@ def _inspect_geometry_item(
     )
 
 
+def _inspect_external_geometry(sketch: Any, part: Any) -> tuple[SketchGeometry, ...]:
+    try:
+        raw = tuple(sketch.ExternalGeo)[2:]
+    except Exception as exc:
+        raise SketchGeometryMalformedError(
+            index=None,
+            reason="external_geometry_collection_unreadable",
+        ) from exc
+    return tuple(_inspect_geometry_item(item, index, True, part) for index, item in enumerate(raw))
+
+
 def _inspect_constraints(
     sketch: Any,
     geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[SketchConstraint, ...]:
     try:
         raw_constraints = tuple(sketch.Constraints)
@@ -266,7 +279,12 @@ def _inspect_constraints(
             )
             continue
 
-        references, unsupported_reference = _constraint_references(item, index, geometry)
+        references, unsupported_reference = _constraint_references(
+            item,
+            index,
+            geometry,
+            external_geometry,
+        )
         if unsupported_reference:
             result.append(
                 UnsupportedSketchConstraint(
@@ -310,16 +328,27 @@ def _constraint_references(
     constraint: Any,
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[tuple[SketchConstraintReference, ...], bool]:
-    tangent = _tangent_references(constraint, geometry)
+    tangent = _tangent_references(constraint, geometry, external_geometry)
     if tangent is not None:
         return tangent
 
-    symmetric = _symmetric_references(constraint, constraint_index, geometry)
+    symmetric = _symmetric_references(
+        constraint,
+        constraint_index,
+        geometry,
+        external_geometry,
+    )
     if symmetric is not None:
         return symmetric
 
-    point_alignment = _point_alignment_references(constraint, constraint_index, geometry)
+    point_alignment = _point_alignment_references(
+        constraint,
+        constraint_index,
+        geometry,
+        external_geometry,
+    )
     if point_alignment is not None:
         return point_alignment
 
@@ -327,15 +356,26 @@ def _constraint_references(
         constraint,
         constraint_index,
         geometry,
+        external_geometry,
     )
     if origin_coincidence is not None:
         return origin_coincidence
 
-    point_on_object = _point_on_object_references(constraint, constraint_index, geometry)
+    point_on_object = _point_on_object_references(
+        constraint,
+        constraint_index,
+        geometry,
+        external_geometry,
+    )
     if point_on_object is not None:
         return point_on_object
 
-    origin_distance = _distance_to_origin_reference(constraint, constraint_index, geometry)
+    origin_distance = _distance_to_origin_reference(
+        constraint,
+        constraint_index,
+        geometry,
+        external_geometry,
+    )
     if origin_distance is not None:
         return origin_distance
 
@@ -355,8 +395,6 @@ def _constraint_references(
 
         if geometry_index == _UNUSED_GEOMETRY_REFERENCE:
             continue
-        if geometry_index <= -3:
-            return (), True
         if geometry_index in _AXIS_NAMES:
             if position_index != 0:
                 return (), True
@@ -368,28 +406,25 @@ def _constraint_references(
                 )
             )
             continue
-        if geometry_index < 0 or position_index not in _POSITION_NAMES:
+        if geometry_index < 0 and geometry_index > -3:
             return (), True
-        if geometry_index >= len(geometry):
-            raise SketchConstraintMalformedError(
-                index=constraint_index, reason="geometry_reference_out_of_range"
-            )
-        position = _controlled_position(geometry[geometry_index], position_index)
-        if position is None:
-            return (), True
-        references.append(
-            SketchConstraintReference(
-                kind="geometry",
-                geometry_index=geometry_index,
-                position=position,
-            )
+        reference = _whole_or_point_reference(
+            geometry_index,
+            position_index,
+            constraint_index,
+            geometry,
+            external_geometry,
         )
+        if reference is None:
+            return (), True
+        references.append(reference)
     return tuple(references), False
 
 
 def _tangent_references(
     constraint: Any,
     geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
     try:
         if constraint.Type != "Tangent":
@@ -409,16 +444,24 @@ def _tangent_references(
         or third != _UNUSED_GEOMETRY_REFERENCE
         or third_position != 0
         or first == second
-        or first < 0
-        or second < 0
-        or first >= len(geometry)
-        or second >= len(geometry)
     ):
         return (), True
 
     supported = (SketchLineGeometry, SketchCircleGeometry, SketchArcGeometry)
-    first_geometry = geometry[first]
-    second_geometry = geometry[second]
+    first_geometry = _geometry_for_native_reference(
+        first,
+        0,
+        geometry,
+        external_geometry,
+    )
+    second_geometry = _geometry_for_native_reference(
+        second,
+        0,
+        geometry,
+        external_geometry,
+    )
+    if first_geometry is None or second_geometry is None:
+        return (), True
     if not isinstance(first_geometry, supported) or not isinstance(second_geometry, supported):
         return (), True
     if isinstance(first_geometry, SketchLineGeometry) and isinstance(
@@ -427,16 +470,8 @@ def _tangent_references(
         return (), True
     return (
         (
-            SketchConstraintReference(
-                kind="geometry",
-                geometry_index=first,
-                position="edge",
-            ),
-            SketchConstraintReference(
-                kind="geometry",
-                geometry_index=second,
-                position="edge",
-            ),
+            _geometry_reference(first, "edge"),
+            _geometry_reference(second, "edge"),
         ),
         False,
     )
@@ -457,6 +492,7 @@ def _symmetric_references(
     constraint: Any,
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
     try:
         if constraint.Type != "Symmetric":
@@ -468,8 +504,18 @@ def _symmetric_references(
         return (), True
 
     try:
-        first_reference = _geometry_point_reference(*first, constraint_index, geometry)
-        second_reference = _geometry_point_reference(*second, constraint_index, geometry)
+        first_reference = _geometry_point_reference(
+            *first,
+            constraint_index,
+            geometry,
+            external_geometry,
+        )
+        second_reference = _geometry_point_reference(
+            *second,
+            constraint_index,
+            geometry,
+            external_geometry,
+        )
     except SketchConstraintMalformedError:
         return (), True
     if first_reference is None or second_reference is None or first == second:
@@ -481,18 +527,18 @@ def _symmetric_references(
         axis_references = {-1: "horizontal_axis", -2: "vertical_axis"}
         if third_geometry in axis_references:
             about = SketchConstraintReference(reference=axis_references[third_geometry])
-        elif third_geometry >= 0:
-            if third_geometry >= len(geometry):
-                return (), True
-            if not isinstance(geometry[third_geometry], SketchLineGeometry):
+        elif third_geometry >= 0 or third_geometry <= -3:
+            about_geometry = _geometry_for_native_reference(
+                third_geometry,
+                0,
+                geometry,
+                external_geometry,
+            )
+            if not isinstance(about_geometry, SketchLineGeometry):
                 return (), True
             if third_geometry in {first[0], second[0]}:
                 return (), True
-            about = SketchConstraintReference(
-                kind="geometry",
-                geometry_index=third_geometry,
-                position="edge",
-            )
+            about = _geometry_reference(third_geometry, "edge")
     elif third == (-1, 1):
         about = SketchConstraintReference(reference="origin")
     else:
@@ -502,6 +548,7 @@ def _symmetric_references(
                 third_position,
                 constraint_index,
                 geometry,
+                external_geometry,
             )
         except SketchConstraintMalformedError:
             return (), True
@@ -517,6 +564,7 @@ def _coincident_origin_references(
     constraint: Any,
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
     try:
         if constraint.Type != "Coincident":
@@ -549,6 +597,7 @@ def _coincident_origin_references(
             position_index,
             constraint_index,
             geometry,
+            external_geometry,
         )
         if controlled is None:
             return (), True
@@ -560,6 +609,7 @@ def _point_alignment_references(
     constraint: Any,
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
     try:
         if constraint.Type not in {"Horizontal", "Vertical"}:
@@ -573,8 +623,18 @@ def _point_alignment_references(
         return None
 
     try:
-        first_reference = _geometry_point_reference(*first, constraint_index, geometry)
-        second_reference = _geometry_point_reference(*second, constraint_index, geometry)
+        first_reference = _geometry_point_reference(
+            *first,
+            constraint_index,
+            geometry,
+            external_geometry,
+        )
+        second_reference = _geometry_point_reference(
+            *second,
+            constraint_index,
+            geometry,
+            external_geometry,
+        )
     except SketchConstraintMalformedError:
         return (), True
     if first_reference is None or second_reference is None or first == second:
@@ -586,6 +646,7 @@ def _point_on_object_references(
     constraint: Any,
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
     try:
         if constraint.Type != "PointOnObject":
@@ -608,6 +669,7 @@ def _point_on_object_references(
             position_index,
             constraint_index,
             geometry,
+            external_geometry,
         )
     except SketchConstraintMalformedError:
         return (), True
@@ -623,21 +685,21 @@ def _point_on_object_references(
             ),
             False,
         )
-    if target_index < 0 or target_index >= len(geometry):
-        return (), True
+    target_geometry = _geometry_for_native_reference(
+        target_index,
+        0,
+        geometry,
+        external_geometry,
+    )
     if target_index == geometry_index or not isinstance(
-        geometry[target_index],
+        target_geometry,
         (SketchLineGeometry, SketchCircleGeometry, SketchArcGeometry),
     ):
         return (), True
     return (
         (
             point,
-            SketchConstraintReference(
-                kind="geometry",
-                geometry_index=target_index,
-                position="edge",
-            ),
+            _geometry_reference(target_index, "edge"),
         ),
         False,
     )
@@ -648,28 +710,32 @@ def _geometry_point_reference(
     position_index: int,
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> SketchConstraintReference | None:
-    if geometry_index < 0:
+    item = _geometry_for_native_reference(
+        geometry_index,
+        position_index,
+        geometry,
+        external_geometry,
+    )
+    if item is None:
+        if geometry_index >= len(geometry):
+            raise SketchConstraintMalformedError(
+                index=constraint_index,
+                reason="geometry_reference_out_of_range",
+            )
         return None
-    if geometry_index >= len(geometry):
-        raise SketchConstraintMalformedError(
-            index=constraint_index,
-            reason="geometry_reference_out_of_range",
-        )
-    position = _controlled_position(geometry[geometry_index], position_index)
+    position = _controlled_position(item, position_index)
     if position is None or position == "edge":
         return None
-    return SketchConstraintReference(
-        kind="geometry",
-        geometry_index=geometry_index,
-        position=position,
-    )
+    return _geometry_reference(geometry_index, position)
 
 
 def _distance_to_origin_reference(
     constraint: Any,
     constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
     try:
         if constraint.Type != "Distance":
@@ -691,29 +757,75 @@ def _distance_to_origin_reference(
     else:
         return None
 
-    if geometry_index < 0:
+    reference = _geometry_point_reference(
+        geometry_index,
+        position_index,
+        constraint_index,
+        geometry,
+        external_geometry,
+    )
+    if reference is None:
         return (), True
-    if geometry_index >= len(geometry):
-        raise SketchConstraintMalformedError(
-            index=constraint_index,
-            reason="geometry_reference_out_of_range",
+    return ((reference,), False)
+
+
+def _geometry_for_native_reference(
+    geometry_index: int,
+    _position_index: int,
+    geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...],
+) -> SketchGeometry | None:
+    if geometry_index >= 0:
+        return geometry[geometry_index] if geometry_index < len(geometry) else None
+    if geometry_index <= -3:
+        number = -3 - geometry_index
+        return external_geometry[number] if number < len(external_geometry) else None
+    return None
+
+
+def _geometry_reference(geometry_index: int, position: str) -> SketchConstraintReference:
+    if geometry_index >= 0:
+        return SketchConstraintReference(
+            kind="geometry",
+            geometry_index=geometry_index,
+            position=position,
         )
-    position = _controlled_position(geometry[geometry_index], position_index)
-    if position is None or position == "edge":
-        return (), True
-    return (
-        (
-            SketchConstraintReference(
-                kind="geometry",
-                geometry_index=geometry_index,
-                position=position,
-            ),
-        ),
-        False,
+    return SketchConstraintReference(
+        kind="external_geometry",
+        external_reference_number=-3 - geometry_index,
+        position=position,
     )
 
 
+def _whole_or_point_reference(
+    geometry_index: int,
+    position_index: int,
+    constraint_index: int,
+    geometry: tuple[SketchGeometry, ...],
+    external_geometry: tuple[SketchGeometry, ...],
+) -> SketchConstraintReference | None:
+    item = _geometry_for_native_reference(
+        geometry_index,
+        position_index,
+        geometry,
+        external_geometry,
+    )
+    if item is None:
+        if geometry_index >= len(geometry):
+            raise SketchConstraintMalformedError(
+                index=constraint_index,
+                reason="geometry_reference_out_of_range",
+            )
+        return None
+    position = _controlled_position(item, position_index)
+    if position is None:
+        return None
+    return _geometry_reference(geometry_index, position)
+
+
 def _controlled_position(item: SketchGeometry, position_index: int) -> str | None:
+    if isinstance(item, UnsupportedSketchGeometry):
+        return None
     if isinstance(item, SketchPointGeometry):
         return "point" if position_index == 1 else None
     return _POSITION_NAMES.get(position_index)

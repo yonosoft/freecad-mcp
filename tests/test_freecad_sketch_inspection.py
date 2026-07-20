@@ -347,6 +347,41 @@ def test_get_sketch_hides_internal_root_point_for_created_distance_to_origin(
     assert constraint["value"] == {"value": 5.0, "unit": "millimeter"}
 
 
+def test_get_sketch_reports_external_constraint_operands_without_native_geo_ids(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[Circle(Vector(5.0, 2.0), 2.0)],
+        constraints=[ConstraintStub("Tangent", first=0, second=-3)],
+    )
+    sketch.ExternalGeo.append(LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0)))
+    _install_document(monkeypatch, [sketch])
+
+    result = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()
+
+    assert result["unsupported_constraint_count"] == 0
+    assert result["constraints"] == [
+        {
+            "index": 0,
+            "type": "tangent",
+            "name": None,
+            "active": True,
+            "virtual_space": False,
+            "driving": None,
+            "references": [
+                {"kind": "geometry", "position": "edge", "geometry_index": 0},
+                {
+                    "kind": "external_geometry",
+                    "position": "edge",
+                    "external_reference_number": 0,
+                },
+            ],
+            "value": None,
+        }
+    ]
+    assert "-3" not in repr(result["constraints"])
+
+
 @pytest.mark.parametrize(
     ("first", "first_pos", "second", "second_pos", "expected"),
     [

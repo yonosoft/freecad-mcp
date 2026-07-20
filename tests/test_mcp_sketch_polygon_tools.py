@@ -28,7 +28,7 @@ def _server() -> Any:
 def test_polygon_profiles_are_exactly_tools_eighteen_and_nineteen() -> None:
     actual = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert len(actual) == 34
+    assert len(actual) == 35
     assert tuple(actual) == REGISTERED_TOOL_NAMES
     assert actual[17:19] == [
         "create_sketch_equilateral_triangle",

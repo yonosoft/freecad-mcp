@@ -726,8 +726,6 @@ def _verify_rollback_state(
         raise SketchExternalGeometryRollbackError("rollback_constraint_state_mismatch")
     if context != base.context or placement_state != base.placement:
         raise SketchExternalGeometryRollbackError("rollback_sketch_context_mismatch")
-    if base.history is not None and history != base.history:
-        raise SketchExternalGeometryRollbackError("rollback_history_state_mismatch")
     if owned_transaction and pending:
         raise SketchExternalGeometryRollbackError("transaction_remained_open")
     if caller_owned_transaction and not pending:
@@ -739,6 +737,10 @@ def _verify_rollback_state(
         raise SketchExternalGeometryRollbackError("rollback_document_state_mismatch")
     if _gui_state_changed(snapshot.gui_state, gui_state):
         raise SketchExternalGeometryRollbackError("rollback_gui_state_mismatch")
+    # Keep history last so a caller handling the one known native zero-effect
+    # history leak can only do so after every semantic rollback check passed.
+    if base.history is not None and history != base.history:
+        raise SketchExternalGeometryRollbackError("rollback_history_state_mismatch")
 
 
 def _normalized_constraints(

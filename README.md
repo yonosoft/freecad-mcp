@@ -1255,10 +1255,68 @@ the public MCP API cannot delete or invalidate source objects. This is a
 non-blocking gap to revisit with a safe disposable fixture or a later controlled
 object-deletion capability; Milestone 19 does not broaden object deletion.
 
+### Unified internal and external sketch constraints
+
+Tool 35 is `add_sketch_reference_constraints`. It accepts the unchanged 17
+constraint discriminator names through a separate reference-aware schema. A
+whole-geometry operand is either `{"kind":"internal","geometry_index":0}` or
+`{"kind":"external","external_reference_number":0}`. Point operands wrap one
+of those references in `geometry` and use the established `position` values
+`start`, `end`, `center`, or `point`. All identities are strict non-negative
+integers; native negative FreeCAD GeoIds are translated only inside the adapter
+and are never accepted or returned.
+
+Use `add_sketch_constraints` for internal-only work. Use the new tool when a
+tested relationship needs an external operand. External geometry remains
+read-only: unary external constraints and external-only relationships are
+refused. Mixed point alignment, parallel, perpendicular, compatible equal,
+Coincident, Point-on-Object, compatible tangent, between-point distance/x/y,
+between-line angle, and selected symmetry arrangements are supported by a
+static FreeCAD 1.1.1 allowlist. Production never probes a user's document to
+discover support.
+
+Coincident means point-to-point. Point-on-Object places a real selected point
+on a line, circular arc, or circle; for example, an external triangle endpoint
+on an internal circumcircle. Direct tangency uses whole geometries; an internal
+circle can remain tangent to external triangle edges to preserve incircle
+intent as the source changes.
+
+Requests contain 1–100 constraints and are preflighted as one batch. A success
+creates one `Add sketch reference constraints` history step, recomputes,
+verifies solver/readback/dependencies, and never saves. A failure restores the
+complete controlled sketch, external mappings, context, solver, and history;
+owned additions remain uncommitted through recompute and all verification, then
+abort before any inverse mutation on failure. Caller-owned failures inverse only
+and leave that transaction open. Structurally redundant mixed orientation
+constraints are refused before transaction opening; this preserves every ordered
+history name even at FreeCAD's observed 20-entry committed undo limit. A guarded
+cleanup remains only for an exact uncapped zero-effect record and never claims to
+restore a capacity-evicted entry. `get_sketch` now
+reports supported external constraint operands additively as `kind:
+external_geometry` plus
+`external_reference_number`. Existing internal-only summaries are unchanged.
+For an owned call against a non-active document, the adapter temporarily
+activates the exact target before opening the transaction and restores the
+previous active document before returning. This prevents FreeCAD from linking
+the history step into another document's undo stack. Caller-owned calls do not
+change the active document.
+Mixed constraints block removal of their internal geometry and external
+reference until the constraint is explicitly removed. Milestone 20 replacement
+and datum-editing schemas remain unchanged and refuse mixed constraints.
+
+See [the tested capability matrix](docs/sketch-reference-constraint-capabilities.md)
+for every mode, geometry pair, operand-order finding, source propagation, and
+known limit. External reference numbers remain current-order-local; list again
+after removal. Constraint expressions and names remain planned for Milestone
+22.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Development setup and CI](docs/development.md)
+- [Sketch reference-constraint capabilities](docs/sketch-reference-constraint-capabilities.md)
+- [Milestone 21 autonomous acceptance](docs/codex-milestone-21-acceptance.md)
+- [Milestone 21 stabilization acceptance](docs/codex-milestone-21-stabilization-acceptance.md)
 
 ## License
 

@@ -889,6 +889,250 @@ SketchConstraintBatch = Annotated[
 ]
 
 
+class InternalSketchGeometryReferenceInput(_SketchConstraintInputModel):
+    """One current-order-local internal sketch geometry operand."""
+
+    kind: Literal["internal"]
+    geometry_index: int = Field(strict=True, ge=0)
+
+
+class ExternalSketchGeometryReferenceInput(_SketchConstraintInputModel):
+    """One current-order-local external reference without exposing its native GeoId."""
+
+    kind: Literal["external"]
+    external_reference_number: int = Field(strict=True, ge=0)
+
+
+SketchGeometryReferenceInput: TypeAlias = Annotated[
+    InternalSketchGeometryReferenceInput | ExternalSketchGeometryReferenceInput,
+    Field(discriminator="kind"),
+]
+
+
+class SketchReferenceConstraintPointInput(_SketchConstraintInputModel):
+    """One internal or external geometry plus an existing semantic point selector."""
+
+    geometry: SketchGeometryReferenceInput
+    position: SketchPointPosition
+
+
+SketchReferenceCoincidentOperandInput: TypeAlias = (
+    SketchReferenceConstraintPointInput | SketchOriginReferenceInput
+)
+SketchReferencePointOnObjectOperandInput: TypeAlias = (
+    SketchReferenceConstraintPointInput | SketchAxisReferenceInput
+)
+SketchReferencePointOnObjectTargetInput: TypeAlias = (
+    SketchReferenceConstraintPointInput
+    | SketchAxisReferenceInput
+    | InternalSketchGeometryReferenceInput
+    | ExternalSketchGeometryReferenceInput
+)
+SketchReferenceSymmetryAboutInput: TypeAlias = (
+    SketchReferenceConstraintPointInput
+    | InternalSketchGeometryReferenceInput
+    | ExternalSketchGeometryReferenceInput
+    | SketchOriginReferenceInput
+    | SketchAxisReferenceInput
+)
+
+
+class ReferenceHorizontalConstraintInput(_SketchConstraintInputModel):
+    type: Literal["horizontal"]
+    geometry: SketchGeometryReferenceInput
+
+
+class ReferenceVerticalConstraintInput(_SketchConstraintInputModel):
+    type: Literal["vertical"]
+    geometry: SketchGeometryReferenceInput
+
+
+class ReferenceHorizontalPointsConstraintInput(_SketchConstraintInputModel):
+    type: Literal["horizontal_points"]
+    first: SketchReferenceConstraintPointInput
+    second: SketchReferenceConstraintPointInput
+
+
+class ReferenceVerticalPointsConstraintInput(_SketchConstraintInputModel):
+    type: Literal["vertical_points"]
+    first: SketchReferenceConstraintPointInput
+    second: SketchReferenceConstraintPointInput
+
+
+class ReferenceParallelConstraintInput(_SketchConstraintInputModel):
+    type: Literal["parallel"]
+    first: SketchGeometryReferenceInput
+    second: SketchGeometryReferenceInput
+
+
+class ReferencePerpendicularConstraintInput(_SketchConstraintInputModel):
+    type: Literal["perpendicular"]
+    first: SketchGeometryReferenceInput
+    second: SketchGeometryReferenceInput
+
+
+class ReferenceEqualConstraintInput(_SketchConstraintInputModel):
+    type: Literal["equal"]
+    first: SketchGeometryReferenceInput
+    second: SketchGeometryReferenceInput
+
+
+class ReferenceCoincidentConstraintInput(_SketchConstraintInputModel):
+    type: Literal["coincident"]
+    first: SketchReferenceCoincidentOperandInput
+    second: SketchReferenceCoincidentOperandInput
+
+
+class ReferencePointOnObjectConstraintInput(_SketchConstraintInputModel):
+    type: Literal["point_on_object"]
+    first: SketchReferencePointOnObjectOperandInput
+    second: SketchReferencePointOnObjectTargetInput
+
+
+class ReferenceSymmetricConstraintInput(_SketchConstraintInputModel):
+    type: Literal["symmetric"]
+    first: SketchReferenceConstraintPointInput
+    second: SketchReferenceConstraintPointInput
+    about: SketchReferenceSymmetryAboutInput
+
+
+class ReferenceTangentConstraintInput(_SketchConstraintInputModel):
+    type: Literal["tangent"]
+    first: SketchGeometryReferenceInput
+    second: SketchGeometryReferenceInput
+
+
+class ReferenceDistanceLineLengthConstraintInput(_SketchConstraintInputModel):
+    type: Literal["distance"]
+    mode: Literal["line_length"]
+    geometry: SketchGeometryReferenceInput
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class ReferenceDistancePointToOriginConstraintInput(_SketchConstraintInputModel):
+    type: Literal["distance"]
+    mode: Literal["point_to_origin"]
+    point: SketchReferenceConstraintPointInput
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class ReferenceDistanceBetweenPointsConstraintInput(_SketchConstraintInputModel):
+    type: Literal["distance"]
+    mode: Literal["between_points"]
+    first: SketchReferenceConstraintPointInput
+    second: SketchReferenceConstraintPointInput
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+ReferenceDistanceConstraintInput: TypeAlias = Annotated[
+    ReferenceDistanceLineLengthConstraintInput
+    | ReferenceDistancePointToOriginConstraintInput
+    | ReferenceDistanceBetweenPointsConstraintInput,
+    Field(discriminator="mode"),
+]
+
+
+class ReferenceDistanceXPointToOriginConstraintInput(_SketchConstraintInputModel):
+    type: Literal["distance_x"]
+    mode: Literal["point_to_origin"]
+    point: SketchReferenceConstraintPointInput
+    value: float = Field(strict=True, allow_inf_nan=False)
+
+
+class ReferenceDistanceXBetweenPointsConstraintInput(_SketchConstraintInputModel):
+    type: Literal["distance_x"]
+    mode: Literal["between_points"]
+    first: SketchReferenceConstraintPointInput
+    second: SketchReferenceConstraintPointInput
+    value: float = Field(strict=True, allow_inf_nan=False)
+
+
+ReferenceDistanceXConstraintInput: TypeAlias = Annotated[
+    ReferenceDistanceXPointToOriginConstraintInput | ReferenceDistanceXBetweenPointsConstraintInput,
+    Field(discriminator="mode"),
+]
+
+
+class ReferenceDistanceYPointToOriginConstraintInput(_SketchConstraintInputModel):
+    type: Literal["distance_y"]
+    mode: Literal["point_to_origin"]
+    point: SketchReferenceConstraintPointInput
+    value: float = Field(strict=True, allow_inf_nan=False)
+
+
+class ReferenceDistanceYBetweenPointsConstraintInput(_SketchConstraintInputModel):
+    type: Literal["distance_y"]
+    mode: Literal["between_points"]
+    first: SketchReferenceConstraintPointInput
+    second: SketchReferenceConstraintPointInput
+    value: float = Field(strict=True, allow_inf_nan=False)
+
+
+ReferenceDistanceYConstraintInput: TypeAlias = Annotated[
+    ReferenceDistanceYPointToOriginConstraintInput | ReferenceDistanceYBetweenPointsConstraintInput,
+    Field(discriminator="mode"),
+]
+
+
+class ReferenceRadiusConstraintInput(_SketchConstraintInputModel):
+    type: Literal["radius"]
+    geometry: SketchGeometryReferenceInput
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class ReferenceDiameterConstraintInput(_SketchConstraintInputModel):
+    type: Literal["diameter"]
+    geometry: SketchGeometryReferenceInput
+    value: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class ReferenceAngleLineConstraintInput(_SketchConstraintInputModel):
+    type: Literal["angle"]
+    mode: Literal["line_angle"]
+    geometry: SketchGeometryReferenceInput
+    value_degrees: float = Field(strict=True, allow_inf_nan=False)
+
+
+class ReferenceAngleBetweenLinesConstraintInput(_SketchConstraintInputModel):
+    type: Literal["angle"]
+    mode: Literal["between_lines"]
+    first: SketchGeometryReferenceInput
+    second: SketchGeometryReferenceInput
+    value_degrees: float = Field(strict=True, allow_inf_nan=False)
+
+
+ReferenceAngleConstraintInput: TypeAlias = Annotated[
+    ReferenceAngleLineConstraintInput | ReferenceAngleBetweenLinesConstraintInput,
+    Field(discriminator="mode"),
+]
+
+
+SketchReferenceConstraintInput: TypeAlias = Annotated[
+    ReferenceHorizontalConstraintInput
+    | ReferenceVerticalConstraintInput
+    | ReferenceHorizontalPointsConstraintInput
+    | ReferenceVerticalPointsConstraintInput
+    | ReferenceParallelConstraintInput
+    | ReferencePerpendicularConstraintInput
+    | ReferenceEqualConstraintInput
+    | ReferenceCoincidentConstraintInput
+    | ReferencePointOnObjectConstraintInput
+    | ReferenceSymmetricConstraintInput
+    | ReferenceTangentConstraintInput
+    | ReferenceDistanceConstraintInput
+    | ReferenceDistanceXConstraintInput
+    | ReferenceDistanceYConstraintInput
+    | ReferenceRadiusConstraintInput
+    | ReferenceDiameterConstraintInput
+    | ReferenceAngleConstraintInput,
+    Field(discriminator="type"),
+]
+SketchReferenceConstraintBatch = Annotated[
+    list[SketchReferenceConstraintInput],
+    Field(min_length=1, max_length=MAX_SKETCH_CONSTRAINT_BATCH_SIZE),
+]
+
+
 @dataclass(frozen=True, slots=True)
 class SketchGeometryAdditionResult:
     """Controlled result for one atomic sketch-geometry batch."""
@@ -1626,6 +1870,7 @@ class SketchConstraintReference:
     kind: str | None = None
     position: str | None = None
     geometry_index: int | None = None
+    external_reference_number: int | None = None
     axis: str | None = None
     reference: str | None = None
 
@@ -1638,6 +1883,8 @@ class SketchConstraintReference:
         }
         if self.geometry_index is not None:
             result["geometry_index"] = self.geometry_index
+        if self.external_reference_number is not None:
+            result["external_reference_number"] = self.external_reference_number
         if self.axis is not None:
             result["axis"] = self.axis
         return result
@@ -1793,6 +2040,51 @@ class SketchInspectionResult:
             "geometry": [item.to_dict() for item in self.geometry],
             "constraints": [item.to_dict() for item in self.constraints],
             "solver": self.solver.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchReferenceConstraintSummary:
+    """One added constraint with normalized public operands and no native GeoIds."""
+
+    constraint_index: int
+    constraint: SketchReferenceConstraintInput
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "constraint_index": self.constraint_index,
+            **self.constraint.model_dump(mode="json"),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchReferenceConstraintAdditionResult:
+    """Verified reference-aware constraint batch and complete controlled readback."""
+
+    document_name: str
+    sketch_name: str
+    added_indices: tuple[int, ...]
+    added_constraints: tuple[SketchReferenceConstraintSummary, ...]
+    external_reference_numbers: tuple[int, ...]
+    internal_geometry_indices: tuple[int, ...]
+    sketch: SketchInspectionResult
+    dependencies: SketchDependencyInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "document_name": self.document_name,
+            "sketch_name": self.sketch_name,
+            "added_constraint_indices": list(self.added_indices),
+            "added_count": len(self.added_indices),
+            "added_reference_constraints": [item.to_dict() for item in self.added_constraints],
+            "external_reference_numbers_used": list(self.external_reference_numbers),
+            "internal_geometry_indices_used": list(self.internal_geometry_indices),
+            "constraint_count": self.sketch.constraint_count,
+            "solver": self.sketch.solver.to_dict(),
+            "dependencies": self.dependencies.to_dict(),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
         }
 
 
@@ -2168,8 +2460,10 @@ __all__ = [
     "ExternalGeometryReferenceData",
     "ExternalGeometrySourceInput",
     "ExternalReferenceNumber",
+    "ExternalSketchGeometryReferenceInput",
     "HorizontalConstraintInput",
     "HorizontalPointsConstraintInput",
+    "InternalSketchGeometryReferenceInput",
     "LineSegmentGeometryInput",
     "LineSegmentGeometryUpdateInput",
     "LowerLeftRectanglePlacementInput",
@@ -2191,6 +2485,32 @@ __all__ = [
     "ProfileDimension",
     "RadiusConstraintInput",
     "RectangleDimension",
+    "ReferenceAngleBetweenLinesConstraintInput",
+    "ReferenceAngleConstraintInput",
+    "ReferenceAngleLineConstraintInput",
+    "ReferenceCoincidentConstraintInput",
+    "ReferenceDiameterConstraintInput",
+    "ReferenceDistanceBetweenPointsConstraintInput",
+    "ReferenceDistanceConstraintInput",
+    "ReferenceDistanceLineLengthConstraintInput",
+    "ReferenceDistancePointToOriginConstraintInput",
+    "ReferenceDistanceXBetweenPointsConstraintInput",
+    "ReferenceDistanceXConstraintInput",
+    "ReferenceDistanceXPointToOriginConstraintInput",
+    "ReferenceDistanceYBetweenPointsConstraintInput",
+    "ReferenceDistanceYConstraintInput",
+    "ReferenceDistanceYPointToOriginConstraintInput",
+    "ReferenceEqualConstraintInput",
+    "ReferenceHorizontalConstraintInput",
+    "ReferenceHorizontalPointsConstraintInput",
+    "ReferenceParallelConstraintInput",
+    "ReferencePerpendicularConstraintInput",
+    "ReferencePointOnObjectConstraintInput",
+    "ReferenceRadiusConstraintInput",
+    "ReferenceSymmetricConstraintInput",
+    "ReferenceTangentConstraintInput",
+    "ReferenceVerticalConstraintInput",
+    "ReferenceVerticalPointsConstraintInput",
     "RoundedRectanglePlacementInput",
     "SketchAnalysisGeometryIndex",
     "SketchAnalysisRequestInput",
@@ -2225,6 +2545,7 @@ __all__ = [
     "SketchGeometryBatch",
     "SketchGeometryExternalGeometrySourceInput",
     "SketchGeometryInput",
+    "SketchGeometryReferenceInput",
     "SketchGeometryUpdateInput",
     "SketchGeometryUpdateResult",
     "SketchHorizontalAxisReferenceInput",
@@ -2252,6 +2573,15 @@ __all__ = [
     "SketchRectangleCreationResult",
     "SketchRectangleProfile",
     "SketchRectangleRequestInput",
+    "SketchReferenceCoincidentOperandInput",
+    "SketchReferenceConstraintAdditionResult",
+    "SketchReferenceConstraintBatch",
+    "SketchReferenceConstraintInput",
+    "SketchReferenceConstraintPointInput",
+    "SketchReferenceConstraintSummary",
+    "SketchReferencePointOnObjectOperandInput",
+    "SketchReferencePointOnObjectTargetInput",
+    "SketchReferenceSymmetryAboutInput",
     "SketchRegularPolygonRequestInput",
     "SketchRoundedCornerProfile",
     "SketchRoundedRectangleCreationResult",

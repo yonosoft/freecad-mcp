@@ -166,6 +166,41 @@ local MCP server inside FreeCAD.
   semantic no-op and use their exact `Update sketch geometry`, `Replace sketch
   constraint`, or `Update sketch constraint value` history name on owned
   success.
+- Use `add_sketch_reference_constraints` only with the strict public
+  `kind=internal`/`geometry_index` or
+  `kind=external`/`external_reference_number` operands. Wrap point operands in
+  `geometry` and use the established start/end/center/point `position` values.
+  Never accept, log as public identity, or return FreeCAD's negative GeoIds.
+- Prefer `add_sketch_constraints` for internal-only relationships. Reference
+  constraint production behavior must use the static tested FreeCAD 1.1.1
+  capability allowlist; never trial native combinations against a user's
+  document. External geometry remains read-only, so unary external and
+  external-only driving relationships are refused before transaction opening.
+- Coincident is point-to-point. Use Point-on-Object to place an external or
+  internal selected point on a line, arc, or circle. Tangency is a
+  whole-geometry relationship. Verify source propagation and external mapping,
+  not merely native construction success.
+- A successful owned reference-aware batch is one exact `Add sketch reference
+  constraints` history step. Preflight all 1–100 items, reject the whole batch
+  on stale identity, unsupported capability, or semantic duplicate, and
+  preserve request order. Caller-owned transactions remain open; failed calls
+  restore exact internal/external/dependency/solver/context/history state.
+  Abort an owned transaction before any compensating constraint or geometry
+  mutation; inverse-only rollback is reserved for a caller-owned transaction or
+  a native abort that genuinely remains pending. For an owned call, activate
+  the exact target before opening the transaction and restore the previous
+  active document before verification or rollback verification; otherwise
+  FreeCAD can link the history step into the wrong document. Caller-owned calls
+  must not switch the active document. Do not claim single-item
+  requests are a solver-failure workaround: the recorded live equilateral
+  circumcircle failed on its third sequential Point-on-Object and the incircle
+  on its second sequential tangent.
+- Mixed constraints block their internal geometry and external reference from
+  removal until `remove_sketch_constraints` explicitly removes them. Do not
+  broaden Milestone 20 replacement or datum schemas: both continue to refuse
+  mixed constraints. External reference numbers are current-order-local and
+  must be relisted after removal. Constraint names and expressions remain
+  Milestone 22 work.
 - After a successful modelling mutation, recompute and inspect the result. If
   it is technically valid but expresses the wrong design intent, inspect the
   named document's history and undo the known top transaction before retrying

@@ -65,10 +65,10 @@ def _server() -> Any:
 def test_milestone_20_appends_exact_tools_thirty_two_through_thirty_four() -> None:
     names = [item.name for item in asyncio.run(_server().list_tools())]
 
-    assert len(names) == 34
+    assert len(names) == 35
     assert tuple(names) == REGISTERED_TOOL_NAMES
     assert tuple(names[:31]) == _FIRST_31
-    assert names[31:] == [
+    assert names[31:34] == [
         UPDATE_SKETCH_GEOMETRY_TOOL,
         REPLACE_SKETCH_CONSTRAINT_TOOL,
         UPDATE_SKETCH_CONSTRAINT_VALUE_TOOL,

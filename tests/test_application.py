@@ -9,6 +9,7 @@ from freecad_mcp.commands import (
     AddExternalGeometryHandler,
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
+    AddSketchReferenceConstraintsHandler,
     AnalyzeSketchHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
@@ -83,6 +84,7 @@ from freecad_mcp.models import (
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
+    SketchReferenceConstraintInput,
     SketchRoundedRectangleRequestInput,
     SketchSemanticPolygonRequest,
     SketchSlotRequestInput,
@@ -318,6 +320,20 @@ class AdapterStub:
             sketch_name=sketch_name,
             added_indices=tuple(range(len(constraints))),
             constraint_count=len(constraints),
+        )
+
+    def add_sketch_reference_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraints: tuple[SketchReferenceConstraintInput, ...],
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "added_constraint_indices": list(range(len(constraints))),
+            }
         )
 
     def add_external_geometry(
@@ -599,6 +615,10 @@ def make_application() -> Application:
         update_sketch_geometry=UpdateSketchGeometryHandler(adapter, dispatcher),
         replace_sketch_constraint=ReplaceSketchConstraintHandler(adapter, dispatcher),
         update_sketch_constraint_value=UpdateSketchConstraintValueHandler(
+            adapter,
+            dispatcher,
+        ),
+        add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
             adapter,
             dispatcher,
         ),

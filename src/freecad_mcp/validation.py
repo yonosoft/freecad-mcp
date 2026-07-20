@@ -46,6 +46,7 @@ from freecad_mcp.models import (
     SketchHorizontalAxisReferenceInput,
     SketchProfileAnalysisRequestInput,
     SketchRectangleRequestInput,
+    SketchReferenceConstraintInput,
     SketchRegularPolygonRequestInput,
     SketchRoundedRectangleRequestInput,
     SketchSlotRequestInput,
@@ -86,6 +87,9 @@ _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES = {
 _SKETCH_GEOMETRY_INPUT_ADAPTER: TypeAdapter[SketchGeometryInput] = TypeAdapter(SketchGeometryInput)
 _SKETCH_CONSTRAINT_INPUT_ADAPTER: TypeAdapter[SketchConstraintInput] = TypeAdapter(
     SketchConstraintInput
+)
+_SKETCH_REFERENCE_CONSTRAINT_INPUT_ADAPTER: TypeAdapter[SketchReferenceConstraintInput] = (
+    TypeAdapter(SketchReferenceConstraintInput)
 )
 _SKETCH_GEOMETRY_UPDATE_INPUT_ADAPTER: TypeAdapter[SketchGeometryUpdateInput] = TypeAdapter(
     SketchGeometryUpdateInput
@@ -1064,6 +1068,154 @@ def validate_add_sketch_constraints_request(
     return tuple(parsed_items)
 
 
+def validate_add_sketch_reference_constraints_request(
+    document_name: object,
+    sketch_name: object,
+    constraints: object,
+) -> CommandResult | tuple[SketchReferenceConstraintInput, ...]:
+    """Validate the strict 17-way reference-aware batch before adapter access."""
+    document_error = validate_document_reference(document_name)
+    if document_error is not None:
+        return document_error
+    sketch_error = _validate_object_name(sketch_name, field="sketch_name", subject="Sketch")
+    if sketch_error is not None:
+        return sketch_error
+    if not isinstance(constraints, list):
+        return CommandResult.failure(
+            code="validation_error",
+            message="Constraints must be a non-empty array.",
+            data={"field": "constraints", "actual_type": type(constraints).__name__},
+        )
+    if not constraints or len(constraints) > MAX_SKETCH_CONSTRAINT_BATCH_SIZE:
+        reason = "empty_constraint_batch" if not constraints else "constraint_batch_too_large"
+        return CommandResult.failure(
+            code="validation_error",
+            message="Constraints must contain between 1 and 100 items.",
+            data={
+                "field": "constraints",
+                "minimum_items": 1,
+                "maximum_items": MAX_SKETCH_CONSTRAINT_BATCH_SIZE,
+                "actual_items": len(constraints),
+                "reason": reason,
+            },
+        )
+
+    parsed_items: list[SketchReferenceConstraintInput] = []
+    serialized: set[str] = set()
+    for index, item in enumerate(constraints):
+        if isinstance(item, Mapping):
+            discriminator = item.get("type")
+            if isinstance(discriminator, str) and (
+                discriminator not in _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES
+            ):
+                return CommandResult.failure(
+                    code="validation_error",
+                    message=f"Constraint item {index} uses an unsupported type.",
+                    data={
+                        "field": f"constraints[{index}].type",
+                        "constraint_index": index,
+                        "actual_value": discriminator,
+                        "allowed": sorted(_SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES),
+                        "reason": "unsupported_constraint_type",
+                    },
+                )
+        try:
+            parsed = _SKETCH_REFERENCE_CONSTRAINT_INPUT_ADAPTER.validate_python(item)
+        except ValidationError as exc:
+            return _reference_constraint_model_validation_error(index, exc)
+
+        semantic_error = _validate_reference_constraint_semantics(index, parsed)
+        if semantic_error is not None:
+            return semantic_error
+        key = parsed.model_dump_json()
+        if key in serialized:
+            return CommandResult.failure(
+                code="validation_error",
+                message="The reference-constraint batch contains a duplicate item.",
+                data={
+                    "field": f"constraints[{index}]",
+                    "constraint_index": index,
+                    "reason": "duplicate_constraint",
+                },
+            )
+        serialized.add(key)
+        parsed_items.append(parsed)
+    return tuple(parsed_items)
+
+
+def _reference_constraint_model_validation_error(
+    index: int,
+    exc: ValidationError,
+) -> CommandResult:
+    error = exc.errors(include_url=False, include_context=False, include_input=False)[0]
+    location = [
+        str(part)
+        for part in error.get("loc", ())
+        if str(part) not in _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES
+        and str(part)
+        not in {"line_length", "point_to_origin", "between_points", "line_angle", "between_lines"}
+    ]
+    field = f"constraints[{index}]" + ("." + ".".join(location) if location else "")
+    return CommandResult.failure(
+        code="validation_error",
+        message=f"Reference constraint item {index} is malformed.",
+        data={
+            "field": field,
+            "constraint_index": index,
+            "reason": str(error.get("type", "invalid_reference_constraint_input")),
+        },
+    )
+
+
+def _validate_reference_constraint_semantics(
+    index: int,
+    item: SketchReferenceConstraintInput,
+) -> CommandResult | None:
+    first = getattr(item, "first", None)
+    second = getattr(item, "second", None)
+    if first is not None and second is not None and first == second:
+        return _reference_semantic_error(index, "identical_operands")
+
+    if item.type == "coincident":
+        point_count = sum(hasattr(value, "geometry") for value in (first, second))
+        if point_count == 0:
+            return _reference_semantic_error(index, "same_origin_reference")
+    elif item.type == "point_on_object":
+        first_is_point = hasattr(first, "geometry")
+        second_is_point = hasattr(second, "geometry")
+        first_is_axis = getattr(first, "reference", None) in {
+            "horizontal_axis",
+            "vertical_axis",
+        }
+        second_is_axis = getattr(second, "reference", None) in {
+            "horizontal_axis",
+            "vertical_axis",
+        }
+        second_is_geometry = getattr(second, "kind", None) in {"internal", "external"}
+        if not (
+            (first_is_point and (second_is_axis or second_is_geometry))
+            or (first_is_axis and second_is_point)
+        ):
+            return _reference_semantic_error(index, "unsupported_operand_role")
+    elif item.type == "symmetric":
+        about = item.about
+        if about in {first, second}:
+            return _reference_semantic_error(index, "identical_symmetry_reference")
+    return None
+
+
+def _reference_semantic_error(index: int, reason: str) -> CommandResult:
+    return CommandResult.failure(
+        code="validation_error",
+        message="The reference constraint operands are not semantically distinct.",
+        data={
+            "field": f"constraints[{index}]",
+            "constraint_index": index,
+            "reason": reason,
+        },
+    )
+
+
 def normalize_arc_angles_degrees(start: float, end: float) -> tuple[float, float]:
     """Return one canonical counter-clockwise arc span shorter than 360 degrees."""
     normalized_start = start % 360.0
@@ -1665,6 +1817,7 @@ __all__ = [
     "validate_add_external_geometry_request",
     "validate_add_sketch_constraints_request",
     "validate_add_sketch_geometry_request",
+    "validate_add_sketch_reference_constraints_request",
     "validate_analyze_sketch_request",
     "validate_create_body_request",
     "validate_create_document_request",

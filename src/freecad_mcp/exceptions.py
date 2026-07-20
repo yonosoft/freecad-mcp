@@ -224,6 +224,30 @@ class SketchConstraintRollbackError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchReferenceConstraintError(RuntimeError):
+    """Raised for a controlled reference-constraint preflight or mutation failure."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        reason: str,
+        index: int | None = None,
+    ) -> None:
+        self.code = code
+        self.reason = reason
+        self.index = index
+        super().__init__(reason)
+
+
+class SketchReferenceConstraintRollbackError(RuntimeError):
+    """Raised when a failed reference-constraint batch is not restored exactly."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SketchMutationIndexNotFoundError(RuntimeError):
     """Raised when a pre-call internal geometry or constraint index is absent."""
 
@@ -733,6 +757,8 @@ __all__ = [
     "SketchRectangleCreationError",
     "SketchRectangleRollbackError",
     "SketchRectangleVerificationError",
+    "SketchReferenceConstraintError",
+    "SketchReferenceConstraintRollbackError",
     "SketchRoundedRectangleCreationError",
     "SketchRoundedRectangleRollbackError",
     "SketchRoundedRectangleVerificationError",

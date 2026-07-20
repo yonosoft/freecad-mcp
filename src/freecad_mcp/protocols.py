@@ -41,6 +41,8 @@ from freecad_mcp.models import (
     SketchProfileValidationResult,
     SketchRectangleCreationResult,
     SketchRectangleRequestInput,
+    SketchReferenceConstraintAdditionResult,
+    SketchReferenceConstraintInput,
     SketchRoundedRectangleCreationResult,
     SketchRoundedRectangleRequestInput,
     SketchSemanticPolygonRequest,
@@ -126,6 +128,14 @@ class DocumentAdapter(Protocol):
         constraints: tuple[SketchConstraintInput, ...],
     ) -> SketchConstraintAdditionResult:
         """Atomically append one controlled ordered constraint batch to a sketch."""
+
+    def add_sketch_reference_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraints: tuple[SketchReferenceConstraintInput, ...],
+    ) -> SketchReferenceConstraintAdditionResult:
+        """Atomically add one preflighted internal/external constraint batch."""
 
     def create_sketch_rectangle(
         self,

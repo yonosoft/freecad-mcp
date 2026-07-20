@@ -395,6 +395,22 @@ def test_constraint_value_unsafe_states_are_refused_before_mutation(
     assert sketch.datums == []
 
 
+def test_mixed_dimensional_constraint_value_update_remains_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inspected = _inspection()
+    mixed_state = _state("Distance", 0, 10.0, second=-3)
+    snapshot = _snapshot(inspected=inspected, states=(mixed_state,))
+    sketch = _Sketch([mixed_state])
+    document = _install(monkeypatch, snapshot, sketch, inspected)
+
+    with pytest.raises(SketchConstraintValueUpdateUnsafeError, match="unsupported_constraint_type"):
+        sketch_editing.update_sketch_constraint_value("Model", "Sketch", 0, 12.0)
+
+    assert document.labels == []
+    assert sketch.datums == []
+
+
 def test_constraint_value_success_uses_quantity_and_one_owned_transaction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -442,6 +458,27 @@ def test_replacement_no_change_and_duplicate_are_preflight_only(
             0,
             HorizontalConstraintInput(type="horizontal", geometry_index=1),
         )
+    assert document.labels == []
+    assert sketch.deleted == []
+
+
+def test_mixed_reference_constraint_replacement_remains_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inspected = _inspection(constraints=(_constraint(0, "parallel", None, driving=None),))
+    mixed_state = _state("Parallel", 0, second=-3)
+    snapshot = _snapshot(inspected=inspected, states=(mixed_state,))
+    sketch = _Sketch([mixed_state])
+    document = _install(monkeypatch, snapshot, sketch, inspected)
+
+    with pytest.raises(SketchConstraintReplacementUnsafeError, match="unsupported_constraint"):
+        sketch_editing.replace_sketch_constraint(
+            "Model",
+            "Sketch",
+            0,
+            HorizontalConstraintInput(type="horizontal", geometry_index=0),
+        )
+
     assert document.labels == []
     assert sketch.deleted == []
 

@@ -61,6 +61,7 @@ def test_rectangle_is_exactly_tool_sixteen_and_preserves_first_fifteen() -> None
         "update_sketch_geometry",
         "replace_sketch_constraint",
         "update_sketch_constraint_value",
+        "add_sketch_reference_constraints",
     ]
     assert tuple(actual) == REGISTERED_TOOL_NAMES
 

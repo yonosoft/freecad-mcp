@@ -10,6 +10,7 @@ from freecad_mcp.commands import (
     AddExternalGeometryHandler,
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
+    AddSketchReferenceConstraintsHandler,
     AnalyzeSketchHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
@@ -88,6 +89,7 @@ from freecad_mcp.models import (
     SketchRectangleCreationResult,
     SketchRectangleProfile,
     SketchRectangleRequestInput,
+    SketchReferenceConstraintInput,
     SketchRoundedRectangleCreationResult,
     SketchRoundedRectangleRequestInput,
     SketchSemanticPolygonRequest,
@@ -128,6 +130,9 @@ class AdapterStub:
         self.add_sketch_geometry_calls: list[tuple[str, str, tuple[SketchGeometryInput, ...]]] = []
         self.add_sketch_constraints_calls: list[
             tuple[str, str, tuple[SketchConstraintInput, ...]]
+        ] = []
+        self.add_sketch_reference_constraints_calls: list[
+            tuple[str, str, tuple[SketchReferenceConstraintInput, ...]]
         ] = []
         self.create_sketch_rectangle_calls: list[SketchRectangleRequestInput] = []
         self.create_sketch_centered_rectangle_calls: list[SketchCenteredRectangleRequestInput] = []
@@ -566,6 +571,23 @@ class AdapterStub:
             constraint_count=len(constraints),
         )
 
+    def add_sketch_reference_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraints: tuple[SketchReferenceConstraintInput, ...],
+    ) -> Any:
+        self.add_sketch_reference_constraints_calls.append(
+            (document_name, sketch_name, constraints)
+        )
+        return _SemanticResultStub(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "added_constraint_indices": list(range(len(constraints))),
+            }
+        )
+
     def create_sketch_rectangle(
         self,
         request: SketchRectangleRequestInput,
@@ -781,6 +803,10 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
                 dispatcher,
             ),
             update_sketch_constraint_value=UpdateSketchConstraintValueHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
                 actual_adapter,
                 dispatcher,
             ),

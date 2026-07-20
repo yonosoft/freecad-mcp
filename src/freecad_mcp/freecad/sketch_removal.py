@@ -64,6 +64,7 @@ class _MutationSnapshot:
     native_constraints: tuple[Any, ...]
     expression_state: tuple[tuple[str, tuple[tuple[str, str], ...]], ...]
     external_state: object
+    external_structure_state: object
     gui_state: Any
     sketch: SketchInspectionResult
     profile: dict[str, object]
@@ -342,6 +343,7 @@ def _snapshot(
             native_constraints=tuple(sketch.Constraints),
             expression_state=_expression_state(document),
             external_state=sketch_external_geometry._reference_state(references),
+            external_structure_state=_external_structure_state(references),
             gui_state=sketch_external_geometry._gui_state(gui, str(document.Name)),
             sketch=inspected,
             profile=_profile_summary(inspected, base.document_summary),
@@ -653,7 +655,17 @@ def _verify_common(
         gui_state = sketch_external_geometry._gui_state(gui, str(document.Name))
     except Exception as exc:
         raise _error(operation, "verification", "context_readback_failed") from exc
-    if sketch_external_geometry._reference_state(references) != snapshot.external_state:
+    expected_external = (
+        snapshot.external_structure_state
+        if operation == "remove_constraints"
+        else snapshot.external_state
+    )
+    actual_external = (
+        _external_structure_state(references)
+        if operation == "remove_constraints"
+        else sketch_external_geometry._reference_state(references)
+    )
+    if actual_external != expected_external:
         raise _error(operation, "verification", "external_geometry_changed")
     if context != snapshot.base.context or placement_state != snapshot.base.placement:
         raise _error(operation, "verification", "sketch_context_changed")
@@ -670,6 +682,16 @@ def _verify_common(
         raise _error(operation, "verification", "document_context_changed")
     if sketch_external_geometry._gui_state_changed(snapshot.gui_state, gui_state):
         raise _error(operation, "verification", "gui_state_changed")
+
+
+def _external_structure_state(references: tuple[Any, ...]) -> object:
+    """Freeze external identity and ordering without mutable constraint usage."""
+    values: list[dict[str, object]] = []
+    for reference in references:
+        value = reference.to_dict()
+        value.pop("used_by_constraint_indices", None)
+        values.append(value)
+    return sketch_external_geometry._freeze(tuple(values))
 
 
 def _pending_transaction(document: Any, operation: _Operation) -> bool:

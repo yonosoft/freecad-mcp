@@ -202,6 +202,19 @@ class Application:
             constraints=constraints,
         )
 
+    def add_sketch_reference_constraints(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraints: object,
+    ) -> CommandResult:
+        """Atomically add constraints with unified internal/external operands."""
+        return self.documents.add_sketch_reference_constraints.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraints=constraints,
+        )
+
     def create_sketch_rectangle(
         self,
         document_name: object,
