@@ -12,6 +12,7 @@ from freecad_mcp.freecad import (
     sketch_constraint_creation,
     sketch_creation,
     sketch_dependencies,
+    sketch_editing,
     sketch_external_geometry,
     sketch_geometry_creation,
     sketch_inspection,
@@ -71,12 +72,16 @@ from freecad_mcp.models import (
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchConstraintRemovalResult,
+    SketchConstraintReplacementResult,
+    SketchConstraintValueUpdateResult,
     SketchCreationResult,
     SketchDependencyInspectionResult,
     SketchGeometryAdditionResult,
     SketchGeometryConstructionResult,
     SketchGeometryInput,
     SketchGeometryRemovalResult,
+    SketchGeometryUpdateInput,
+    SketchGeometryUpdateResult,
     SketchInspectionResult,
     SketchOpenVerticesResult,
     SketchPolygonCreationResult,
@@ -319,4 +324,46 @@ class FreeCADDocumentAdapter:
             sketch_name,
             geometry_indices,
             construction,
+        )
+
+    def update_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        geometry: SketchGeometryUpdateInput,
+    ) -> SketchGeometryUpdateResult:
+        return sketch_editing.update_sketch_geometry(
+            document_name,
+            sketch_name,
+            geometry_index,
+            geometry,
+        )
+
+    def replace_sketch_constraint(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        replacement: SketchConstraintInput,
+    ) -> SketchConstraintReplacementResult:
+        return sketch_editing.replace_sketch_constraint(
+            document_name,
+            sketch_name,
+            constraint_index,
+            replacement,
+        )
+
+    def update_sketch_constraint_value(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        value: float,
+    ) -> SketchConstraintValueUpdateResult:
+        return sketch_editing.update_sketch_constraint_value(
+            document_name,
+            sketch_name,
+            constraint_index,
+            value,
         )

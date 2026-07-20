@@ -20,6 +20,7 @@ from freecad_mcp.mcp.sketch_centered_rectangle_tools import (
 )
 from freecad_mcp.mcp.sketch_constraint_tools import register_add_sketch_constraints_tool
 from freecad_mcp.mcp.sketch_curved_profile_tools import register_sketch_curved_profile_tools
+from freecad_mcp.mcp.sketch_editing_tools import register_sketch_editing_tools
 from freecad_mcp.mcp.sketch_external_geometry_tools import (
     register_sketch_external_geometry_tools,
 )
@@ -69,7 +70,10 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             " Use remove_sketch_constraints for explicit relationship removal. Use "
             "remove_sketch_geometry only after dependent constraints have been removed explicitly; "
             "it never cascade-deletes them. Use set_sketch_geometry_construction to request an "
-            "exact normal or construction final state instead of applying blind toggles."
+            "exact normal or construction final state instead of applying blind toggles. Use "
+            "update_sketch_geometry for a complete same-type final geometry state, "
+            "replace_sketch_constraint for one controlled relationship replacement, and "
+            "update_sketch_constraint_value for an existing driving dimensional value."
         ),
         host=config.host,
         port=config.port,
@@ -94,5 +98,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_analysis_tools(server, handlers)
     register_sketch_external_geometry_tools(server, handlers)
     register_sketch_removal_tools(server, handlers)
+    register_sketch_editing_tools(server, handlers)
 
     return server

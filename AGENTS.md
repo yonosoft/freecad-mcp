@@ -149,6 +149,23 @@ local MCP server inside FreeCAD.
   solver/context/history state, and caller-owned transaction preservation. Do
   not undo after verified internal rollback; correct a wrong success with the
   exact transaction name and retry in the same sketch.
+- Use `update_sketch_geometry` only for a complete same-type final state of one
+  supported internal line, point, circle, or bounded arc. Preserve construction
+  state and indices. A semantic no-op may report dependencies, but an actual
+  edit with any dependent constraint is refused; use
+  `update_sketch_constraint_value` for dimensional intent.
+- `replace_sketch_constraint` reuses the unchanged 17-way controlled union.
+  FreeCAD appends after deleting, so report the replacement index and complete
+  survivor remapping; never imply slot preservation. Refuse duplicates,
+  unsupported state, names, expressions, and solver conflicts rather than
+  rebuilding unrelated constraints.
+- Use `update_sketch_constraint_value` only for active driving distance,
+  distance-x/y, radius, diameter, or angle constraints. Requests are absolute
+  millimetre/degree values, not deltas. Never clear expressions or convert a
+  reference constraint. All three editing tools are transaction-free on
+  semantic no-op and use their exact `Update sketch geometry`, `Replace sketch
+  constraint`, or `Update sketch constraint value` history name on owned
+  success.
 - After a successful modelling mutation, recompute and inspect the result. If
   it is technically valid but expresses the wrong design intent, inspect the
   named document's history and undo the known top transaction before retrying

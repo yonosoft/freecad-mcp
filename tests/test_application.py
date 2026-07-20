@@ -33,9 +33,12 @@ from freecad_mcp.commands import (
     RemoveExternalGeometryHandler,
     RemoveSketchConstraintsHandler,
     RemoveSketchGeometryHandler,
+    ReplaceSketchConstraintHandler,
     SaveDocumentHandler,
     SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
+    UpdateSketchConstraintValueHandler,
+    UpdateSketchGeometryHandler,
     ValidateSketchProfileHandler,
 )
 from freecad_mcp.commands.sketch import CreateSketchHandler
@@ -64,6 +67,7 @@ from freecad_mcp.models import (
     SketchCreationResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
+    SketchGeometryUpdateInput,
     SketchInspectionResult,
     SketchOpenVerticesResult,
     SketchPolygonCircumcircleReference,
@@ -388,6 +392,47 @@ class AdapterStub:
             }
         )
 
+    def update_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        geometry: SketchGeometryUpdateInput,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "geometry_index": geometry_index,
+                "requested_geometry": geometry.model_dump(mode="json"),
+                "no_change": False,
+            }
+        )
+
+    def replace_sketch_constraint(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        replacement: SketchConstraintInput,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "requested_constraint_index": constraint_index,
+                "replacement_constraint_index": constraint_index,
+                "no_change": False,
+            }
+        )
+
+    def update_sketch_constraint_value(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        value: float,
+    ) -> Any:
+        return _SemanticResult(
+            {"constraint_index": constraint_index, "value": value, "no_change": False}
+        )
+
     def create_sketch_rectangle(
         self,
         request: SketchRectangleRequestInput,
@@ -487,6 +532,7 @@ class _SemanticResult:
         self.data = data
         changed = data.get("changed_geometry_indices", ())
         self.changed_geometry_indices = tuple(changed) if isinstance(changed, list) else ()
+        self.no_change = bool(data.get("no_change", False))
 
     def to_dict(self) -> dict[str, object]:
         return self.data
@@ -547,6 +593,12 @@ def make_application() -> Application:
         remove_sketch_constraints=RemoveSketchConstraintsHandler(adapter, dispatcher),
         remove_sketch_geometry=RemoveSketchGeometryHandler(adapter, dispatcher),
         set_sketch_geometry_construction=SetSketchGeometryConstructionHandler(
+            adapter,
+            dispatcher,
+        ),
+        update_sketch_geometry=UpdateSketchGeometryHandler(adapter, dispatcher),
+        replace_sketch_constraint=ReplaceSketchConstraintHandler(adapter, dispatcher),
+        update_sketch_constraint_value=UpdateSketchConstraintValueHandler(
             adapter,
             dispatcher,
         ),

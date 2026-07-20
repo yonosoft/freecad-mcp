@@ -35,9 +35,12 @@ from freecad_mcp.commands import (
     RemoveExternalGeometryHandler,
     RemoveSketchConstraintsHandler,
     RemoveSketchGeometryHandler,
+    ReplaceSketchConstraintHandler,
     SaveDocumentHandler,
     SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
+    UpdateSketchConstraintValueHandler,
+    UpdateSketchGeometryHandler,
     ValidateSketchProfileHandler,
 )
 from freecad_mcp.core.result import CommandResult
@@ -119,6 +122,9 @@ def test_build_runtime_wires_create_sketch_handler(
         "remove_sketch_constraints": RemoveSketchConstraintsHandler,
         "remove_sketch_geometry": RemoveSketchGeometryHandler,
         "set_sketch_geometry_construction": SetSketchGeometryConstructionHandler,
+        "update_sketch_geometry": UpdateSketchGeometryHandler,
+        "replace_sketch_constraint": ReplaceSketchConstraintHandler,
+        "update_sketch_constraint_value": UpdateSketchConstraintValueHandler,
         "recompute": RecomputeDocumentHandler,
     }
 

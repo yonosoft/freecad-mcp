@@ -32,9 +32,12 @@ from freecad_mcp.commands import (
     RemoveExternalGeometryHandler,
     RemoveSketchConstraintsHandler,
     RemoveSketchGeometryHandler,
+    ReplaceSketchConstraintHandler,
     SaveDocumentHandler,
     SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
+    UpdateSketchConstraintValueHandler,
+    UpdateSketchGeometryHandler,
     ValidateSketchProfileHandler,
 )
 from freecad_mcp.commands.body import CreateBodyHandler
@@ -150,6 +153,18 @@ def _build_runtime() -> Runtime:
             dispatcher=dispatcher,
         ),
         set_sketch_geometry_construction=SetSketchGeometryConstructionHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        update_sketch_geometry=UpdateSketchGeometryHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        replace_sketch_constraint=ReplaceSketchConstraintHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        update_sketch_constraint_value=UpdateSketchConstraintValueHandler(
             adapter=adapter,
             dispatcher=dispatcher,
         ),

@@ -1806,3 +1806,115 @@ Milestone 18 live broken-source mapping reporting remains unverified because the
 public MCP API cannot delete or invalidate source objects. This is a non-blocking
 deferred gap; do not manufacture it through unsupported native manipulation or
 broaden Milestone 19 into object deletion.
+
+## Milestone 20 Controlled Sketch-Editing Verification
+
+Tools 32–34 add one-element same-type geometry updates, atomic controlled
+constraint replacement, and dimensional datum updates. Develop them with the
+changed adapter/handler/transport surface and direct composition neighbors:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pytest -q `
+  tests\test_freecad_sketch_editing.py `
+  tests\test_sketch_editing_commands.py `
+  tests\test_mcp_sketch_editing_tools.py `
+  tests\test_application.py `
+  tests\test_runtime.py `
+  tests\test_mcp_server.py
+
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m ruff check `
+  src\freecad_mcp\commands\sketch_editing.py `
+  src\freecad_mcp\freecad\sketch_editing.py `
+  src\freecad_mcp\mcp\sketch_editing_tools.py `
+  tests\test_freecad_sketch_editing.py
+
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m mypy `
+  src\freecad_mcp\commands\sketch_editing.py `
+  src\freecad_mcp\freecad\sketch_editing.py `
+  src\freecad_mcp\mcp\sketch_editing_tools.py
+```
+
+Run the permanent native campaign after any native algorithm, history, rollback,
+or result-contract change:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\smoke_sketch_editing.py
+```
+
+The campaign has 73 explicitly numbered assertions. It covers exact 34-tool
+order; distance, distance-x, distance-y, radius, diameter, and angle values;
+datum no-op and unsupported/expression refusal; value undo/redo and redo
+invalidation; geometric and dimensional replacement; tail index and survivor
+mapping; replacement no-op, duplicate/invalid/conflict refusal, rollback, and
+same-sketch correction; external preservation; line, point, circle, and bounded
+arc updates; same-type, unsupported, and constrained-geometry refusal; target
+index/count/construction/profile preservation; Body and attachment preservation;
+injected exact rollback; caller-owned success; saved-file no-auto-save and
+save/reopen; unsaved state; non-active exact-name targeting; same-named document
+isolation; and no edit-mode mutation.
+
+### Native contract recorded by the campaign
+
+- `SketchObject` has no `setGeometry` or `movePoint` in FreeCAD 1.1.1.
+- `moveGeometry` returns `None`, preserves the geometry index, and is reliable
+  only for underconstrained portions. Lines use start/end point positions 1/2,
+  points use 1, circles use center 3 and radius edge 0.
+- A bounded arc rejects endpoint movement if its center is moved first. The
+  verified sequence is start/end, center, then two start/end passes; the second
+  final pass reduces the observed residual below the fixed `1e-7` tolerance.
+- `setDatum` returns `None`; length quantities use millimetres and angles use
+  degrees. Reference and expression-backed datum mutation is unsafe and is
+  refused.
+- `delConstraint` returns `None`; `addConstraint` appends and returns the new
+  tail index. Exact slot preservation is not safely available without rebuilding
+  unrelated constraints.
+- Solver-invalid, redundant, conflicting, partially redundant, malformed, stale,
+  or unavailable post-state is never accepted. Mutation is rolled back instead.
+
+### Risk-based verification map
+
+| Changed responsibility | Principal files | Focused evidence |
+| --- | --- | --- |
+| Strict geometry/value/index schemas | `models.py`, `validation.py` | finite values, Boolean/string/float index rejection, closed objects, four geometry variants |
+| Existing constraint language reuse | `models.py`, `mcp/sketch_editing_tools.py` | replacement schema equals the unchanged 17-variant add union |
+| Handler and Qt boundary | `commands/sketch_editing.py`, `application.py`, `protocols.py`, `runtime.py` | dispatch, controlled refusal/error/no-op envelopes, composition tests |
+| Geometry identity and dependency policy | `freecad/sketch_editing.py` | same-type/no-op/dependency unit tests plus all four native geometry cases |
+| Datum identity and solver behavior | `freecad/sketch_editing.py` | six native dimensional types, unsupported/expression refusal, no-op, history, undo/redo |
+| Replacement/remapping | `freecad/sketch_editing.py` | semantic no-op, duplicate refusal, exact survivor mapping, geometric/dimensional native replacement |
+| Transactions and rollback | `freecad/sketch_editing.py`, shared `sketch_removal.py`, transaction names | owned/caller-owned history, conflict/injected rollback, same-sketch correction |
+| Registry and transport | `tool_registry.py`, `mcp/sketch_editing_tools.py`, `mcp/server.py` | exact 34 order, unchanged first 31, strict schemas, explicit registration, no MCP delegation |
+| Shared inspection/profile/external/history consumers | existing controlled adapters | document-history, native-reference, analysis, external, removal, and curved-profile native regressions |
+
+After focused tests, smoke, documentation, and campaign preparation are green,
+run the complete gate exactly once:
+
+```powershell
+.\scripts\test.ps1 -PythonExe "C:\Program Files\FreeCAD 1.1\bin\python.exe"
+```
+
+Milestone 20 consumes controlled geometry/constraint inspection, profile impact,
+external mappings, shared full-state rollback, history, and current-order index
+semantics. The required final native regression set is therefore:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_editing.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_document_history.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_native_references.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_analysis.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_external_geometry.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_removal.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_curved_profiles.py
+```
+
+Broader historical creation campaigns remain outside the change surface because
+Milestone 20 does not modify geometry creation, attachment creation, or the pure
+topology engine. Review the full diff, run `git diff --check`, and inspect `git
+status` after the final gate and regressions.
+
+The autonomous external-client campaign is prepared, not executed, in
+`docs/codex-milestone-20-acceptance.md`. Missing public expression/naming,
+open/close, and active-document inspection capabilities are recorded as
+capability gaps; they do not authorize native workarounds and do not make a run
+inconclusive. Retain the previously deferred broken-source reporting,
+expression-removal, save/reopen, and active-document observability notes.

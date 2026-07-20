@@ -14,14 +14,15 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- twenty-eight typed MCP tools for document creation, inspection, saving,
+- thirty-four typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
   inspection, one-step undo and redo, plus verified semantic axis-aligned
   lower-left and centre-defined rectangles, equilateral triangles, and regular
   polygons, straight slots, axis-aligned rounded rectangles, controlled
-  external geometry, and read-only sketch dependency inspection;
+  external geometry, read-only sketch dependency inspection, controlled sketch
+  removal/construction state, and precise sketch geometry/constraint editing;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -140,6 +141,9 @@ get_sketch_dependencies
 remove_sketch_constraints
 remove_sketch_geometry
 set_sketch_geometry_construction
+update_sketch_geometry
+replace_sketch_constraint
+update_sketch_constraint_value
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -1179,6 +1183,72 @@ Known FreeCAD 1.1.1 limits are immediate index renumbering, native geometry
 deletion cascades, construction mutation by toggle-only native API, and no
 persistent geometry or constraint identity. The adapter converts desired state
 to verified toggles and returns remapping instead of hiding those limits.
+
+### Controlled sketch editing
+
+Tools 32–34 are `update_sketch_geometry`, `replace_sketch_constraint`, and
+`update_sketch_constraint_value`. Every request uses exact internal document and
+sketch names and one strict non-negative current-order-local index. Request
+objects are closed schemas: unknown fields, Boolean/float/string indices, and
+non-finite numeric values are rejected.
+
+`update_sketch_geometry` takes a complete desired state, not a delta. Its
+`geometry` union has four same-type variants:
+
+- `line_segment` with finite `start` and `end` points;
+- `point` with a finite `position`;
+- `circle` with finite `center` and positive `radius`;
+- `arc_of_circle` with finite `center`, positive `radius`, and finite
+  `start_angle_degrees`/`end_angle_degrees` using the established normalized
+  counter-clockwise bounded-arc contract.
+
+The request deliberately has no `construction` field. A successful in-place
+move preserves the geometry index, all other geometry and constraint indices,
+construction flags, and external mappings. B-splines, conics, unsupported
+custom geometry, external geometry, and type conversion are refused. The first
+public policy permits only geometry with no dependent constraints. A semantic
+no-op is reported before dependency refusal; otherwise dimensional dependency
+returns guidance to use `update_sketch_constraint_value`, and every other
+dependency is refused rather than allowing solver-driven cascading movement.
+
+`replace_sketch_constraint` reuses the unchanged 17-variant
+`add_sketch_constraints` union. FreeCAD 1.1.1 cannot safely insert into the
+deleted slot: the selected constraint is deleted and the replacement is
+appended atomically. Results therefore report both the requested pre-call index,
+the actual appended `replacement_constraint_index`, and a complete survivor
+mapping ordered by old index. Exact semantic no-ops do not transact, exact
+duplicates of another surviving constraint are refused before mutation, and a
+redundant or conflicting solver result rolls back. Named, expression-backed,
+downstream-expression-sensitive, inactive, virtual-space, reference, and
+unsupported constraints are not replaced in Milestone 20.
+
+`update_sketch_constraint_value` preserves constraint identity and supports
+active driving `distance`, `distance_x`, `distance_y`, `radius`, `diameter`, and
+`angle` constraints. Length requests use millimetres and angles use degrees;
+controlled readback retains the established `millimeter` and `degree` labels.
+Generic distance, radius, and diameter values must be positive, while signed
+`distance_x` and `distance_y` follow the existing add-constraint contract.
+Geometric, inactive, virtual, reference/driven, unsupported, and
+expression-sensitive constraints are refused.
+
+All three tools compare the requested state before opening a transaction. A
+semantic no-op performs no recompute, creates no history, and preserves modified
+state. Successful owned changes create exactly one `Update sketch geometry`,
+`Replace sketch constraint`, or `Update sketch constraint value` step, recompute,
+verify fresh healthy solver and profile impact, and never save. Caller-owned
+transactions remain open. Failed changes restore and verify the complete
+ordered sketch, expressions/names/flags, external/context state, history, and
+observable GUI state; do not undo after verified internal rollback. Correct a
+wrong successful edit by exact-name undo and retry in the same sketch. Undo
+followed by a different successful edit invalidates redo normally.
+
+Native FreeCAD 1.1.1 exposes no `setGeometry` or `movePoint` method on the
+sketch object. The controlled adapter uses index-preserving `moveGeometry` and
+`setDatum`; bounded arcs require an endpoint-first, center, then repeated
+endpoint sequence to converge below the fixed `1e-7` tolerance. Native
+delete-then-add replacement appends at the tail, so replacement results never
+pretend the original constraint slot survived. Saved document bytes remain
+unchanged until `save_document`, and unsaved documents remain unsaved.
 
 Milestone 18 live broken-source mapping reporting remains unverified because
 the public MCP API cannot delete or invalidate source objects. This is a

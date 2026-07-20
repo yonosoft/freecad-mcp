@@ -15,7 +15,9 @@ from freecad_mcp.models import (
     MAX_SKETCH_MUTATION_SELECTION_SIZE,
     AngleBetweenLinesConstraintInput,
     ArcOfCircleGeometryInput,
+    ArcOfCircleGeometryUpdateInput,
     CircleGeometryInput,
+    CircleGeometryUpdateInput,
     CoincidentConstraintInput,
     DistanceBetweenPointsConstraintInput,
     DistanceXBetweenPointsConstraintInput,
@@ -24,11 +26,13 @@ from freecad_mcp.models import (
     ExternalGeometrySourceInput,
     HorizontalPointsConstraintInput,
     LineSegmentGeometryInput,
+    LineSegmentGeometryUpdateInput,
     ObjectSubelementExternalGeometrySourceInput,
     OriginPlane,
     ParallelConstraintInput,
     PerpendicularConstraintInput,
     PointGeometryInput,
+    PointGeometryUpdateInput,
     PointOnObjectConstraintInput,
     SketchAnalysisRequestInput,
     SketchCenteredRectangleRequestInput,
@@ -38,6 +42,7 @@ from freecad_mcp.models import (
     SketchEquilateralTriangleRequestInput,
     SketchGeometryExternalGeometrySourceInput,
     SketchGeometryInput,
+    SketchGeometryUpdateInput,
     SketchHorizontalAxisReferenceInput,
     SketchProfileAnalysisRequestInput,
     SketchRectangleRequestInput,
@@ -81,6 +86,9 @@ _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES = {
 _SKETCH_GEOMETRY_INPUT_ADAPTER: TypeAdapter[SketchGeometryInput] = TypeAdapter(SketchGeometryInput)
 _SKETCH_CONSTRAINT_INPUT_ADAPTER: TypeAdapter[SketchConstraintInput] = TypeAdapter(
     SketchConstraintInput
+)
+_SKETCH_GEOMETRY_UPDATE_INPUT_ADAPTER: TypeAdapter[SketchGeometryUpdateInput] = TypeAdapter(
+    SketchGeometryUpdateInput
 )
 _SKETCH_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchRectangleRequestInput] = TypeAdapter(
     SketchRectangleRequestInput
@@ -1493,6 +1501,165 @@ def validate_set_sketch_geometry_construction_request(
     return selection, construction
 
 
+def _validate_strict_mutation_index(value: object, *, field: str) -> int | CommandResult:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return CommandResult.failure(
+            code="validation_error",
+            message=f"{field} must be a strict non-negative integer.",
+            data={"field": field, "actual_type": type(value).__name__},
+        )
+    if value < 0:
+        return CommandResult.failure(
+            code="validation_error",
+            message=f"{field} must be non-negative.",
+            data={"field": field, "value": value},
+        )
+    return value
+
+
+def validate_update_sketch_geometry_request(
+    document_name: object,
+    sketch_name: object,
+    geometry_index: object,
+    geometry: object,
+) -> tuple[int, SketchGeometryUpdateInput] | CommandResult:
+    """Validate one same-type complete geometry replacement state."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(geometry_index, field="geometry_index")
+    if isinstance(index, CommandResult):
+        return index
+    if isinstance(geometry, Mapping):
+        discriminator = geometry.get("type")
+        if (
+            isinstance(discriminator, str)
+            and discriminator not in _SUPPORTED_SKETCH_GEOMETRY_INPUT_TYPES
+        ):
+            return CommandResult.failure(
+                code="validation_error",
+                message="geometry uses an unsupported type.",
+                data={
+                    "field": "geometry.type",
+                    "actual_value": discriminator,
+                    "allowed": sorted(_SUPPORTED_SKETCH_GEOMETRY_INPUT_TYPES),
+                },
+            )
+    try:
+        parsed = _SKETCH_GEOMETRY_UPDATE_INPUT_ADAPTER.validate_python(geometry)
+    except ValidationError as exc:
+        error = exc.errors(include_url=False, include_context=False, include_input=False)[0]
+        location = [
+            str(part)
+            for part in error.get("loc", ())
+            if str(part) not in _SUPPORTED_SKETCH_GEOMETRY_INPUT_TYPES
+        ]
+        return CommandResult.failure(
+            code="validation_error",
+            message="geometry is malformed.",
+            data={
+                "field": "geometry" + ("." + ".".join(location) if location else ""),
+                "geometry_index": index,
+                "reason": str(error.get("type", "invalid_geometry_input")),
+            },
+        )
+    if isinstance(parsed, LineSegmentGeometryUpdateInput) and (
+        parsed.start.x == parsed.end.x and parsed.start.y == parsed.end.y
+    ):
+        return CommandResult.failure(
+            code="validation_error",
+            message="geometry is a zero-length line segment.",
+            data={"field": "geometry", "geometry_index": index, "reason": "zero_length_line"},
+        )
+    if isinstance(parsed, ArcOfCircleGeometryUpdateInput):
+        try:
+            normalize_arc_angles_degrees(parsed.start_angle_degrees, parsed.end_angle_degrees)
+        except ValueError:
+            return CommandResult.failure(
+                code="validation_error",
+                message="geometry has collapsing arc angles.",
+                data={
+                    "field": "geometry",
+                    "geometry_index": index,
+                    "reason": "arc_angles_collapse",
+                },
+            )
+    if not isinstance(
+        parsed,
+        (
+            LineSegmentGeometryUpdateInput,
+            PointGeometryUpdateInput,
+            CircleGeometryUpdateInput,
+            ArcOfCircleGeometryUpdateInput,
+        ),
+    ):
+        return CommandResult.failure(
+            code="validation_error",
+            message="geometry uses an unsupported type.",
+            data={"field": "geometry.type"},
+        )
+    return index, parsed
+
+
+def validate_replace_sketch_constraint_request(
+    document_name: object,
+    sketch_name: object,
+    constraint_index: object,
+    replacement: object,
+) -> tuple[int, SketchConstraintInput] | CommandResult:
+    """Validate one index and one existing controlled 17-way constraint input."""
+    index = _validate_strict_mutation_index(constraint_index, field="constraint_index")
+    if isinstance(index, CommandResult):
+        reference_error = validate_object_reference(document_name, sketch_name)
+        return reference_error if reference_error is not None else index
+    parsed = validate_add_sketch_constraints_request(
+        document_name,
+        sketch_name,
+        [replacement],
+    )
+    if isinstance(parsed, CommandResult):
+        data = dict(parsed.data)
+        field = data.get("field")
+        if isinstance(field, str):
+            data["field"] = field.replace("constraints[0]", "replacement", 1)
+        data["constraint_index"] = index
+        return CommandResult.failure(
+            code=parsed.code,
+            message=parsed.message.replace("Constraint item 0", "replacement"),
+            data=data,
+        )
+    return index, parsed[0]
+
+
+def validate_update_sketch_constraint_value_request(
+    document_name: object,
+    sketch_name: object,
+    constraint_index: object,
+    value: object,
+) -> tuple[int, float] | CommandResult:
+    """Validate an absolute finite numeric datum using public degree/mm conventions."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(constraint_index, field="constraint_index")
+    if isinstance(index, CommandResult):
+        return index
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return CommandResult.failure(
+            code="validation_error",
+            message="value must be a finite number.",
+            data={"field": "value", "actual_type": type(value).__name__},
+        )
+    converted = float(value)
+    if not math.isfinite(converted):
+        return CommandResult.failure(
+            code="validation_error",
+            message="value must be finite.",
+            data={"field": "value", "reason": "non_finite_value"},
+        )
+    return index, converted
+
+
 __all__ = [
     "normalize_arc_angles_degrees",
     "validate_add_external_geometry_request",
@@ -1512,7 +1679,10 @@ __all__ = [
     "validate_document_reference",
     "validate_external_geometry_reference_request",
     "validate_object_reference",
+    "validate_replace_sketch_constraint_request",
     "validate_set_sketch_geometry_construction_request",
     "validate_sketch_mutation_selection_request",
     "validate_sketch_profile_analysis_request",
+    "validate_update_sketch_constraint_value_request",
+    "validate_update_sketch_geometry_request",
 ]

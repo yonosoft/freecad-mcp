@@ -28,6 +28,11 @@ from freecad_mcp.commands.sketch_curved_profiles import (
     CreateSketchRoundedRectangleHandler,
     CreateSketchSlotHandler,
 )
+from freecad_mcp.commands.sketch_editing import (
+    ReplaceSketchConstraintHandler,
+    UpdateSketchConstraintValueHandler,
+    UpdateSketchGeometryHandler,
+)
 from freecad_mcp.commands.sketch_external_geometry import (
     AddExternalGeometryHandler,
     GetSketchDependenciesHandler,
@@ -83,6 +88,9 @@ class DocumentHandlers:
     remove_sketch_constraints: RemoveSketchConstraintsHandler
     remove_sketch_geometry: RemoveSketchGeometryHandler
     set_sketch_geometry_construction: SetSketchGeometryConstructionHandler
+    update_sketch_geometry: UpdateSketchGeometryHandler
+    replace_sketch_constraint: ReplaceSketchConstraintHandler
+    update_sketch_constraint_value: UpdateSketchConstraintValueHandler
     recompute: RecomputeDocumentHandler
 
 
@@ -115,9 +123,12 @@ __all__ = [
     "RemoveExternalGeometryHandler",
     "RemoveSketchConstraintsHandler",
     "RemoveSketchGeometryHandler",
+    "ReplaceSketchConstraintHandler",
     "SaveDocumentHandler",
     "SetSketchGeometryConstructionHandler",
     "UndoDocumentHandler",
+    "UpdateSketchConstraintValueHandler",
+    "UpdateSketchGeometryHandler",
     "ValidateSketchProfileHandler",
     "report_status",
 ]

@@ -34,9 +34,12 @@ from freecad_mcp.commands import (
     RemoveExternalGeometryHandler,
     RemoveSketchConstraintsHandler,
     RemoveSketchGeometryHandler,
+    ReplaceSketchConstraintHandler,
     SaveDocumentHandler,
     SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
+    UpdateSketchConstraintValueHandler,
+    UpdateSketchGeometryHandler,
     ValidateSketchProfileHandler,
 )
 from freecad_mcp.commands.sketch import CreateSketchHandler
@@ -69,6 +72,7 @@ from freecad_mcp.models import (
     SketchDependencyInspectionResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
+    SketchGeometryUpdateInput,
     SketchInspectionResult,
     SketchOpenVerticesResult,
     SketchPolygonCircumcircleReference,
@@ -139,6 +143,11 @@ class AdapterStub:
         self.set_sketch_geometry_construction_calls: list[
             tuple[str, str, tuple[int, ...], bool]
         ] = []
+        self.update_sketch_geometry_calls: list[
+            tuple[str, str, int, SketchGeometryUpdateInput]
+        ] = []
+        self.replace_sketch_constraint_calls: list[tuple[str, str, int, SketchConstraintInput]] = []
+        self.update_sketch_constraint_value_calls: list[tuple[str, str, int, float]] = []
         self.undo_names = ["Add sketch constraints"]
         self.redo_names: list[str] = []
 
@@ -489,6 +498,60 @@ class AdapterStub:
             }
         )
 
+    def update_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        geometry: SketchGeometryUpdateInput,
+    ) -> Any:
+        self.update_sketch_geometry_calls.append(
+            (document_name, sketch_name, geometry_index, geometry)
+        )
+        return _SemanticResultStub(
+            {
+                "geometry_index": geometry_index,
+                "requested_geometry": geometry.model_dump(mode="json"),
+                "no_change": False,
+            }
+        )
+
+    def replace_sketch_constraint(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        replacement: SketchConstraintInput,
+    ) -> Any:
+        self.replace_sketch_constraint_calls.append(
+            (document_name, sketch_name, constraint_index, replacement)
+        )
+        return _SemanticResultStub(
+            {
+                "requested_constraint_index": constraint_index,
+                "replacement_constraint_index": constraint_index,
+                "no_change": False,
+            }
+        )
+
+    def update_sketch_constraint_value(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        value: float,
+    ) -> Any:
+        self.update_sketch_constraint_value_calls.append(
+            (document_name, sketch_name, constraint_index, value)
+        )
+        return _SemanticResultStub(
+            {
+                "constraint_index": constraint_index,
+                "after_value": value,
+                "no_change": False,
+            }
+        )
+
     def add_sketch_constraints(
         self,
         document_name: str,
@@ -650,6 +713,7 @@ class _SemanticResultStub:
         self.value = value
         changed = value.get("changed_geometry_indices", ())
         self.changed_geometry_indices = tuple(changed) if isinstance(changed, list) else ()
+        self.no_change = bool(value.get("no_change", False))
 
     def to_dict(self) -> dict[str, object]:
         return self.value
@@ -708,6 +772,15 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             ),
             remove_sketch_geometry=RemoveSketchGeometryHandler(actual_adapter, dispatcher),
             set_sketch_geometry_construction=SetSketchGeometryConstructionHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            update_sketch_geometry=UpdateSketchGeometryHandler(actual_adapter, dispatcher),
+            replace_sketch_constraint=ReplaceSketchConstraintHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            update_sketch_constraint_value=UpdateSketchConstraintValueHandler(
                 actual_adapter,
                 dispatcher,
             ),

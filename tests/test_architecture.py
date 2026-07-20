@@ -96,6 +96,7 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         "freecad/sketch_external_geometry.py",
         "freecad/sketch_dependencies.py",
         "freecad/sketch_removal.py",
+        "freecad/sketch_editing.py",
         "freecad/document_history.py",
         "freecad/history_guard.py",
         "freecad/qt_dispatcher.py",
@@ -131,6 +132,7 @@ def test_mcp_registration_does_not_depend_on_freecad_implementation() -> None:
         "mcp/sketch_analysis_tools.py",
         "mcp/sketch_external_geometry_tools.py",
         "mcp/sketch_removal_tools.py",
+        "mcp/sketch_editing_tools.py",
         "mcp/server.py",
     )
     for relative_path in registration_modules:
@@ -157,6 +159,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "mcp/sketch_analysis_tools.py",
         "mcp/sketch_external_geometry_tools.py",
         "mcp/sketch_removal_tools.py",
+        "mcp/sketch_editing_tools.py",
     )
     registered_constants: list[str] = []
     for relative_path in registration_modules:
@@ -212,6 +215,9 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "REMOVE_SKETCH_CONSTRAINTS_TOOL",
         "REMOVE_SKETCH_GEOMETRY_TOOL",
         "SET_SKETCH_GEOMETRY_CONSTRUCTION_TOOL",
+        "UPDATE_SKETCH_GEOMETRY_TOOL",
+        "REPLACE_SKETCH_CONSTRAINT_TOOL",
+        "UPDATE_SKETCH_CONSTRAINT_VALUE_TOOL",
     ]
     assert _imported_modules("tool_registry.py") == set()
 
@@ -347,6 +353,9 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "SketchGeometryRemovalUnsafeError",
             "SketchControlledMutationError",
             "SketchControlledMutationRollbackError",
+            "SketchGeometryUpdateUnsafeError",
+            "SketchConstraintReplacementUnsafeError",
+            "SketchConstraintValueUpdateUnsafeError",
         },
         "validation.py": {
             "validate_create_body_request",
@@ -367,6 +376,9 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
             "validate_sketch_profile_analysis_request",
             "validate_sketch_mutation_selection_request",
             "validate_set_sketch_geometry_construction_request",
+            "validate_update_sketch_geometry_request",
+            "validate_replace_sketch_constraint_request",
+            "validate_update_sketch_constraint_value_request",
         },
         "freecad/document.py": {"FreeCADDocumentAdapter"},
         "mcp/server.py": {"build_mcp_server"},
@@ -393,9 +405,11 @@ def test_representative_modules_import_in_clean_processes() -> None:
         "freecad_mcp.mcp.sketch_curved_profile_tools",
         "freecad_mcp.mcp.sketch_analysis_tools",
         "freecad_mcp.mcp.sketch_removal_tools",
+        "freecad_mcp.mcp.sketch_editing_tools",
         "freecad_mcp.freecad.sketch_analysis",
         "freecad_mcp.freecad.sketch_topology",
         "freecad_mcp.freecad.sketch_removal",
+        "freecad_mcp.freecad.sketch_editing",
         "freecad_mcp.mcp.document_history_tools",
         "freecad_mcp.mcp.sketch_rectangle_tools",
         "freecad_mcp.mcp.server",
@@ -711,6 +725,40 @@ def test_sketch_removal_layers_use_handlers_and_controlled_native_apis_only() ->
         for node in ast.walk(native_tree)
     )
     native_imports = _imported_modules("freecad/sketch_removal.py")
+    assert not any(
+        module == "freecad_mcp.mcp" or module.startswith("freecad_mcp.mcp.")
+        for module in native_imports
+    )
+
+
+def test_sketch_editing_layers_use_handlers_and_controlled_native_apis_only() -> None:
+    command_forbidden = {"FreeCAD", "FreeCADGui", "Part", "Sketcher", "freecad_mcp.freecad"}
+    command_imports = _imported_modules("commands/sketch_editing.py")
+    assert not any(_matches_prefix(module, command_forbidden) for module in command_imports)
+
+    transport_imports = _imported_modules("mcp/sketch_editing_tools.py")
+    assert not any(_matches_prefix(module, command_forbidden) for module in transport_imports)
+    transport_tree = _tree("mcp/sketch_editing_tools.py")
+    handler_calls = {
+        node.func.attr
+        for node in ast.walk(transport_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Attribute)
+        and isinstance(node.func.value.value, ast.Name)
+        and node.func.value.value.id == "handlers"
+    }
+    assert handler_calls == {"execute"}
+
+    native_tree = _tree("freecad/sketch_editing.py")
+    forbidden_calls = {"runCommand", "doCommand", "doCommandGui", "call_tool"}
+    assert not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in forbidden_calls
+        for node in ast.walk(native_tree)
+    )
+    native_imports = _imported_modules("freecad/sketch_editing.py")
     assert not any(
         module == "freecad_mcp.mcp" or module.startswith("freecad_mcp.mcp.")
         for module in native_imports

@@ -24,12 +24,16 @@ from freecad_mcp.models import (
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchConstraintRemovalResult,
+    SketchConstraintReplacementResult,
+    SketchConstraintValueUpdateResult,
     SketchCreationResult,
     SketchDependencyInspectionResult,
     SketchGeometryAdditionResult,
     SketchGeometryConstructionResult,
     SketchGeometryInput,
     SketchGeometryRemovalResult,
+    SketchGeometryUpdateInput,
+    SketchGeometryUpdateResult,
     SketchInspectionResult,
     SketchOpenVerticesResult,
     SketchPolygonCreationResult,
@@ -255,6 +259,37 @@ class SketchControlledMutationAdapter(Protocol):
         """Set desired construction state without blindly toggling no-op members."""
 
 
+class SketchEditingAdapter(Protocol):
+    """Precise controlled edits to existing sketch geometry and constraints."""
+
+    def update_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        geometry: SketchGeometryUpdateInput,
+    ) -> SketchGeometryUpdateResult:
+        """Update one same-type unconstrained internal geometry element."""
+
+    def replace_sketch_constraint(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        replacement: SketchConstraintInput,
+    ) -> SketchConstraintReplacementResult:
+        """Replace one safe controlled constraint with explicit remapping."""
+
+    def update_sketch_constraint_value(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        value: float,
+    ) -> SketchConstraintValueUpdateResult:
+        """Set one supported driving dimensional datum."""
+
+
 class TaskExecutor(Protocol):
     """Supplies thread detection and queued task submission."""
 
@@ -287,6 +322,7 @@ __all__ = [
     "SketchControlledMutationAdapter",
     "SketchCurvedProfileAdapter",
     "SketchDependencyAdapter",
+    "SketchEditingAdapter",
     "SketchExternalGeometryAdapter",
     "SketchPolygonAdapter",
     "TaskExecutor",

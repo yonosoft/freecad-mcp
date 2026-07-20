@@ -1828,6 +1828,91 @@ public MCP API cannot delete or invalidate source objects. It is non-blocking
 and remains deferred until a safe fixture or controlled object-deletion
 capability exists.
 
+## Controlled Sketch Editing
+
+Tools 32–34 append after the unchanged first 31 registrations:
+
+```text
+MCP registration
+-> UpdateSketchGeometryHandler, ReplaceSketchConstraintHandler,
+   or UpdateSketchConstraintValueHandler
+-> SketchEditingAdapter protocol
+-> FreeCADDocumentAdapter
+-> freecad.sketch_editing
+-> Qt main-thread dispatcher
+-> SketchObject moveGeometry, delConstraint/addConstraint, or setDatum
+-> recompute, solver/profile verification, and controlled result
+```
+
+The transport schemas are explicit and closed. Geometry editing has a four-way
+same-type union without `construction`; replacement imports the existing
+17-variant constraint union directly; datum editing accepts one strict finite
+number. The command layer owns validation and stable controlled error envelopes,
+while the FreeCAD layer owns native fingerprints, dependency inspection,
+transaction/rollback, and semantic comparison. No registration function calls
+another MCP tool, and no production path uses GUI commands, edit mode, selection,
+or arbitrary Python execution.
+
+### Native facts and public policy
+
+FreeCAD 1.1.1 `SketchObject` has neither `setGeometry` nor `movePoint`.
+`moveGeometry(index, point_position, vector, false)` returns `None` and retains
+the index for underconstrained lines, points, circles, and circular arcs. Line
+positions 1/2 address start/end, point position 1 addresses its point, circle
+position 3 moves the center and 0 changes radius through an edge target. For an
+arc, moving the center first makes a later endpoint move fail. The proven
+sequence is start/end, center, then two start/end passes; it preserves
+construction state and converges below `1e-7`.
+
+Because `moveGeometry` solves through temporary weak constraints, actual edits
+are limited to geometry with no constraint references in any native reference
+slot. Semantic equality is checked first, so an already-correct constrained
+item remains a transaction-free no-op. Actual dimensionally controlled edits
+return `dimensionally_controlled`; other references return
+`dependent_constraints`. Unsupported geometry and type conversion are refused.
+Successful verification requires exactly the selected controlled geometry to
+change, with geometry/constraint counts, constraint fingerprints, construction,
+external mappings, Body/attachment/placement, and surrounding context intact.
+
+`setDatum` returns `None`. Distance, distance-x/y, radius, and diameter requests
+are sent as millimetre quantities; angle requests are sent as degree quantities.
+Controlled inspection reports the established `millimeter`/`degree` units.
+Generic distance, radius, and diameter remain positive; signed distance-x/y and
+unwrapped angle requests reuse the add-constraint contract. Reference/driven,
+inactive, virtual, geometric, unsupported, and expression-sensitive constraints
+are refused. Datum verification preserves every native identity field and every
+unrelated constraint fingerprint, while reporting geometry moved legitimately
+by the solver.
+
+FreeCAD has no safe constraint-slot replacement. `delConstraint` returns
+`None`; `addConstraint` returns the appended index. The public atomic operation
+therefore deletes one eligible constraint, appends one controlled replacement,
+verifies the exact survivor sequence, and reports the new tail index plus the
+complete old-index-ordered survivor mapping. A semantic no-op is detected before
+mutation. A replacement equal to another survivor is refused as a duplicate.
+Named, expression-sensitive, inactive, virtual, reference, and unsupported
+constraints are refused because reconstructing their metadata is outside this
+milestone. Fresh solver conflict, redundancy, partial redundancy, malformed
+state, or unavailable verification rolls back the complete mutation.
+
+### Transactions, rollback, and comparisons
+
+Owned changes use one exact `Update sketch geometry`, `Replace sketch
+constraint`, or `Update sketch constraint value` transaction. Caller-owned
+transactions are not committed or aborted. All no-ops precede recompute and
+transaction opening. Success requires fresh solver diagnostics, unchanged
+ordered state outside the documented target, complete common snapshot equality,
+and explicit before/after profile summaries.
+
+The editing adapter reuses the Milestone 19 full-state snapshot and rollback
+engine. Owned failures abort; caller-owned failures restore native geometry and
+constraint snapshots while leaving the caller transaction open. Verification
+covers ordered geometry/constraints, dimensional values, names, expressions,
+active/virtual/driving flags, construction, external mappings, attachment, Body,
+placement, file/saved/modified state, history, active document, selection, and
+edit mode where observable. No result contains a native object, memory address,
+or negative geometry ID.
+
 ## Test Ownership
 
 The pure-Python suite mirrors the production responsibilities rather than
@@ -1843,12 +1928,16 @@ collecting all adapter or transport behavior in single modules:
   translation belong in `tests/test_freecad_sketch_external_geometry.py`, and
   dependency categories belong in `tests/test_freecad_sketch_dependencies.py`;
   Milestone 19 preflight, remapping, transaction, construction no-op, and
-  rollback behavior belong in `tests/test_freecad_sketch_removal.py`;
+  rollback behavior belong in `tests/test_freecad_sketch_removal.py`; Milestone
+  20 comparison, move sequencing, editing preflight, transaction, remapping, and
+  rollback routing belong in `tests/test_freecad_sketch_editing.py`;
 - MCP tests are split into document, object, creation, and sketch-geometry
   registrations; tools 25--28 have exact schema and delegation coverage in
   `tests/test_mcp_sketch_external_geometry_tools.py`; tools 29–31 have strict
   schema, order, and delegation coverage in
-  `tests/test_mcp_sketch_removal_tools.py`; server composition, authoritative
+  `tests/test_mcp_sketch_removal_tools.py`; tools 32–34 have strict schema,
+  order, and delegation coverage in `tests/test_mcp_sketch_editing_tools.py`;
+  server composition, authoritative
   inventory, lifecycle agreement, and HTTP transport remain together;
 - `tests/test_module_compatibility.py` exclusively owns legacy/canonical identity
   promises;

@@ -263,8 +263,56 @@ class SketchGeometryRemovalUnsafeError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchGeometryUpdateUnsafeError(RuntimeError):
+    """Raised before an in-place geometry edit whose solver impact is unsafe."""
+
+    def __init__(
+        self,
+        *,
+        reason: str,
+        geometry_index: int,
+        dependencies: tuple[dict[str, object], ...] = (),
+    ) -> None:
+        self.reason = reason
+        self.geometry_index = geometry_index
+        self.dependencies = dependencies
+        super().__init__(reason)
+
+
+class SketchConstraintReplacementUnsafeError(RuntimeError):
+    """Raised before replacement when identity or dependency safety is unproven."""
+
+    def __init__(
+        self,
+        *,
+        reason: str,
+        constraint_index: int,
+        dependencies: tuple[dict[str, object], ...] = (),
+    ) -> None:
+        self.reason = reason
+        self.constraint_index = constraint_index
+        self.dependencies = dependencies
+        super().__init__(reason)
+
+
+class SketchConstraintValueUpdateUnsafeError(RuntimeError):
+    """Raised before a datum edit that is unsupported or expression-sensitive."""
+
+    def __init__(
+        self,
+        *,
+        reason: str,
+        constraint_index: int,
+        dependencies: tuple[dict[str, object], ...] = (),
+    ) -> None:
+        self.reason = reason
+        self.constraint_index = constraint_index
+        self.dependencies = dependencies
+        super().__init__(reason)
+
+
 class SketchControlledMutationError(RuntimeError):
-    """Raised when a Milestone 19 mutation cannot be completed or verified."""
+    """Raised when a controlled sketch mutation cannot be completed or verified."""
 
     def __init__(self, *, operation: str, phase: str, reason: str) -> None:
         self.operation = operation
@@ -274,7 +322,7 @@ class SketchControlledMutationError(RuntimeError):
 
 
 class SketchControlledMutationRollbackError(RuntimeError):
-    """Raised when a failed Milestone 19 mutation cannot restore exact state."""
+    """Raised when a failed controlled sketch mutation cannot restore exact state."""
 
     def __init__(self, *, operation: str, reason: str) -> None:
         self.operation = operation
@@ -663,7 +711,9 @@ __all__ = [
     "SketchCenteredRectangleVerificationError",
     "SketchConstraintCreationError",
     "SketchConstraintMalformedError",
+    "SketchConstraintReplacementUnsafeError",
     "SketchConstraintRollbackError",
+    "SketchConstraintValueUpdateUnsafeError",
     "SketchCreationError",
     "SketchDependencyInspectionError",
     "SketchExternalGeometryAlreadyExistsError",
@@ -675,6 +725,7 @@ __all__ = [
     "SketchGeometryCreationError",
     "SketchGeometryMalformedError",
     "SketchGeometryRollbackError",
+    "SketchGeometryUpdateUnsafeError",
     "SketchInspectionError",
     "SketchPolygonCreationError",
     "SketchPolygonRollbackError",

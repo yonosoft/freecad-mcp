@@ -399,6 +399,51 @@ class Application:
             construction=construction,
         )
 
+    def update_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_index: object,
+        geometry: object,
+    ) -> CommandResult:
+        """Update one same-type internal sketch geometry element."""
+        return self.documents.update_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_index=geometry_index,
+            geometry=geometry,
+        )
+
+    def replace_sketch_constraint(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraint_index: object,
+        replacement: object,
+    ) -> CommandResult:
+        """Replace one current sketch constraint with one controlled constraint."""
+        return self.documents.replace_sketch_constraint.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraint_index=constraint_index,
+            replacement=replacement,
+        )
+
+    def update_sketch_constraint_value(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraint_index: object,
+        value: object,
+    ) -> CommandResult:
+        """Set one supported driving dimensional constraint value."""
+        return self.documents.update_sketch_constraint_value.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraint_index=constraint_index,
+            value=value,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

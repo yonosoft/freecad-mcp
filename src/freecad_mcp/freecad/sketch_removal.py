@@ -48,7 +48,14 @@ from freecad_mcp.transaction_names import (
     SET_SKETCH_GEOMETRY_CONSTRUCTION_TRANSACTION_NAME,
 )
 
-_Operation = Literal["remove_constraints", "remove_geometry", "set_construction"]
+_Operation = Literal[
+    "remove_constraints",
+    "remove_geometry",
+    "set_construction",
+    "update_geometry",
+    "replace_constraint",
+    "update_constraint_value",
+]
 
 
 @dataclass(frozen=True, slots=True)

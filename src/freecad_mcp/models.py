@@ -342,6 +342,48 @@ SketchGeometryBatch = Annotated[
 ]
 
 
+class LineSegmentGeometryUpdateInput(_SketchGeometryInputModel):
+    """Complete desired state for one existing line segment."""
+
+    type: Literal["line_segment"]
+    start: SketchPoint2DInput
+    end: SketchPoint2DInput
+
+
+class CircleGeometryUpdateInput(_SketchGeometryInputModel):
+    """Complete desired state for one existing circle."""
+
+    type: Literal["circle"]
+    center: SketchPoint2DInput
+    radius: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class ArcOfCircleGeometryUpdateInput(_SketchGeometryInputModel):
+    """Complete desired state for one existing bounded circular arc."""
+
+    type: Literal["arc_of_circle"]
+    center: SketchPoint2DInput
+    radius: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+    start_angle_degrees: float = Field(strict=True, allow_inf_nan=False)
+    end_angle_degrees: float = Field(strict=True, allow_inf_nan=False)
+
+
+class PointGeometryUpdateInput(_SketchGeometryInputModel):
+    """Complete desired state for one existing point geometry item."""
+
+    type: Literal["point"]
+    position: SketchPoint2DInput
+
+
+SketchGeometryUpdateInput = Annotated[
+    LineSegmentGeometryUpdateInput
+    | CircleGeometryUpdateInput
+    | ArcOfCircleGeometryUpdateInput
+    | PointGeometryUpdateInput,
+    Field(discriminator="type"),
+]
+
+
 SketchAnalysisGeometryIndex = Annotated[int, Field(strict=True, ge=0)]
 SketchMutationIndex = Annotated[int, Field(strict=True, ge=0)]
 SketchMutationIndexSelection = Annotated[
@@ -353,6 +395,10 @@ SketchMutationIndexSelection = Annotated[
     ),
 ]
 SketchConstructionState = Annotated[bool, Field(strict=True)]
+SketchConstraintValueInput = Annotated[
+    float,
+    Field(strict=True, allow_inf_nan=False),
+]
 
 
 class SketchAnalysisRequestInput(_SketchGeometryInputModel):
@@ -1843,6 +1889,117 @@ class SketchGeometryConstructionResult:
 
 
 @dataclass(frozen=True, slots=True)
+class SketchGeometryUpdateResult:
+    """Verified same-index geometry update or transaction-free no-change."""
+
+    geometry_index: int
+    requested_geometry: SketchGeometryUpdateInput
+    before_geometry: SketchGeometry
+    after_geometry: SketchGeometry
+    no_change: bool
+    dependent_constraint_indices: tuple[int, ...]
+    affected_geometry_indices: tuple[int, ...]
+    unchanged_geometry_count: int
+    unchanged_constraint_count: int
+    profile_impact: Mapping[str, object]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "geometry_index": self.geometry_index,
+            "requested_geometry": self.requested_geometry.model_dump(mode="json"),
+            "before_geometry": self.before_geometry.to_dict(),
+            "after_geometry": self.after_geometry.to_dict(),
+            "no_change": self.no_change,
+            "dependent_constraint_indices": list(self.dependent_constraint_indices),
+            "affected_geometry_indices": list(self.affected_geometry_indices),
+            "unchanged_geometry_count": self.unchanged_geometry_count,
+            "unchanged_constraint_count": self.unchanged_constraint_count,
+            "construction": self.after_geometry.construction,
+            "solver": self.sketch.solver.to_dict(),
+            "profile_impact": dict(self.profile_impact),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintReplacementResult:
+    """Verified atomic constraint replacement with explicit remapping."""
+
+    requested_constraint_index: int
+    removed_constraint: SketchConstraint
+    replacement_constraint: SketchConstraint
+    replacement_constraint_index: int
+    constraint_index_changes: tuple[SketchIndexChange, ...]
+    no_change: bool
+    affected_geometry_indices: tuple[int, ...]
+    profile_impact: Mapping[str, object]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "requested_constraint_index": self.requested_constraint_index,
+            "removed_constraint": self.removed_constraint.to_dict(),
+            "replacement_constraint": self.replacement_constraint.to_dict(),
+            "replacement_constraint_index": self.replacement_constraint_index,
+            "constraint_index_changes": [item.to_dict() for item in self.constraint_index_changes],
+            "no_change": self.no_change,
+            "geometry_count": self.sketch.geometry_count,
+            "external_geometry_count": self.sketch.external_geometry_count,
+            "affected_geometry_indices": list(self.affected_geometry_indices),
+            "solver": self.sketch.solver.to_dict(),
+            "profile_impact": dict(self.profile_impact),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintValueUpdateResult:
+    """Verified dimensional-datum update or transaction-free no-change."""
+
+    constraint_index: int
+    constraint_type: str
+    before_constraint: SketchConstraintData
+    after_constraint: SketchConstraintData
+    no_change: bool
+    affected_geometry_indices: tuple[int, ...]
+    profile_impact: Mapping[str, object]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "constraint_index": self.constraint_index,
+            "constraint_type": self.constraint_type,
+            "before_constraint": self.before_constraint.to_dict(),
+            "after_constraint": self.after_constraint.to_dict(),
+            "before_value": (
+                None
+                if self.before_constraint.value is None
+                else self.before_constraint.value.to_dict()
+            ),
+            "after_value": (
+                None
+                if self.after_constraint.value is None
+                else self.after_constraint.value.to_dict()
+            ),
+            "no_change": self.no_change,
+            "geometry_count": self.sketch.geometry_count,
+            "constraint_count": self.sketch.constraint_count,
+            "external_geometry_count": self.sketch.external_geometry_count,
+            "affected_geometry_indices": list(self.affected_geometry_indices),
+            "solver": self.sketch.solver.to_dict(),
+            "profile_impact": dict(self.profile_impact),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SketchAnalysisResult:
     """Controlled broad-analysis payload returned across the adapter boundary."""
 
@@ -1981,9 +2138,11 @@ __all__ = [
     "AngleConstraintInput",
     "AngleLineConstraintInput",
     "ArcOfCircleGeometryInput",
+    "ArcOfCircleGeometryUpdateInput",
     "AttachmentInfo",
     "CenterRoundedRectanglePlacementInput",
     "CircleGeometryInput",
+    "CircleGeometryUpdateInput",
     "Circumradius",
     "CoincidentConstraintInput",
     "DiameterConstraintInput",
@@ -2012,6 +2171,7 @@ __all__ = [
     "HorizontalConstraintInput",
     "HorizontalPointsConstraintInput",
     "LineSegmentGeometryInput",
+    "LineSegmentGeometryUpdateInput",
     "LowerLeftRectanglePlacementInput",
     "ObjectDetail",
     "ObjectSubelementExternalGeometrySourceInput",
@@ -2023,6 +2183,7 @@ __all__ = [
     "PlacementPosition",
     "PlacementRotation",
     "PointGeometryInput",
+    "PointGeometryUpdateInput",
     "PointOnObjectConstraintInput",
     "PolygonAngleDegrees",
     "PolygonSideCount",
@@ -2051,7 +2212,10 @@ __all__ = [
     "SketchConstraintInput",
     "SketchConstraintPointReferenceInput",
     "SketchConstraintReference",
+    "SketchConstraintReplacementResult",
     "SketchConstraintValue",
+    "SketchConstraintValueInput",
+    "SketchConstraintValueUpdateResult",
     "SketchCreationResult",
     "SketchCurvedProfileJoin",
     "SketchDependencyInspectionResult",
@@ -2061,6 +2225,8 @@ __all__ = [
     "SketchGeometryBatch",
     "SketchGeometryExternalGeometrySourceInput",
     "SketchGeometryInput",
+    "SketchGeometryUpdateInput",
+    "SketchGeometryUpdateResult",
     "SketchHorizontalAxisReferenceInput",
     "SketchInspectionResult",
     "SketchLineGeometry",
