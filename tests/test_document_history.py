@@ -42,6 +42,8 @@ def test_controlled_transaction_names_are_stable_agent_readable_labels() -> None
         "Create sketch",
         "Add sketch geometry",
         "Add sketch constraints",
+        "Add sketch external geometry",
+        "Remove sketch external geometry",
         "Create sketch rectangle",
         "Create centered sketch rectangle",
         "Create sketch equilateral triangle",

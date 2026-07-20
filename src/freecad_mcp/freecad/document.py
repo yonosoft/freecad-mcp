@@ -11,6 +11,8 @@ from freecad_mcp.freecad import (
     sketch_centered_rectangle_creation,
     sketch_constraint_creation,
     sketch_creation,
+    sketch_dependencies,
+    sketch_external_geometry,
     sketch_geometry_creation,
     sketch_inspection,
     sketch_polygon_creation,
@@ -55,6 +57,9 @@ from freecad_mcp.models import (
     DocumentHistoryInspectionResult,
     DocumentHistoryOperationResult,
     DocumentSummary,
+    ExternalGeometryListResult,
+    ExternalGeometryMutationResult,
+    ExternalGeometrySourceInput,
     ObjectDetail,
     ObjectSummary,
     OriginPlane,
@@ -65,6 +70,7 @@ from freecad_mcp.models import (
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchCreationResult,
+    SketchDependencyInspectionResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
@@ -234,3 +240,41 @@ class FreeCADDocumentAdapter:
     ) -> SketchRoundedRectangleCreationResult:
         """Create one verified rounded rectangle without GUI commands or saving."""
         return sketch_rounded_rectangle_creation.create_sketch_rounded_rectangle(request)
+
+    def add_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        source: ExternalGeometrySourceInput,
+    ) -> ExternalGeometryMutationResult:
+        return sketch_external_geometry.add_external_geometry(
+            document_name,
+            sketch_name,
+            source,
+        )
+
+    def list_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> ExternalGeometryListResult:
+        return sketch_external_geometry.list_external_geometry(document_name, sketch_name)
+
+    def remove_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        external_reference_number: int,
+    ) -> ExternalGeometryMutationResult:
+        return sketch_external_geometry.remove_external_geometry(
+            document_name,
+            sketch_name,
+            external_reference_number,
+        )
+
+    def get_sketch_dependencies(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchDependencyInspectionResult:
+        return sketch_dependencies.get_sketch_dependencies(document_name, sketch_name)

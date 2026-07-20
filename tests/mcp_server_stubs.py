@@ -7,6 +7,7 @@ from dataclasses import replace
 from typing import Any, TypeVar, cast
 
 from freecad_mcp.commands import (
+    AddExternalGeometryHandler,
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
     AnalyzeSketchHandler,
@@ -22,12 +23,15 @@ from freecad_mcp.commands import (
     GetDocumentHandler,
     GetDocumentHistoryHandler,
     GetObjectHandler,
+    GetSketchDependenciesHandler,
     GetSketchHandler,
     ListDocumentsHandler,
+    ListExternalGeometryHandler,
     ListObjectsHandler,
     ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
+    RemoveExternalGeometryHandler,
     SaveDocumentHandler,
     UndoDocumentHandler,
     ValidateSketchProfileHandler,
@@ -42,6 +46,10 @@ from freecad_mcp.models import (
     DocumentHistorySnapshot,
     DocumentHistoryTransaction,
     DocumentSummary,
+    ExternalGeometryListResult,
+    ExternalGeometryMutationResult,
+    ExternalGeometryReferenceData,
+    ExternalGeometrySourceInput,
     ObjectDetail,
     OriginPlane,
     PlacementData,
@@ -55,6 +63,7 @@ from freecad_mcp.models import (
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchCreationResult,
+    SketchDependencyInspectionResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
@@ -118,6 +127,10 @@ class AdapterStub:
         self.create_sketch_polygon_calls: list[SketchSemanticPolygonRequest] = []
         self.create_sketch_slot_calls: list[SketchSlotRequestInput] = []
         self.create_sketch_rounded_rectangle_calls: list[SketchRoundedRectangleRequestInput] = []
+        self.add_external_geometry_calls: list[tuple[str, str, ExternalGeometrySourceInput]] = []
+        self.list_external_geometry_calls: list[tuple[str, str]] = []
+        self.remove_external_geometry_calls: list[tuple[str, str, int]] = []
+        self.get_sketch_dependencies_calls: list[tuple[str, str]] = []
         self.undo_names = ["Add sketch constraints"]
         self.redo_names: list[str] = []
 
@@ -336,6 +349,90 @@ class AdapterStub:
             geometry_count=len(geometry),
         )
 
+    def _external_reference(self) -> ExternalGeometryReferenceData:
+        return ExternalGeometryReferenceData(
+            external_reference_number=0,
+            source={
+                "type": "object_subelement",
+                "document_name": "TestDocument",
+                "object_name": "Pad",
+                "object_label": "Pad",
+                "subelement": "Edge1",
+            },
+            reference_category="object_edge",
+            reference_mode="normal",
+            resolved=True,
+            broken_reason=None,
+            geometry=None,
+            used_by_constraint_indices=(),
+        )
+
+    def add_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        source: ExternalGeometrySourceInput,
+    ) -> ExternalGeometryMutationResult:
+        self.add_external_geometry_calls.append((document_name, sketch_name, source))
+        reference = self._external_reference()
+        return ExternalGeometryMutationResult(
+            "add",
+            reference,
+            (reference,),
+            self.get_sketch(document_name, sketch_name),
+            self.document,
+        )
+
+    def list_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> ExternalGeometryListResult:
+        self.list_external_geometry_calls.append((document_name, sketch_name))
+        return ExternalGeometryListResult(
+            document_name,
+            sketch_name,
+            (self._external_reference(),),
+            self.document,
+        )
+
+    def remove_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        external_reference_number: int,
+    ) -> ExternalGeometryMutationResult:
+        self.remove_external_geometry_calls.append(
+            (document_name, sketch_name, external_reference_number)
+        )
+        return ExternalGeometryMutationResult(
+            "remove",
+            self._external_reference(),
+            (),
+            self.get_sketch(document_name, sketch_name),
+            self.document,
+            {"dependent_constraint_indices": [], "other_relationships": []},
+        )
+
+    def get_sketch_dependencies(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchDependencyInspectionResult:
+        self.get_sketch_dependencies_calls.append((document_name, sketch_name))
+        return SketchDependencyInspectionResult(
+            document_name,
+            sketch_name,
+            (self._external_reference(),),
+            (),
+            (),
+            (),
+            (),
+            (),
+            (),
+            self.document,
+        )
+
     def add_sketch_constraints(
         self,
         document_name: str,
@@ -543,6 +640,10 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
                 actual_adapter,
                 dispatcher,
             ),
+            add_external_geometry=AddExternalGeometryHandler(actual_adapter, dispatcher),
+            list_external_geometry=ListExternalGeometryHandler(actual_adapter, dispatcher),
+            remove_external_geometry=RemoveExternalGeometryHandler(actual_adapter, dispatcher),
+            get_sketch_dependencies=GetSketchDependenciesHandler(actual_adapter, dispatcher),
             recompute=RecomputeDocumentHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,

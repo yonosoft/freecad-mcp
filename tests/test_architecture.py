@@ -93,6 +93,8 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         "freecad/sketch_inspection.py",
         "freecad/sketch_analysis.py",
         "freecad/sketch_topology.py",
+        "freecad/sketch_external_geometry.py",
+        "freecad/sketch_dependencies.py",
         "freecad/document_history.py",
         "freecad/history_guard.py",
         "freecad/qt_dispatcher.py",
@@ -126,6 +128,7 @@ def test_mcp_registration_does_not_depend_on_freecad_implementation() -> None:
         "mcp/sketch_polygon_tools.py",
         "mcp/sketch_curved_profile_tools.py",
         "mcp/sketch_analysis_tools.py",
+        "mcp/sketch_external_geometry_tools.py",
         "mcp/server.py",
     )
     for relative_path in registration_modules:
@@ -150,6 +153,7 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "mcp/sketch_polygon_tools.py",
         "mcp/sketch_curved_profile_tools.py",
         "mcp/sketch_analysis_tools.py",
+        "mcp/sketch_external_geometry_tools.py",
     )
     registered_constants: list[str] = []
     for relative_path in registration_modules:
@@ -198,6 +202,10 @@ def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
         "ANALYZE_SKETCH_TOOL",
         "VALIDATE_SKETCH_PROFILE_TOOL",
         "LIST_SKETCH_OPEN_VERTICES_TOOL",
+        "ADD_EXTERNAL_GEOMETRY_TOOL",
+        "LIST_EXTERNAL_GEOMETRY_TOOL",
+        "REMOVE_EXTERNAL_GEOMETRY_TOOL",
+        "GET_SKETCH_DEPENDENCIES_TOOL",
     ]
     assert _imported_modules("tool_registry.py") == set()
 

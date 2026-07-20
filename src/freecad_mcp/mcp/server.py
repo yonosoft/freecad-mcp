@@ -20,6 +20,9 @@ from freecad_mcp.mcp.sketch_centered_rectangle_tools import (
 )
 from freecad_mcp.mcp.sketch_constraint_tools import register_add_sketch_constraints_tool
 from freecad_mcp.mcp.sketch_curved_profile_tools import register_sketch_curved_profile_tools
+from freecad_mcp.mcp.sketch_external_geometry_tools import (
+    register_sketch_external_geometry_tools,
+)
 from freecad_mcp.mcp.sketch_geometry_tools import register_add_sketch_geometry_tool
 from freecad_mcp.mcp.sketch_polygon_tools import register_sketch_polygon_tools
 from freecad_mcp.mcp.sketch_rectangle_tools import register_create_sketch_rectangle_tool
@@ -58,6 +61,10 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             "usable closed profiles. Use list_sketch_open_vertices when locating profile gaps, "
             "and get_sketch for detailed controlled geometry and constraints. Analysis tools "
             "never repair geometry and exclude construction and external geometry by default."
+            " Use add_external_geometry for one proven same-document edge, vertex, or supported "
+            "source-sketch geometry reference. Use list_external_geometry for controlled mapping "
+            "readback and get_sketch_dependencies for dependency impact. Remove only through "
+            "remove_external_geometry; it refuses constraint-used references instead of cascading."
         ),
         host=config.host,
         port=config.port,
@@ -80,5 +87,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_polygon_tools(server, handlers)
     register_sketch_curved_profile_tools(server, handlers)
     register_sketch_analysis_tools(server, handlers)
+    register_sketch_external_geometry_tools(server, handlers)
 
     return server

@@ -55,11 +55,9 @@ class _HeadlessSelection:
 
 _GUI_DOCUMENTS: dict[str, _HeadlessGuiDocument] = {}
 if not hasattr(Gui, "getDocument"):
-    Gui.getDocument = lambda name: _GUI_DOCUMENTS.setdefault(  # type: ignore[attr-defined]
-        name, _HeadlessGuiDocument()
-    )
+    Gui.getDocument = lambda name: _GUI_DOCUMENTS.setdefault(name, _HeadlessGuiDocument())
 if not hasattr(Gui, "Selection"):
-    Gui.Selection = _HeadlessSelection()  # type: ignore[attr-defined]
+    Gui.Selection = _HeadlessSelection()
 
 
 def _record(name: str, condition: bool, value: object = True) -> None:
@@ -468,9 +466,11 @@ def _ownership_external_and_preservation_cases() -> None:
     before = _state("M17Attached")
     _validate("M17Attached")
     after = _state("M17Attached")
+    after_inspection = cast(dict[str, Any], after["inspection"])
     _record(
-        "xy_attachment_preserved", before == after and after["inspection"]["attachment"] is not None
-    )  # type: ignore[index]
+        "xy_attachment_preserved",
+        before == after and after_inspection["attachment"] is not None,
+    )
     App.closeDocument(str(document.Name))
 
     first, first_sketch = _new_sketch("M17NamedFirst")
@@ -560,10 +560,20 @@ def main() -> None:
     _defect_and_intersection_cases()
     _ownership_external_and_preservation_cases()
 
-    _record("exact_24_tool_inventory", len(REGISTERED_TOOL_NAMES) == 24)
     _record(
-        "first_21_tool_regression",
-        REGISTERED_TOOL_NAMES[:21]
+        "exact_28_tool_inventory",
+        len(REGISTERED_TOOL_NAMES) == 28
+        and REGISTERED_TOOL_NAMES[24:]
+        == (
+            "add_external_geometry",
+            "list_external_geometry",
+            "remove_external_geometry",
+            "get_sketch_dependencies",
+        ),
+    )
+    _record(
+        "first_24_tool_regression",
+        REGISTERED_TOOL_NAMES[:24]
         == (
             "create_document",
             "list_documents",
@@ -586,6 +596,9 @@ def main() -> None:
             "create_sketch_regular_polygon",
             "create_sketch_slot",
             "create_sketch_rounded_rectangle",
+            "analyze_sketch",
+            "validate_sketch_profile",
+            "list_sketch_open_vertices",
         ),
     )
     _record("no_raw_native_readback", "Part" not in json.dumps(_SCENARIOS))

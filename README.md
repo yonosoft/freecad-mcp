@@ -14,13 +14,14 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- twenty-one typed MCP tools for document creation, inspection, saving,
+- twenty-eight typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
   inspection, one-step undo and redo, plus verified semantic axis-aligned
   lower-left and centre-defined rectangles, equilateral triangles, and regular
-  polygons, straight slots, and axis-aligned rounded rectangles;
+  polygons, straight slots, axis-aligned rounded rectangles, controlled
+  external geometry, and read-only sketch dependency inspection;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -132,6 +133,10 @@ create_sketch_rounded_rectangle
 analyze_sketch
 validate_sketch_profile
 list_sketch_open_vertices
+add_external_geometry
+list_external_geometry
+remove_external_geometry
+get_sketch_dependencies
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -1039,6 +1044,86 @@ gap?”, and `get_sketch` for detailed geometry and constraints. Existing mutati
 tools—not analysis tools—create or change geometry. Known limits are no repair,
 healing, tolerance override, persistent IDs, B-spline profile support, face or
 Pad validation, GUI highlighting, or automatic save.
+
+### Controlled external geometry and sketch dependencies
+
+Tools 25–28 are `add_external_geometry`, `list_external_geometry`,
+`remove_external_geometry`, and `get_sketch_dependencies`. They target the exact
+named document and sketch through the shared Qt-dispatched application path.
+None invokes another MCP tool or a Sketcher GUI command.
+
+`add_external_geometry` accepts one strict discriminated source:
+
+```json
+{
+  "document_name": "Model",
+  "sketch_name": "TargetSketch",
+  "source": {
+    "type": "object_subelement",
+    "object_name": "Pad",
+    "subelement": "Edge3"
+  }
+}
+```
+
+The object form accepts one canonical positive `EdgeN` or `VertexN` on a
+same-document non-sketch object. The alternative `sketch_geometry` form accepts
+another same-document sketch and a zero-based geometry index. Its supported
+source geometry is deliberately limited to lines, circles, and bounded circular
+arcs. Point and B-spline projection, whole-object projection, subelement path
+chains, intersection geometry, carbon copy, and cross-document creation are not
+part of this contract. Exact duplicates are rejected before mutation.
+FreeCAD's own container rules still apply: in the verified build, a sketch
+inside a PartDesign Body rejected an external object located outside that Body.
+Such native rejection is returned as a controlled add failure with rollback.
+
+The public identity is `external_reference_number`, a deterministic,
+non-negative number local to the target sketch's current external-reference
+order. The adapter translates FreeCAD's internal negative constraint indices at
+the boundary and never returns them. Removing an earlier reference can renumber
+later references, so callers must list again after mutation; these numbers are
+not persistent topological identifiers. Add verification and caller-owned
+rollback identify a reference by its exact normalized source-object and native
+subelement pair, not by projected coordinates or an assumed flattened tail.
+
+`list_external_geometry` returns controlled source identity and labels,
+category, normal/unsupported mode, resolved state, controlled geometry, and
+constraint indices using each reference. It does not recompute or solve. When
+FreeCAD has already lost enough source-mapping information that positions
+cannot be proven, every affected projection is reported unresolved with a null
+source instead of guessing. No automatic topological-name repair or healing is
+claimed.
+
+`get_sketch_dependencies` is also strictly read-only. It reports controlled
+external sources, attachment sources, expression sources, constraints using
+external references, downstream consumers, broken references, and observed
+cross-document relationships. It returns no native document objects, raw link
+arrays, memory addresses, arbitrary properties, or negative native IDs.
+
+`remove_external_geometry` accepts one non-negative reference number. It first
+inspects impact and refuses unresolved, unsupported, non-normal,
+cross-document, or constraint-used references. Native FreeCAD removal can
+delete dependent constraints, so this tool never cascades and has no cascade
+option. Reinspect dependencies after any model change before removal.
+
+Successful owned mutations are exactly one `Add sketch external geometry` or
+`Remove sketch external geometry` history step. They recompute, verify complete
+controlled readback and surrounding sketch/document state, and never save,
+activate a document, enter edit mode, or change selection. A failed atomic call
+restores its own external mappings, internal geometry, constraints, solver and
+context state, history, modified flag, and GUI observations; do not undo after
+such a failure. GUI selection and edit-mode observations are preserved when
+readable; a runtime that cannot expose either optional observation does not by
+itself block a safely restorable model mutation. Correct a successful but wrong
+reference by inspecting history, undoing the exact transaction, and adding the
+intended reference to the same sketch. Saved files are not written until
+`save_document`; unsaved documents remain unsaved.
+
+Use `list_external_geometry` for reference identity and projection readback,
+`get_sketch_dependencies` before removal or for relationship questions,
+`add_external_geometry` for one proven supported projection, and
+`remove_external_geometry` only after the impact is clear. Use `get_sketch` for
+the complete internal sketch state and the analysis tools for profile topology.
 
 ## Documentation
 

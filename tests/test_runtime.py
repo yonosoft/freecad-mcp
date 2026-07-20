@@ -8,6 +8,7 @@ import pytest
 
 from freecad_mcp.application import Application
 from freecad_mcp.commands import (
+    AddExternalGeometryHandler,
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
     AnalyzeSketchHandler,
@@ -23,12 +24,15 @@ from freecad_mcp.commands import (
     GetDocumentHandler,
     GetDocumentHistoryHandler,
     GetObjectHandler,
+    GetSketchDependenciesHandler,
     GetSketchHandler,
     ListDocumentsHandler,
+    ListExternalGeometryHandler,
     ListObjectsHandler,
     ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
+    RemoveExternalGeometryHandler,
     SaveDocumentHandler,
     UndoDocumentHandler,
     ValidateSketchProfileHandler,
@@ -105,6 +109,10 @@ def test_build_runtime_wires_create_sketch_handler(
         "create_sketch_regular_polygon": CreateSketchRegularPolygonHandler,
         "create_sketch_slot": CreateSketchSlotHandler,
         "create_sketch_rounded_rectangle": CreateSketchRoundedRectangleHandler,
+        "add_external_geometry": AddExternalGeometryHandler,
+        "list_external_geometry": ListExternalGeometryHandler,
+        "remove_external_geometry": RemoveExternalGeometryHandler,
+        "get_sketch_dependencies": GetSketchDependenciesHandler,
         "recompute": RecomputeDocumentHandler,
     }
 

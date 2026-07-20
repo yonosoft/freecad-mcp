@@ -106,6 +106,26 @@ local MCP server inside FreeCAD.
   transaction, move history, save, activate a document, enter edit mode,
   change selection, repair geometry, or route one analysis MCP tool through
   another. Use existing mutation tools for creation or repair.
+- Use `add_external_geometry` only for one proven same-document source object
+  `EdgeN`/`VertexN` or another sketch's supported line, circle, or circular arc.
+  Keep the public identity as the current non-negative sketch-local
+  `external_reference_number`; never expose FreeCAD's negative native geometry
+  index as API identity or claim that the controlled number is persistent.
+- Use `list_external_geometry` for controlled mapping/projection readback and
+  `get_sketch_dependencies` for attachment, expression, constraint, consumer,
+  broken, and cross-document relationship inspection. Both operations are
+  strictly read-only: no recompute, solve, transaction, history movement, save,
+  activation, edit mode, selection change, repair, or MCP-to-MCP routing.
+- `remove_external_geometry` must inspect impact and prefer refusal. Never
+  cascade native constraint deletion; refuse used, unresolved, unsupported,
+  non-normal, or cross-document references. Re-list after removal because
+  surviving sketch-local reference numbers can change.
+- A successful external add or removal is one verified `Add sketch external
+  geometry` or `Remove sketch external geometry` history step. Failed atomic
+  calls own rollback and must not be followed by undo. Correct wrong successful
+  intent through exact-name undo and retry in the same sketch. Do not claim
+  topological-name repair, healing, general cross-document support, or automatic
+  saving.
 - After a successful modelling mutation, recompute and inspect the result. If
   it is technically valid but expresses the wrong design intent, inspect the
   named document's history and undo the known top transaction before retrying

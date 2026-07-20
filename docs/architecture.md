@@ -43,6 +43,11 @@ placement extraction; and `freecad.body_creation` and
 Atomic geometry addition belongs to `freecad.sketch_geometry_creation`, while
 read-only sketch state belongs to `freecad.sketch_inspection`. Both remain
 separate from sketch creation and behind the same public adapter facade.
+Controlled external-reference enumeration and mutation belong to
+`freecad.sketch_external_geometry`; read-only attachment, expression,
+constraint, consumer, broken, and cross-document dependency extraction belongs
+to `freecad.sketch_dependencies`. Both remain behind the same adapter facade,
+but only the former owns transactions.
 Semantic axis-aligned rectangle creation belongs to
 `freecad.sketch_rectangle_creation` and
 `freecad.sketch_centered_rectangle_creation`. They share deterministic
@@ -210,6 +215,8 @@ and regular polygon profiles.
 rounded-rectangle profiles.
 `mcp.sketch_analysis_tools` explicitly appends read-only sketch analysis,
 profile validation, and open-vertex location.
+`mcp.sketch_external_geometry_tools` explicitly appends controlled external
+geometry add/list/remove and sketch dependency inspection.
 `mcp.server` is the small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
@@ -222,7 +229,10 @@ undo, and redo are exactly tools thirteen through fifteen;
 exactly tools eighteen and nineteen; `create_sketch_slot` and
 `create_sketch_rounded_rectangle` are exactly tools twenty and twenty-one;
 `analyze_sketch`, `validate_sketch_profile`, and
-`list_sketch_open_vertices` are exactly tools twenty-two through twenty-four.
+`list_sketch_open_vertices` are exactly tools twenty-two through twenty-four;
+`add_external_geometry`, `list_external_geometry`, `remove_external_geometry`,
+and `get_sketch_dependencies` are exactly tools twenty-five through
+twenty-eight.
 No registration loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
@@ -239,7 +249,9 @@ The registry currently exposes `create_document`, `list_documents`,
 `create_sketch_centered_rectangle`, `create_sketch_equilateral_triangle`, and
 `create_sketch_regular_polygon`, `create_sketch_slot`, and
 `create_sketch_rounded_rectangle`, `analyze_sketch`,
-`validate_sketch_profile`, and `list_sketch_open_vertices`, in that order.
+`validate_sketch_profile`, `list_sketch_open_vertices`,
+`add_external_geometry`, `list_external_geometry`,
+`remove_external_geometry`, and `get_sketch_dependencies`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -1594,6 +1606,135 @@ therefore retain the freshness reported by `get_sketch`. All expected input,
 lookup, malformed-data, topology, adapter, and dispatch failures are mapped to
 stable command codes without leaking native exception details.
 
+## External Geometry and Dependency Inspection
+
+Milestone 18 adds four separate public operations while leaving the first 24
+tool names and schemas and the 17-way sketch-constraint union unchanged:
+
+```text
+MCP external-geometry registration
+-> typed validation and command handler
+-> SketchExternalGeometryAdapter or SketchDependencyAdapter protocol
+-> FreeCADDocumentAdapter facade
+-> freecad.sketch_external_geometry or freecad.sketch_dependencies
+-> controlled result models
+```
+
+The input source is a strict discriminated union. `object_subelement` resolves
+one canonical positive `EdgeN` or `VertexN` on a same-document non-sketch
+object. `sketch_geometry` resolves a zero-based line, circle, or bounded
+circular-arc geometry index on another same-document sketch. The public add
+contract excludes point and B-spline projection, whole-object projection,
+subelement chains, intersection geometry, carbon copy, and cross-document
+creation. Duplicate identity is the normalized `(source internal name,
+subelement)` pair and is rejected before a transaction opens.
+
+### Observed FreeCAD 1.1.1 native facts
+
+Focused embedded-runtime probes established these facts independently of the
+public policy:
+
+- `SketchObject.addExternal(name, subelement, False, False)` creates one normal
+  reference and returns `None`; exact native duplicates raise `ValueError`.
+- `ExternalGeo` begins with two built-in axes. Public external reference `n`
+  appears in constraint geometry fields as native index `-3-n`.
+- `ExternalGeometry` groups subelement names by source object; deterministic
+  public order requires flattening those groups. A second geometry from the
+  same source sketch is appended inside that source's group while producing a
+  second flattened projection in the same order. Interleaving another source
+  can produce a later group for the original source. `ExternalTypes` uses zero
+  for normal references but can retain stale values after removal.
+- Object edges and vertices and source-sketch line, circle, and bounded-arc
+  geometry project successfully. Point projection did not provide a usable
+  controlled result in the tested build.
+- FreeCAD container policy remains authoritative. A target sketch inside a
+  PartDesign Body rejected an ordinary source object outside that Body in the
+  tested build, even though both objects were in the same document.
+- Moving or dimensionally changing a source updates a projection after
+  recompute. Save/reopen preserves valid mappings.
+- `delExternal(n)` returns `None`, renumbers later external identities, and can
+  silently delete constraints that use the removed reference.
+- Deleting a source may drop its mapping while leaving projection data. With
+  more than one source, remaining positions cannot always be reconstructed
+  reliably from the surviving grouped mapping.
+- Same-document add/remove undo and redo as one named transaction. Native
+  cross-document add attempts tested with ordinary and document-qualified names
+  were rejected.
+
+These are observations for the verified build, not guarantees of persistent
+topological naming. The project does not promise that `EdgeN`/`VertexN` survives
+unrelated upstream topology changes.
+
+### Controlled identity and read-only policy
+
+`external_reference_number` is the non-negative position in the target
+sketch's current flattened external-reference order. Native negative indices
+never cross the adapter boundary. The number is sketch-local and can be
+renumbered by removal; it is not a persistent identifier.
+
+Enumeration returns controlled source identity and labels, category, mode,
+resolved/broken state, sanitized geometry, and every constraint index using the
+reference. If the number of grouped mappings no longer equals the number of
+native projections, positional attribution is not provable. The adapter marks
+all affected entries unresolved with source `null` and
+`source_mapping_incomplete` rather than assigning a potentially wrong source.
+Observed cross-document mappings are reported but remain unresolved and outside
+the mutation boundary.
+
+`list_external_geometry` and `get_sketch_dependencies` perform no recompute,
+solve, transaction, history movement, save, activation, edit-mode transition,
+selection change, or repair. Dependency inspection returns controlled external
+sources, attachment sources, expression sources, constraint-to-external
+mappings, downstream consumers, broken references, and cross-document
+observations. Expression parsing deliberately identifies only simple internal
+object references that can be represented safely; it is not a general FreeCAD
+expression parser. Native objects, raw link arrays, arbitrary properties,
+memory addresses, and negative indices never appear in results.
+
+### Mutation, refusal, and rollback policy
+
+An owned add opens exactly `Add sketch external geometry`; an owned removal
+opens exactly `Remove sketch external geometry`. Both capture the complete
+controlled external mapping, internal geometry and construction flags,
+normalized constraints, cached solver state, attachment/Body/placement context,
+document identity and path, modified state, active document, selection, edit
+mode, history stacks, and pending-transaction state. They mutate once,
+recompute, verify complete semantic readback and preserved surroundings, then
+commit one history step. They never save.
+
+Removal is narrower than native `delExternal`: used, unresolved, unsupported,
+non-normal, and cross-document references are refused before mutation, and no
+dependent constraint is ever deleted automatically. An owned transaction may
+remove a safe non-tail reference because native abort can restore it exactly. A
+caller-owned transaction may remove only its current unused tail reference, for
+which the adapter has a proven exact manual inverse; the caller's transaction is
+never committed or aborted by this operation.
+
+After failure, owned operations abort and recompute when required to restore a
+previously fresh solver snapshot. Caller-owned operations apply only the exact
+manual inverse and leave the caller transaction open. Add verification and its
+manual inverse locate the new reference through the exact normalized source
+identity `(source internal name, native subelement)`, never projected
+coordinates, a native negative ID, or an assumed flattened tail. A pre-existing
+mapping that cannot be uniquely represented by those identities is rejected
+before mutation.
+
+Rollback verifies the complete captured external, sketch, document, history,
+solver, and GUI state. The document modified state is required for safe model
+restoration. Selection and edit-mode identity are optional observations:
+readable values must remain equal, while an unavailable getter or unreadable
+value is recorded by field and does not alone block mutation. FreeCAD GUI
+`getInEdit()` returns a view provider in the verified build, so the adapter
+unwraps its `.Object` before comparing model identity. If exact required-state
+restoration cannot be proven, a distinct rollback failure is returned; callers
+must not issue undo after an internally restored failure. A wrong successful
+reference is recovered by exact-name undo and retry in the same sketch, which
+also preserves ordinary redo invalidation semantics.
+
+Known limits are no cascade option, automatic replacement, healing,
+topological-name repair, attachment remapping, general cross-document support,
+GUI intersection projection, carbon copy, or automatic save.
+
 ## Test Ownership
 
 The pure-Python suite mirrors the production responsibilities rather than
@@ -1605,10 +1746,14 @@ collecting all adapter or transport behavior in single modules:
 - FreeCAD adapter tests are split into document operations, object inspection,
   body creation, sketch creation, sketch attachment, and read-only sketch
   inspection modules; atomic geometry mutation and rollback belong in
-  `tests/test_freecad_sketch_geometry_creation.py`;
+  `tests/test_freecad_sketch_geometry_creation.py`; external mapping and source
+  translation belong in `tests/test_freecad_sketch_external_geometry.py`, and
+  dependency categories belong in `tests/test_freecad_sketch_dependencies.py`;
 - MCP tests are split into document, object, creation, and sketch-geometry
-  registrations, while server composition, authoritative inventory, lifecycle
-  agreement, and HTTP transport remain together;
+  registrations; tools 25--28 have exact schema and delegation coverage in
+  `tests/test_mcp_sketch_external_geometry_tools.py`, while server composition,
+  authoritative inventory, lifecycle agreement, and HTTP transport remain
+  together;
 - `tests/test_module_compatibility.py` exclusively owns legacy/canonical identity
   promises;
 - `tests/test_architecture.py` owns stable import-direction, explicit-registration,

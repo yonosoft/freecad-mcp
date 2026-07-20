@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from freecad_mcp.application import Application, create_application
 from freecad_mcp.commands import (
+    AddExternalGeometryHandler,
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
     AnalyzeSketchHandler,
@@ -20,12 +21,15 @@ from freecad_mcp.commands import (
     GetDocumentHandler,
     GetDocumentHistoryHandler,
     GetObjectHandler,
+    GetSketchDependenciesHandler,
     GetSketchHandler,
     ListDocumentsHandler,
+    ListExternalGeometryHandler,
     ListObjectsHandler,
     ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
+    RemoveExternalGeometryHandler,
     SaveDocumentHandler,
     UndoDocumentHandler,
     ValidateSketchProfileHandler,
@@ -115,6 +119,22 @@ def _build_runtime() -> Runtime:
             dispatcher=dispatcher,
         ),
         create_sketch_rounded_rectangle=CreateSketchRoundedRectangleHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        add_external_geometry=AddExternalGeometryHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        list_external_geometry=ListExternalGeometryHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        remove_external_geometry=RemoveExternalGeometryHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        get_sketch_dependencies=GetSketchDependenciesHandler(
             adapter=adapter,
             dispatcher=dispatcher,
         ),

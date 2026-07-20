@@ -371,6 +371,29 @@ class SketchProfileAnalysisRequestInput(_SketchGeometryInputModel):
     include_external: bool = Field(default=False, strict=True)
 
 
+class ObjectSubelementExternalGeometrySourceInput(_SketchGeometryInputModel):
+    """One exact edge or vertex on a same-document source object."""
+
+    type: Literal["object_subelement"]
+    object_name: str = Field(strict=True)
+    subelement: str = Field(strict=True)
+
+
+class SketchGeometryExternalGeometrySourceInput(_SketchGeometryInputModel):
+    """One supported zero-based geometry item in a same-document source sketch."""
+
+    type: Literal["sketch_geometry"]
+    sketch_name: str = Field(strict=True)
+    geometry_index: int = Field(strict=True, ge=0)
+
+
+ExternalGeometrySourceInput: TypeAlias = Annotated[
+    ObjectSubelementExternalGeometrySourceInput | SketchGeometryExternalGeometrySourceInput,
+    Field(discriminator="type"),
+]
+ExternalReferenceNumber = Annotated[int, Field(strict=True, ge=0)]
+
+
 RectangleDimension = Annotated[
     float,
     Field(strict=True, allow_inf_nan=False, gt=0.0),
@@ -1436,6 +1459,110 @@ SketchGeometry = (
 
 
 @dataclass(frozen=True, slots=True)
+class ExternalGeometryReferenceData:
+    """One controlled sketch-local external reference without a native GeoId."""
+
+    external_reference_number: int
+    source: Mapping[str, object] | None
+    reference_category: str
+    reference_mode: str
+    resolved: bool
+    broken_reason: str | None
+    geometry: SketchGeometry | None
+    used_by_constraint_indices: tuple[int, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "external_reference_number": self.external_reference_number,
+            "source": None if self.source is None else dict(self.source),
+            "reference_category": self.reference_category,
+            "reference_mode": self.reference_mode,
+            "resolved": self.resolved,
+            "broken_reason": self.broken_reason,
+            "geometry": None if self.geometry is None else self.geometry.to_dict(),
+            "used_by_constraint_indices": list(self.used_by_constraint_indices),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ExternalGeometryListResult:
+    """Read-only controlled enumeration of a sketch's external references."""
+
+    document_name: str
+    sketch_name: str
+    external_geometry: tuple[ExternalGeometryReferenceData, ...]
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "document_name": self.document_name,
+            "sketch_name": self.sketch_name,
+            "external_geometry_count": len(self.external_geometry),
+            "external_geometry": [item.to_dict() for item in self.external_geometry],
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ExternalGeometryMutationResult:
+    """Verified add or remove result with complete current controlled readback."""
+
+    action: Literal["add", "remove"]
+    reference: ExternalGeometryReferenceData
+    external_geometry: tuple[ExternalGeometryReferenceData, ...]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+    removal_impact: Mapping[str, object] | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        changed_key = "added_reference" if self.action == "add" else "removed_reference"
+        result: dict[str, object] = {
+            changed_key: self.reference.to_dict(),
+            "external_geometry_count": len(self.external_geometry),
+            "external_geometry": [item.to_dict() for item in self.external_geometry],
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+        if self.removal_impact is not None:
+            result["removal_impact"] = dict(self.removal_impact)
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class SketchDependencyInspectionResult:
+    """Controlled read-only sketch dependency categories."""
+
+    document_name: str
+    sketch_name: str
+    external_geometry_sources: tuple[ExternalGeometryReferenceData, ...]
+    attachment_sources: tuple[Mapping[str, object], ...]
+    expression_sources: tuple[Mapping[str, object], ...]
+    constraint_external_references: tuple[Mapping[str, object], ...]
+    downstream_consumers: tuple[Mapping[str, object], ...]
+    broken_references: tuple[Mapping[str, object], ...]
+    cross_document_references: tuple[Mapping[str, object], ...]
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "document_name": self.document_name,
+            "sketch_name": self.sketch_name,
+            "external_geometry_sources": [
+                item.to_dict() for item in self.external_geometry_sources
+            ],
+            "attachment_sources": [dict(item) for item in self.attachment_sources],
+            "expression_sources": [dict(item) for item in self.expression_sources],
+            "constraint_external_references": [
+                dict(item) for item in self.constraint_external_references
+            ],
+            "downstream_consumers": [dict(item) for item in self.downstream_consumers],
+            "broken_references": [dict(item) for item in self.broken_references],
+            "cross_document_references": [dict(item) for item in self.cross_document_references],
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SketchConstraintReference:
     """Controlled reference to sketch geometry or a built-in sketch axis."""
 
@@ -1774,11 +1901,17 @@ __all__ = [
     "DocumentHistoryTransaction",
     "DocumentSummary",
     "EqualConstraintInput",
+    "ExternalGeometryListResult",
+    "ExternalGeometryMutationResult",
+    "ExternalGeometryReferenceData",
+    "ExternalGeometrySourceInput",
+    "ExternalReferenceNumber",
     "HorizontalConstraintInput",
     "HorizontalPointsConstraintInput",
     "LineSegmentGeometryInput",
     "LowerLeftRectanglePlacementInput",
     "ObjectDetail",
+    "ObjectSubelementExternalGeometrySourceInput",
     "ObjectSummary",
     "OriginPlane",
     "ParallelConstraintInput",
@@ -1818,10 +1951,12 @@ __all__ = [
     "SketchConstraintValue",
     "SketchCreationResult",
     "SketchCurvedProfileJoin",
+    "SketchDependencyInspectionResult",
     "SketchEquilateralTriangleRequestInput",
     "SketchGeometry",
     "SketchGeometryAdditionResult",
     "SketchGeometryBatch",
+    "SketchGeometryExternalGeometrySourceInput",
     "SketchGeometryInput",
     "SketchHorizontalAxisReferenceInput",
     "SketchInspectionResult",

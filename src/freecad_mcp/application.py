@@ -310,6 +310,54 @@ class Application:
             placement=placement,
         )
 
+    def add_external_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        source: object,
+    ) -> CommandResult:
+        """Add one controlled same-document external reference."""
+        return self.documents.add_external_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            source=source,
+        )
+
+    def list_external_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+    ) -> CommandResult:
+        """List controlled external references without modifying the sketch."""
+        return self.documents.list_external_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+        )
+
+    def remove_external_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        external_reference_number: object,
+    ) -> CommandResult:
+        """Remove one preflighted unused controlled external reference."""
+        return self.documents.remove_external_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            external_reference_number=external_reference_number,
+        )
+
+    def get_sketch_dependencies(
+        self,
+        document_name: object,
+        sketch_name: object,
+    ) -> CommandResult:
+        """Inspect controlled sketch dependency categories without mutation."""
+        return self.documents.get_sketch_dependencies.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

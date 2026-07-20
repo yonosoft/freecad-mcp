@@ -6,6 +6,7 @@ from typing import Any, TypeVar
 
 from freecad_mcp.application import Application, create_application
 from freecad_mcp.commands import (
+    AddExternalGeometryHandler,
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
     AnalyzeSketchHandler,
@@ -21,12 +22,15 @@ from freecad_mcp.commands import (
     GetDocumentHandler,
     GetDocumentHistoryHandler,
     GetObjectHandler,
+    GetSketchDependenciesHandler,
     GetSketchHandler,
     ListDocumentsHandler,
+    ListExternalGeometryHandler,
     ListObjectsHandler,
     ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
+    RemoveExternalGeometryHandler,
     SaveDocumentHandler,
     UndoDocumentHandler,
     ValidateSketchProfileHandler,
@@ -41,6 +45,7 @@ from freecad_mcp.models import (
     DocumentHistorySnapshot,
     DocumentHistoryTransaction,
     DocumentSummary,
+    ExternalGeometrySourceInput,
     ObjectDetail,
     OriginPlane,
     PlacementData,
@@ -308,6 +313,48 @@ class AdapterStub:
             constraint_count=len(constraints),
         )
 
+    def add_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        source: ExternalGeometrySourceInput,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "added_reference": {"external_reference_number": 0},
+                "external_geometry_count": 1,
+            }
+        )
+
+    def list_external_geometry(self, document_name: str, sketch_name: str) -> Any:
+        return _SemanticResult({"external_geometry_count": 1, "external_geometry": []})
+
+    def remove_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        external_reference_number: int,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "removed_reference": {"external_reference_number": external_reference_number},
+                "external_geometry_count": 0,
+            }
+        )
+
+    def get_sketch_dependencies(self, document_name: str, sketch_name: str) -> Any:
+        return _SemanticResult(
+            {
+                "external_geometry_sources": [],
+                "attachment_sources": [],
+                "expression_sources": [],
+                "constraint_external_references": [],
+                "downstream_consumers": [],
+                "broken_references": [],
+                "cross_document_references": [],
+            }
+        )
+
     def create_sketch_rectangle(
         self,
         request: SketchRectangleRequestInput,
@@ -458,6 +505,10 @@ def make_application() -> Application:
             adapter,
             dispatcher,
         ),
+        add_external_geometry=AddExternalGeometryHandler(adapter, dispatcher),
+        list_external_geometry=ListExternalGeometryHandler(adapter, dispatcher),
+        remove_external_geometry=RemoveExternalGeometryHandler(adapter, dispatcher),
+        get_sketch_dependencies=GetSketchDependenciesHandler(adapter, dispatcher),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
@@ -593,6 +644,23 @@ def test_application_dispatches_add_sketch_geometry_command() -> None:
         "geometry_count": 1,
         "message": "Sketch geometry added.",
     }
+
+
+def test_application_dispatches_all_external_geometry_and_dependency_commands() -> None:
+    application = make_application()
+    added = application.add_external_geometry(
+        "TestDocument",
+        "BaseSketch",
+        {"type": "object_subelement", "object_name": "Pad", "subelement": "Edge1"},
+    )
+    listed = application.list_external_geometry("TestDocument", "BaseSketch")
+    removed = application.remove_external_geometry("TestDocument", "BaseSketch", 0)
+    dependencies = application.get_sketch_dependencies("TestDocument", "BaseSketch")
+
+    assert added.code == "external_geometry_added"
+    assert listed.code == "external_geometry_listed"
+    assert removed.code == "external_geometry_removed"
+    assert dependencies.code == "sketch_dependencies_retrieved"
 
 
 def test_application_dispatches_equilateral_triangle_with_dedicated_semantics() -> None:

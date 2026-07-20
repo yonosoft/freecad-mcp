@@ -11,6 +11,9 @@ from freecad_mcp.models import (
     DocumentHistoryInspectionResult,
     DocumentHistoryOperationResult,
     DocumentSummary,
+    ExternalGeometryListResult,
+    ExternalGeometryMutationResult,
+    ExternalGeometrySourceInput,
     ObjectDetail,
     ObjectSummary,
     OriginPlane,
@@ -21,6 +24,7 @@ from freecad_mcp.models import (
     SketchConstraintAdditionResult,
     SketchConstraintInput,
     SketchCreationResult,
+    SketchDependencyInspectionResult,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchInspectionResult,
@@ -181,6 +185,44 @@ class SketchAnalysisAdapter(Protocol):
         """Return only degree-one topology vertices."""
 
 
+class SketchExternalGeometryAdapter(Protocol):
+    """Controlled external-geometry inspection and mutation operations."""
+
+    def add_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        source: ExternalGeometrySourceInput,
+    ) -> ExternalGeometryMutationResult:
+        """Atomically add one verified same-document external reference."""
+
+    def list_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> ExternalGeometryListResult:
+        """Return deterministic controlled external-reference enumeration."""
+
+    def remove_external_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        external_reference_number: int,
+    ) -> ExternalGeometryMutationResult:
+        """Atomically remove one preflighted unused external reference."""
+
+
+class SketchDependencyAdapter(Protocol):
+    """Read-only controlled sketch dependency inspection."""
+
+    def get_sketch_dependencies(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchDependencyInspectionResult:
+        """Return supported dependency categories without native objects."""
+
+
 class TaskExecutor(Protocol):
     """Supplies thread detection and queued task submission."""
 
@@ -211,6 +253,8 @@ __all__ = [
     "ServerRunner",
     "SketchAnalysisAdapter",
     "SketchCurvedProfileAdapter",
+    "SketchDependencyAdapter",
+    "SketchExternalGeometryAdapter",
     "SketchPolygonAdapter",
     "TaskExecutor",
 ]

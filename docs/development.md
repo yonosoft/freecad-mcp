@@ -1625,3 +1625,90 @@ not an implementation task: do not edit the repository, and retain raw
 constraint union, all three strict new schemas, structured results, deterministic
 topology evidence, preservation snapshots, Report View output, saved metadata,
 and exact repository status.
+
+## Milestone 18 External-Geometry Verification
+
+Tools 25--28 add controlled external geometry and read-only dependency
+inspection. Run focused pure tests while changing the implementation, then the
+permanent native campaign at the integration checkpoint:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pytest -q `
+  tests\test_sketch_external_geometry_commands.py `
+  tests\test_freecad_sketch_external_geometry.py `
+  tests\test_freecad_sketch_dependencies.py `
+  tests\test_mcp_sketch_external_geometry_tools.py
+
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\smoke_sketch_external_geometry.py
+```
+
+The native campaign records exactly 49 named assertions. It covers edge,
+vertex, and source-sketch projection; deterministic controlled numbering;
+duplicate rejection; source update propagation; attachment, expression,
+consumer, and constraint dependencies; safe non-tail and tail removal; unsafe
+removal refusal; transaction labels; owned and caller-owned rollback; undo,
+redo, and same-sketch correction; conservative broken mapping; save/reopen and
+no automatic save; non-active targeting; same-named document isolation;
+cross-document policy; selection/edit-mode preservation; two distinct
+source-sketch geometries and duplicate rejection for either; exact rollback of
+a forced second-reference postcondition failure; a complex Body document; the
+FreeCAD ViewProvider edit-state contract; and optional unreadable GUI state.
+
+The add source union accepts only a same-document object `EdgeN`/`VertexN` or a
+line, circle, or bounded circular arc from another same-document sketch.
+Controlled reference numbers are non-negative and current-order-local. Native
+negative constraint indices are an adapter implementation detail. A safe remove
+must refuse every used, unresolved, unsupported, non-normal, or cross-document
+reference instead of permitting FreeCAD's native constraint cascade.
+
+Read-only calls require before/after equality for mappings, geometry and
+constraints, solver freshness, construction flags, attachment/Body/placement,
+history and pending transaction state, file path and modified state, active
+document, selection, and edit mode. They must not recompute. Mutation rollback
+requires the same equality after an injected post-mutation failure; do not call
+undo after a failure that restored its own snapshot.
+
+### Risk-based verification map
+
+| Changed responsibility | Principal files | Required focused evidence |
+| --- | --- | --- |
+| Strict source/reference schemas | `models.py`, `validation.py` | pure validation plus raw MCP schema tests |
+| Handler and Qt-dispatch boundary | `commands/sketch_external_geometry.py`, `application.py`, `protocols.py`, `runtime.py` | controlled-error, application delegation, and runtime composition tests |
+| Tool order and transport | `tool_registry.py`, `mcp/sketch_external_geometry_tools.py`, `mcp/server.py` | exact 28-tool order, unchanged first 24, strict extra-field rejection, HTTP composition |
+| External mapping and identity | `freecad/sketch_external_geometry.py` | adapter translation tests plus native edge/vertex/sketch, constraint, broken, and isolation cases |
+| Add/remove transactions | `freecad/sketch_external_geometry.py`, `transaction_names.py` | native labels, duplicate/refusal zero mutation, owned/caller-owned rollback, undo/redo, same-sketch recovery |
+| Dependency extraction | `freecad/sketch_dependencies.py` | deterministic category tests plus native attachment/expression/consumer/constraint observations |
+| Existing shared inspection/history consumers | narrow facade and registry wiring | document-history, `get_sketch`, Milestone 17 analysis, and one semantic-profile regression |
+| Documentation and campaign | README, architecture/development/agent guidance, acceptance plan | documentation review, `git diff --check`, exact prepared-not-run campaign path |
+
+Run the complete quality gate once after documentation and focused checks are
+green:
+
+```powershell
+.\scripts\test.ps1 -PythonExe "C:\Program Files\FreeCAD 1.1\bin\python.exe"
+```
+
+Because Milestone 18 adds focused modules and narrow facade/registry wiring
+rather than changing shared geometry creation, attachment, transaction,
+controlled inspection, history, or topology engines, the final native
+regression set is deliberately risk-selected:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_external_geometry.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_document_history.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_native_references.py
+```
+
+Run the Milestone 17 analysis smoke only if shared controlled inspection
+changes. Do not rerun historical geometry campaigns unless the final diff
+expands into shared core geometry, constraint, attachment, transaction,
+inspection, or history code. Review the final diff and `git status`, and run
+`git diff --check`, before completion.
+
+The separate live MCP campaign is prepared, not executed, in
+`docs/codex-milestone-18-acceptance.md`. It is an external-client operator test
+that must preserve the repository and capture raw 28-tool discovery, unchanged
+first-24 schemas, the unchanged 17-variant constraint union, strict new schemas,
+controlled state snapshots, Report View output, saved-file evidence, and exact
+starting/ending repository status.

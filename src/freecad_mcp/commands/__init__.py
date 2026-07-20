@@ -28,6 +28,12 @@ from freecad_mcp.commands.sketch_curved_profiles import (
     CreateSketchRoundedRectangleHandler,
     CreateSketchSlotHandler,
 )
+from freecad_mcp.commands.sketch_external_geometry import (
+    AddExternalGeometryHandler,
+    GetSketchDependenciesHandler,
+    ListExternalGeometryHandler,
+    RemoveExternalGeometryHandler,
+)
 from freecad_mcp.commands.sketch_geometry import AddSketchGeometryHandler
 from freecad_mcp.commands.sketch_polygon import (
     CreateSketchEquilateralTriangleHandler,
@@ -65,10 +71,15 @@ class DocumentHandlers:
     create_sketch_regular_polygon: CreateSketchRegularPolygonHandler
     create_sketch_slot: CreateSketchSlotHandler
     create_sketch_rounded_rectangle: CreateSketchRoundedRectangleHandler
+    add_external_geometry: AddExternalGeometryHandler
+    list_external_geometry: ListExternalGeometryHandler
+    remove_external_geometry: RemoveExternalGeometryHandler
+    get_sketch_dependencies: GetSketchDependenciesHandler
     recompute: RecomputeDocumentHandler
 
 
 __all__ = [
+    "AddExternalGeometryHandler",
     "AddSketchConstraintsHandler",
     "AddSketchGeometryHandler",
     "AnalyzeSketchHandler",
@@ -85,12 +96,15 @@ __all__ = [
     "GetDocumentHandler",
     "GetDocumentHistoryHandler",
     "GetObjectHandler",
+    "GetSketchDependenciesHandler",
     "GetSketchHandler",
     "ListDocumentsHandler",
+    "ListExternalGeometryHandler",
     "ListObjectsHandler",
     "ListSketchOpenVerticesHandler",
     "RecomputeDocumentHandler",
     "RedoDocumentHandler",
+    "RemoveExternalGeometryHandler",
     "SaveDocumentHandler",
     "UndoDocumentHandler",
     "ValidateSketchProfileHandler",

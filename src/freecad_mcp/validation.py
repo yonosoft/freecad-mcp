@@ -20,8 +20,10 @@ from freecad_mcp.models import (
     DistanceXBetweenPointsConstraintInput,
     DistanceYBetweenPointsConstraintInput,
     EqualConstraintInput,
+    ExternalGeometrySourceInput,
     HorizontalPointsConstraintInput,
     LineSegmentGeometryInput,
+    ObjectSubelementExternalGeometrySourceInput,
     OriginPlane,
     ParallelConstraintInput,
     PerpendicularConstraintInput,
@@ -33,6 +35,7 @@ from freecad_mcp.models import (
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
     SketchEquilateralTriangleRequestInput,
+    SketchGeometryExternalGeometrySourceInput,
     SketchGeometryInput,
     SketchHorizontalAxisReferenceInput,
     SketchProfileAnalysisRequestInput,
@@ -47,6 +50,7 @@ from freecad_mcp.models import (
 )
 
 _INTERNAL_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+_EXTERNAL_SUBELEMENT_PATTERN = re.compile(r"(?:Edge|Vertex)[1-9][0-9]*\Z")
 _INTERNAL_NAME_RULE = "ASCII letter or underscore, followed by letters, digits, or underscores"
 _SUPPORTED_SKETCH_GEOMETRY_INPUT_TYPES = {
     "arc_of_circle",
@@ -94,6 +98,9 @@ _SKETCH_SLOT_REQUEST_ADAPTER: TypeAdapter[SketchSlotRequestInput] = TypeAdapter(
 )
 _SKETCH_ROUNDED_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchRoundedRectangleRequestInput] = (
     TypeAdapter(SketchRoundedRectangleRequestInput)
+)
+_EXTERNAL_GEOMETRY_SOURCE_ADAPTER: TypeAdapter[ExternalGeometrySourceInput] = TypeAdapter(
+    ExternalGeometrySourceInput
 )
 
 
@@ -188,6 +195,115 @@ def validate_object_reference(document_name: object, object_name: object) -> Com
     if doc_error is not None:
         return doc_error
     return _validate_object_name(object_name, field="object_name", subject="Object")
+
+
+def validate_add_external_geometry_request(
+    document_name: object,
+    sketch_name: object,
+    source: object,
+) -> CommandResult | ExternalGeometrySourceInput:
+    """Validate one narrow same-document external-geometry source union."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    if isinstance(source, Mapping):
+        discriminator = source.get("type")
+        if isinstance(discriminator, str) and discriminator not in {
+            "object_subelement",
+            "sketch_geometry",
+        }:
+            return CommandResult.failure(
+                code="validation_error",
+                message="External geometry source uses an unsupported type.",
+                data={
+                    "field": "source.type",
+                    "actual_value": discriminator,
+                    "allowed": ["object_subelement", "sketch_geometry"],
+                },
+            )
+    try:
+        parsed = _EXTERNAL_GEOMETRY_SOURCE_ADAPTER.validate_python(source)
+    except ValidationError as exc:
+        first = exc.errors(include_url=False)[0]
+        path = ".".join(str(item) for item in first.get("loc", ()))
+        return CommandResult.failure(
+            code="validation_error",
+            message="External geometry source does not satisfy the strict schema.",
+            data={
+                "field": f"source.{path}" if path else "source",
+                "reason": str(first.get("type", "invalid_source")),
+            },
+        )
+
+    assert isinstance(sketch_name, str)
+    if isinstance(parsed, ObjectSubelementExternalGeometrySourceInput):
+        name_error = _validate_object_name(
+            parsed.object_name,
+            field="source.object_name",
+            subject="Source object",
+        )
+        if name_error is not None:
+            return name_error
+        if _EXTERNAL_SUBELEMENT_PATTERN.fullmatch(parsed.subelement) is None:
+            return CommandResult.failure(
+                code="validation_error",
+                message="Source subelement must be a canonical EdgeN or VertexN name.",
+                data={
+                    "field": "source.subelement",
+                    "actual_value": parsed.subelement,
+                    "rule": "Edge or Vertex followed by a positive decimal integer",
+                },
+            )
+        return parsed
+
+    assert isinstance(parsed, SketchGeometryExternalGeometrySourceInput)
+    name_error = _validate_object_name(
+        parsed.sketch_name,
+        field="source.sketch_name",
+        subject="Source sketch",
+    )
+    if name_error is not None:
+        return name_error
+    if parsed.sketch_name == sketch_name:
+        return CommandResult.failure(
+            code="validation_error",
+            message="A sketch cannot add its own geometry as an external reference.",
+            data={
+                "field": "source.sketch_name",
+                "reason": "target_sketch_is_source",
+            },
+        )
+    return parsed
+
+
+def validate_external_geometry_reference_request(
+    document_name: object,
+    sketch_name: object,
+    external_reference_number: object,
+) -> CommandResult | int:
+    """Validate one controlled non-negative sketch-local reference number."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    if type(external_reference_number) is not int:
+        return CommandResult.failure(
+            code="validation_error",
+            message="External reference number must be a non-negative strict integer.",
+            data={
+                "field": "external_reference_number",
+                "actual_type": type(external_reference_number).__name__,
+            },
+        )
+    if external_reference_number < 0:
+        return CommandResult.failure(
+            code="validation_error",
+            message="External reference number must be non-negative.",
+            data={
+                "field": "external_reference_number",
+                "value": external_reference_number,
+            },
+        )
+    return external_reference_number
 
 
 def validate_analyze_sketch_request(
@@ -1294,6 +1410,7 @@ def _validate_geometry_semantics(
 
 __all__ = [
     "normalize_arc_angles_degrees",
+    "validate_add_external_geometry_request",
     "validate_add_sketch_constraints_request",
     "validate_add_sketch_geometry_request",
     "validate_analyze_sketch_request",
@@ -1308,6 +1425,7 @@ __all__ = [
     "validate_create_sketch_slot_request",
     "validate_document_history_request",
     "validate_document_reference",
+    "validate_external_geometry_reference_request",
     "validate_object_reference",
     "validate_sketch_profile_analysis_request",
 ]

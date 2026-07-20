@@ -141,6 +141,72 @@ class SketchGeometryRollbackError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchExternalGeometryError(RuntimeError):
+    """Raised when controlled external-geometry inspection or mutation fails."""
+
+    def __init__(self, *, phase: str, reason: str) -> None:
+        self.phase = phase
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SketchExternalGeometrySourceError(RuntimeError):
+    """Raised when the exact requested source cannot be resolved safely."""
+
+    def __init__(self, *, source_name: str, reason: str) -> None:
+        self.source_name = source_name
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SketchExternalGeometryAlreadyExistsError(RuntimeError):
+    """Raised before mutation when the normalized source is already referenced."""
+
+    def __init__(self, external_reference_number: int) -> None:
+        self.external_reference_number = external_reference_number
+        super().__init__("external_geometry_already_exists")
+
+
+class SketchExternalGeometryNotFoundError(RuntimeError):
+    """Raised when a controlled reference number is absent from current sketch state."""
+
+    def __init__(self, external_reference_number: int) -> None:
+        self.external_reference_number = external_reference_number
+        super().__init__("external_geometry_not_found")
+
+
+class SketchExternalGeometryRemovalUnsafeError(RuntimeError):
+    """Raised before mutation when native removal could cascade or be ambiguous."""
+
+    def __init__(
+        self,
+        *,
+        external_reference_number: int,
+        reason: str,
+        constraint_indices: tuple[int, ...] = (),
+    ) -> None:
+        self.external_reference_number = external_reference_number
+        self.reason = reason
+        self.constraint_indices = constraint_indices
+        super().__init__(reason)
+
+
+class SketchExternalGeometryRollbackError(RuntimeError):
+    """Raised when a failed external-geometry mutation cannot restore exact state."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SketchDependencyInspectionError(RuntimeError):
+    """Raised when controlled sketch dependencies cannot be read safely."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SketchConstraintCreationError(RuntimeError):
     """Raised when an atomic sketch-constraint batch cannot be created."""
 
@@ -541,6 +607,13 @@ __all__ = [
     "SketchConstraintMalformedError",
     "SketchConstraintRollbackError",
     "SketchCreationError",
+    "SketchDependencyInspectionError",
+    "SketchExternalGeometryAlreadyExistsError",
+    "SketchExternalGeometryError",
+    "SketchExternalGeometryNotFoundError",
+    "SketchExternalGeometryRemovalUnsafeError",
+    "SketchExternalGeometryRollbackError",
+    "SketchExternalGeometrySourceError",
     "SketchGeometryCreationError",
     "SketchGeometryMalformedError",
     "SketchGeometryRollbackError",

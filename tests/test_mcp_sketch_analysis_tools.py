@@ -31,10 +31,10 @@ def test_analysis_tools_are_exactly_twenty_two_through_twenty_four() -> None:
     tools = asyncio.run(_server().list_tools())
     names = [item.name for item in tools]
 
-    assert len(names) == 24
+    assert len(names) == 28
     assert tuple(names) == REGISTERED_TOOL_NAMES
     assert names[:21] == list(REGISTERED_TOOL_NAMES[:21])
-    assert names[21:] == [
+    assert names[21:24] == [
         "analyze_sketch",
         "validate_sketch_profile",
         "list_sketch_open_vertices",

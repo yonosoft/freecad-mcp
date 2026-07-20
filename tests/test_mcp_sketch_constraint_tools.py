@@ -253,7 +253,7 @@ def test_add_sketch_constraints_remains_exactly_tool_twelve() -> None:
         "create_sketch_slot",
         "create_sketch_rounded_rectangle",
     ]
-    assert actual[21:] == [
+    assert actual[21:24] == [
         "analyze_sketch",
         "validate_sketch_profile",
         "list_sketch_open_vertices",
