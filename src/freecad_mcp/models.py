@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 MAX_SKETCH_GEOMETRY_BATCH_SIZE = 100
 MAX_SKETCH_CONSTRAINT_BATCH_SIZE = 100
+MAX_SKETCH_MUTATION_SELECTION_SIZE = 100
 MAX_REGULAR_POLYGON_SIDE_COUNT = 64
 
 
@@ -342,6 +343,16 @@ SketchGeometryBatch = Annotated[
 
 
 SketchAnalysisGeometryIndex = Annotated[int, Field(strict=True, ge=0)]
+SketchMutationIndex = Annotated[int, Field(strict=True, ge=0)]
+SketchMutationIndexSelection = Annotated[
+    list[SketchMutationIndex],
+    Field(
+        min_length=1,
+        max_length=MAX_SKETCH_MUTATION_SELECTION_SIZE,
+        json_schema_extra={"uniqueItems": True},
+    ),
+]
+SketchConstructionState = Annotated[bool, Field(strict=True)]
 
 
 class SketchAnalysisRequestInput(_SketchGeometryInputModel):
@@ -1736,6 +1747,98 @@ class SketchInspectionResult:
             "geometry": [item.to_dict() for item in self.geometry],
             "constraints": [item.to_dict() for item in self.constraints],
             "solver": self.solver.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchIndexChange:
+    """One current-order-local survivor mapping after controlled removal."""
+
+    old_index: int
+    new_index: int
+
+    def to_dict(self) -> dict[str, int]:
+        return {"old_index": self.old_index, "new_index": self.new_index}
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintRemovalResult:
+    """Verified explicit constraint removal with pre-call survivor identities."""
+
+    removed_constraint_indices: tuple[int, ...]
+    removed_constraints: tuple[SketchConstraint, ...]
+    constraint_index_changes: tuple[SketchIndexChange, ...]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "removed_constraint_indices": list(self.removed_constraint_indices),
+            "removed_constraints": [item.to_dict() for item in self.removed_constraints],
+            "remaining_constraint_count": self.sketch.constraint_count,
+            "constraint_index_changes": [item.to_dict() for item in self.constraint_index_changes],
+            "solver": self.sketch.solver.to_dict(),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchGeometryRemovalResult:
+    """Verified safe internal-geometry removal and deterministic remapping."""
+
+    removed_geometry_indices: tuple[int, ...]
+    removed_geometry: tuple[SketchGeometry, ...]
+    geometry_index_changes: tuple[SketchIndexChange, ...]
+    constraint_index_changes: tuple[SketchIndexChange, ...]
+    profile_impact: Mapping[str, object]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "removed_geometry_indices": list(self.removed_geometry_indices),
+            "removed_geometry": [item.to_dict() for item in self.removed_geometry],
+            "remaining_geometry_count": self.sketch.geometry_count,
+            "geometry_index_changes": [item.to_dict() for item in self.geometry_index_changes],
+            "constraint_index_changes": [item.to_dict() for item in self.constraint_index_changes],
+            "solver": self.sketch.solver.to_dict(),
+            "profile_impact": dict(self.profile_impact),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchGeometryConstructionResult:
+    """Desired-state construction update, including controlled no-change results."""
+
+    construction: bool
+    requested_geometry_indices: tuple[int, ...]
+    changed_geometry_indices: tuple[int, ...]
+    unchanged_geometry_indices: tuple[int, ...]
+    before_geometry: tuple[SketchGeometry, ...]
+    after_geometry: tuple[SketchGeometry, ...]
+    profile_impact: Mapping[str, object]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        construction_count = sum(item.construction for item in self.sketch.geometry)
+        return {
+            "construction": self.construction,
+            "requested_geometry_indices": list(self.requested_geometry_indices),
+            "changed_geometry_indices": list(self.changed_geometry_indices),
+            "unchanged_geometry_indices": list(self.unchanged_geometry_indices),
+            "no_change": not self.changed_geometry_indices,
+            "before_geometry": [item.to_dict() for item in self.before_geometry],
+            "after_geometry": [item.to_dict() for item in self.after_geometry],
+            "construction_geometry_count": construction_count,
+            "normal_geometry_count": self.sketch.geometry_count - construction_count,
+            "solver": self.sketch.solver.to_dict(),
+            "profile_impact": dict(self.profile_impact),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
         }
 
 

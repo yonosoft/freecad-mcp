@@ -561,14 +561,20 @@ def main() -> None:
     _ownership_external_and_preservation_cases()
 
     _record(
-        "exact_28_tool_inventory",
-        len(REGISTERED_TOOL_NAMES) == 28
-        and REGISTERED_TOOL_NAMES[24:]
+        "exact_31_tool_inventory",
+        len(REGISTERED_TOOL_NAMES) == 31
+        and REGISTERED_TOOL_NAMES[24:28]
         == (
             "add_external_geometry",
             "list_external_geometry",
             "remove_external_geometry",
             "get_sketch_dependencies",
+        )
+        and REGISTERED_TOOL_NAMES[28:]
+        == (
+            "remove_sketch_constraints",
+            "remove_sketch_geometry",
+            "set_sketch_geometry_construction",
         ),
     )
     _record(

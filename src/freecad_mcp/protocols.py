@@ -23,10 +23,13 @@ from freecad_mcp.models import (
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
     SketchConstraintInput,
+    SketchConstraintRemovalResult,
     SketchCreationResult,
     SketchDependencyInspectionResult,
     SketchGeometryAdditionResult,
+    SketchGeometryConstructionResult,
     SketchGeometryInput,
+    SketchGeometryRemovalResult,
     SketchInspectionResult,
     SketchOpenVerticesResult,
     SketchPolygonCreationResult,
@@ -223,6 +226,35 @@ class SketchDependencyAdapter(Protocol):
         """Return supported dependency categories without native objects."""
 
 
+class SketchControlledMutationAdapter(Protocol):
+    """Controlled constraint removal, internal geometry removal, and construction state."""
+
+    def remove_sketch_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_indices: tuple[int, ...],
+    ) -> SketchConstraintRemovalResult:
+        """Remove one verified pre-call constraint selection atomically."""
+
+    def remove_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+    ) -> SketchGeometryRemovalResult:
+        """Remove selected unconstrained internal geometry atomically."""
+
+    def set_sketch_geometry_construction(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        construction: bool,
+    ) -> SketchGeometryConstructionResult:
+        """Set desired construction state without blindly toggling no-op members."""
+
+
 class TaskExecutor(Protocol):
     """Supplies thread detection and queued task submission."""
 
@@ -252,6 +284,7 @@ __all__ = [
     "RunnerFactory",
     "ServerRunner",
     "SketchAnalysisAdapter",
+    "SketchControlledMutationAdapter",
     "SketchCurvedProfileAdapter",
     "SketchDependencyAdapter",
     "SketchExternalGeometryAdapter",

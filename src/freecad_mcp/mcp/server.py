@@ -26,6 +26,7 @@ from freecad_mcp.mcp.sketch_external_geometry_tools import (
 from freecad_mcp.mcp.sketch_geometry_tools import register_add_sketch_geometry_tool
 from freecad_mcp.mcp.sketch_polygon_tools import register_sketch_polygon_tools
 from freecad_mcp.mcp.sketch_rectangle_tools import register_create_sketch_rectangle_tool
+from freecad_mcp.mcp.sketch_removal_tools import register_sketch_removal_tools
 from freecad_mcp.server.config import ServerConfig
 
 
@@ -65,6 +66,10 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             "source-sketch geometry reference. Use list_external_geometry for controlled mapping "
             "readback and get_sketch_dependencies for dependency impact. Remove only through "
             "remove_external_geometry; it refuses constraint-used references instead of cascading."
+            " Use remove_sketch_constraints for explicit relationship removal. Use "
+            "remove_sketch_geometry only after dependent constraints have been removed explicitly; "
+            "it never cascade-deletes them. Use set_sketch_geometry_construction to request an "
+            "exact normal or construction final state instead of applying blind toggles."
         ),
         host=config.host,
         port=config.port,
@@ -88,5 +93,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_curved_profile_tools(server, handlers)
     register_sketch_analysis_tools(server, handlers)
     register_sketch_external_geometry_tools(server, handlers)
+    register_sketch_removal_tools(server, handlers)
 
     return server

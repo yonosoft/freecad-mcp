@@ -41,6 +41,11 @@ from freecad_mcp.commands.sketch_polygon import (
 )
 from freecad_mcp.commands.sketch_query import GetSketchHandler
 from freecad_mcp.commands.sketch_rectangle import CreateSketchRectangleHandler
+from freecad_mcp.commands.sketch_removal import (
+    RemoveSketchConstraintsHandler,
+    RemoveSketchGeometryHandler,
+    SetSketchGeometryConstructionHandler,
+)
 from freecad_mcp.commands.status import report_status
 
 
@@ -75,6 +80,9 @@ class DocumentHandlers:
     list_external_geometry: ListExternalGeometryHandler
     remove_external_geometry: RemoveExternalGeometryHandler
     get_sketch_dependencies: GetSketchDependenciesHandler
+    remove_sketch_constraints: RemoveSketchConstraintsHandler
+    remove_sketch_geometry: RemoveSketchGeometryHandler
+    set_sketch_geometry_construction: SetSketchGeometryConstructionHandler
     recompute: RecomputeDocumentHandler
 
 
@@ -105,7 +113,10 @@ __all__ = [
     "RecomputeDocumentHandler",
     "RedoDocumentHandler",
     "RemoveExternalGeometryHandler",
+    "RemoveSketchConstraintsHandler",
+    "RemoveSketchGeometryHandler",
     "SaveDocumentHandler",
+    "SetSketchGeometryConstructionHandler",
     "UndoDocumentHandler",
     "ValidateSketchProfileHandler",
     "report_status",

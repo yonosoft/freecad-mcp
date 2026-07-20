@@ -55,6 +55,9 @@ def test_rectangle_is_exactly_tool_sixteen_and_preserves_first_fifteen() -> None
         "list_external_geometry",
         "remove_external_geometry",
         "get_sketch_dependencies",
+        "remove_sketch_constraints",
+        "remove_sketch_geometry",
+        "set_sketch_geometry_construction",
     ]
     assert tuple(actual) == REGISTERED_TOOL_NAMES
 

@@ -1712,3 +1712,97 @@ that must preserve the repository and capture raw 28-tool discovery, unchanged
 first-24 schemas, the unchanged 17-variant constraint union, strict new schemas,
 controlled state snapshots, Report View output, saved-file evidence, and exact
 starting/ending repository status.
+
+## Milestone 19 Controlled Sketch-Mutation Verification
+
+Tools 29–31 add explicit constraint removal, safe internal-geometry removal,
+and desired-state construction control. During development, run the changed
+handler/MCP/adapter surface plus direct architecture neighbors:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pytest -q `
+  tests\test_sketch_removal_commands.py `
+  tests\test_freecad_sketch_removal.py `
+  tests\test_mcp_sketch_removal_tools.py `
+  tests\test_runtime.py `
+  tests\test_mcp_server.py
+
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m ruff check `
+  src\freecad_mcp\commands\sketch_removal.py `
+  src\freecad_mcp\freecad\sketch_removal.py `
+  src\freecad_mcp\mcp\sketch_removal_tools.py
+
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m mypy `
+  src\freecad_mcp\commands\sketch_removal.py `
+  src\freecad_mcp\freecad\sketch_removal.py `
+  src\freecad_mcp\mcp\sketch_removal_tools.py
+```
+
+Run the permanent native campaign at coherent integration checkpoints:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
+  scripts\smoke_sketch_removal.py
+```
+
+The campaign has explicit numbered assertions for the 31-tool inventory and
+unchanged first 28; single and multiple dimensional/geometric/virtual constraint
+removal; constraint remapping; named and numeric expression refusal; construction normal-to-
+construction and construction-to-normal; mixed and all-correct no-op selection;
+profile participation; history, undo/redo, and redo invalidation; unused line and
+circle removal; dependent-constraint refusal and exact impact; explicit
+constraint-then-geometry correction; geometry remapping; external preservation;
+Body ownership and attachment; owned and caller-owned rollback; saved-file
+no-auto-save and reopen; unsaved state; non-active targeting; and same-named
+cross-document isolation.
+
+### Risk-based verification map
+
+| Changed responsibility | Principal files | Focused evidence |
+| --- | --- | --- |
+| Strict selections and desired Boolean | `models.py`, `validation.py` | empty, duplicate, Boolean-as-integer, negative, type, and deterministic-order validation tests |
+| Typed handlers and error envelopes | `commands/sketch_removal.py` | dispatch, unsafe impact, not-found, rollback, and no-change result tests |
+| Tool inventory and schemas | `tool_registry.py`, `mcp/sketch_removal_tools.py`, `mcp/server.py` | exact 31 order, unchanged first 28, unchanged 17 constraint variants, strict extras, no MCP-to-MCP routing |
+| Native preflight and remapping | `freecad/sketch_removal.py` | all constraint reference slots, descending deletion, geometry/constraint survivor mapping, controlled results |
+| Transactions and rollback | `freecad/sketch_removal.py`, `transaction_names.py` | exact labels, one-step undo/redo, caller-owned preservation, injected owned/caller rollback |
+| Construction topology impact | shared controlled inspection plus `sketch_topology.py` consumer | mixed/no-op tests, native profile before/after, Milestone 17 regression |
+| External/context preservation | shared external enumeration and snapshot consumers | Milestone 18 external regression, Body attachment, active document, saved/unsaved evidence |
+
+After implementation, smoke, documentation, and focused checks are green, run
+the complete gate once:
+
+```powershell
+.\scripts\test.ps1 -PythonExe "C:\Program Files\FreeCAD 1.1\bin\python.exe"
+```
+
+Because Milestone 19 consumes shared controlled inspection, topology impact,
+external enumeration, history, runtime composition, and rollback helpers, the
+required final native regressions are:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_removal.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_document_history.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_native_references.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_analysis.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_external_geometry.py
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" scripts\smoke_sketch_curved_profiles.py
+```
+
+The first is the permanent Milestone 19 campaign. Document history and native
+`get_sketch` protect the directly consumed history and inspection boundaries.
+Milestone 17 protects profile impact, Milestone 18 protects external mapping and
+constraint-use translation, and the curved-profile campaign is the selected
+semantic-profile regression. Broader historical geometry campaigns remain
+outside the final change surface unless the diff expands into shared creation,
+attachment, or topology algorithms.
+
+Review `git diff --check`, the complete diff, and `git status` after those
+commands. The external-client acceptance campaign is prepared but not executed
+in `docs/codex-milestone-19-acceptance.md`. It must not edit `freecad-mcp`, must
+treat `freecad-test` only as a disposable dirty fixture holder, must not install
+dependencies, and must not commit or push.
+
+Milestone 18 live broken-source mapping reporting remains unverified because the
+public MCP API cannot delete or invalidate source objects. This is a non-blocking
+deferred gap; do not manufacture it through unsupported native manipulation or
+broaden Milestone 19 into object deletion.

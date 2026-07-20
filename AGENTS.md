@@ -126,6 +126,29 @@ local MCP server inside FreeCAD.
   intent through exact-name undo and retry in the same sketch. Do not claim
   topological-name repair, healing, general cross-document support, or automatic
   saving.
+- Use `remove_sketch_constraints` for explicit current constraint removal. Its
+  indices describe the pre-call order and surviving constraints are remapped;
+  refuse unsupported or expression-dependent selections rather than guessing
+  cleanup. Never delete geometry or external references as a side effect.
+- Use `remove_sketch_geometry` only for supported internal geometry with no
+  dependent constraints. FreeCAD's native deletion cascades constraints, so
+  report exact impact and require `remove_sketch_constraints` first. External
+  references remain the responsibility of `remove_external_geometry`; never
+  pass native negative geometry IDs through either internal-geometry tool.
+- `set_sketch_geometry_construction` takes a desired final Boolean, not toggle
+  intent. Change only mismatched selected geometry, report already-correct
+  members, and create no transaction for an all-correct retry. Preserve counts,
+  constraints, attachment, Body ownership, placement, and external references.
+- Geometry and constraint indices are current-order-local. Removal requests use
+  pre-call indices and results return ordered old-to-new survivor mappings;
+  never describe those mappings as persistent identity. Successful owned
+  mutations are one exact `Remove sketch constraints`, `Remove sketch geometry`,
+  or `Set sketch geometry construction` history step and never save.
+- Failed sketch removal/construction calls own exact rollback, including ordered
+  geometry and constraints, construction flags, expressions, external mappings,
+  solver/context/history state, and caller-owned transaction preservation. Do
+  not undo after verified internal rollback; correct a wrong success with the
+  exact transaction name and retry in the same sketch.
 - After a successful modelling mutation, recompute and inspect the result. If
   it is technically valid but expresses the wrong design intent, inspect the
   named document's history and undo the known top transaction before retrying

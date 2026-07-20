@@ -358,6 +358,47 @@ class Application:
             sketch_name=sketch_name,
         )
 
+    def remove_sketch_constraints(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraint_indices: object,
+    ) -> CommandResult:
+        """Remove explicitly selected current sketch constraints atomically."""
+        return self.documents.remove_sketch_constraints.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraint_indices=constraint_indices,
+        )
+
+    def remove_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object,
+    ) -> CommandResult:
+        """Remove selected unconstrained internal sketch geometry atomically."""
+        return self.documents.remove_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+        )
+
+    def set_sketch_geometry_construction(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object,
+        construction: object,
+    ) -> CommandResult:
+        """Set selected internal geometry to an exact desired construction state."""
+        return self.documents.set_sketch_geometry_construction.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+            construction=construction,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

@@ -33,7 +33,10 @@ from freecad_mcp.commands import (
     RecomputeDocumentHandler,
     RedoDocumentHandler,
     RemoveExternalGeometryHandler,
+    RemoveSketchConstraintsHandler,
+    RemoveSketchGeometryHandler,
     SaveDocumentHandler,
+    SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
     ValidateSketchProfileHandler,
 )
@@ -113,6 +116,9 @@ def test_build_runtime_wires_create_sketch_handler(
         "list_external_geometry": ListExternalGeometryHandler,
         "remove_external_geometry": RemoveExternalGeometryHandler,
         "get_sketch_dependencies": GetSketchDependenciesHandler,
+        "remove_sketch_constraints": RemoveSketchConstraintsHandler,
+        "remove_sketch_geometry": RemoveSketchGeometryHandler,
+        "set_sketch_geometry_construction": SetSketchGeometryConstructionHandler,
         "recompute": RecomputeDocumentHandler,
     }
 

@@ -50,6 +50,9 @@ def test_controlled_transaction_names_are_stable_agent_readable_labels() -> None
         "Create sketch regular polygon",
         "Create sketch slot",
         "Create sketch rounded rectangle",
+        "Remove sketch constraints",
+        "Remove sketch geometry",
+        "Set sketch geometry construction",
     )
 
 

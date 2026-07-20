@@ -1735,6 +1735,99 @@ Known limits are no cascade option, automatic replacement, healing,
 topological-name repair, attachment remapping, general cross-document support,
 GUI intersection projection, carbon copy, or automatic save.
 
+## Controlled Sketch Removal and Construction State
+
+Tools 29–31 append to the unchanged first 28 registrations:
+
+```text
+MCP registration
+-> RemoveSketchConstraintsHandler, RemoveSketchGeometryHandler,
+   or SetSketchGeometryConstructionHandler
+-> SketchControlledMutationAdapter protocol
+-> FreeCADDocumentAdapter
+-> freecad.sketch_removal
+-> Qt main-thread dispatcher
+-> SketchObject delConstraint, delGeometry, or toggleConstruction
+-> semantic verification and controlled result
+```
+
+No public tool calls another MCP tool. The shared internal mutation module owns
+snapshot, preflight, transaction, rollback, context-preservation, remapping, and
+profile-impact helpers, while each public operation retains a separate request,
+handler, error code, transaction label, verification branch, and result type.
+All selections are strict non-empty arrays of unique non-negative pre-call
+indices. Native negative external IDs never reach `delGeometry` or
+`toggleConstruction`.
+
+### Observed native behavior and implemented policy
+
+Focused FreeCAD 1.1.1 probes observed that `delConstraint`, `delGeometry`,
+`toggleConstruction`, and `setVirtualSpace` return `None`. Constraint and
+geometry identities renumber immediately. Descending deletion therefore
+preserves a pre-call multi-selection; ascending geometry deletion can invalidate
+a later index. `delGeometry` also silently deletes every dependent constraint
+and remaps surviving constraints' geometry references. `toggleConstruction`
+preserves constraint content and counts, while forwarding a native negative
+external index produced an access-violation error.
+
+Public constraint removal deletes only selected supported constraints in
+descending order. It snapshots exact native constraint state and verifies the
+survivor sequence, flags, names, values, references, controlled summaries, and
+old-to-new mapping. Virtual-space constraints are eligible. Unsupported
+controlled readback is refused. Deleting a named expression-backed constraint
+clears its attached expression while downstream expressions can remain dangling,
+while unnamed constraints can be addressed as `Constraints[index]` and native
+deletion renumbers surviving numeric expression paths. Selected named or numeric
+dependencies, and numeric references whose target index would change, are
+reported and refused before mutation.
+
+Public geometry removal is deliberately narrower than native `delGeometry`.
+Preflight examines First/Second/Third native constraint geometry slots and
+returns exact selected-geometry to dependent-constraint indices. Any dependency
+refuses the complete batch; callers explicitly remove constraints first. Safe
+removal verifies the ordered subset of controlled geometry, construction flags,
+native constraint-reference remapping, unchanged constraint identities/count,
+external mapping, and before/after topology summary. Survivor mapping is derived
+from pre-call order and verified against the complete ordered fingerprints; it
+does not pretend geometrically identical elements have durable identity.
+
+Construction input is desired-state idempotent. The adapter classifies selected
+geometry into changed and already-correct indices, calls `toggleConstruction`
+only for changed members, and verifies exact final flags plus unchanged geometry,
+constraint, external, attachment, Body, placement, and document context. An
+all-correct call does not recompute or open a transaction. The result reports
+before/after selected summaries, normal/construction counts, solver readback,
+and compact profile impact from the shared Milestone 17 topology engine.
+
+### Transactions, rollback, and identity
+
+Owned changes use exactly one `Remove sketch constraints`, `Remove sketch
+geometry`, or `Set sketch geometry construction` transaction. Caller-owned
+transactions are neither committed nor aborted. A pre-mutation snapshot contains
+cloned ordered geometry, construction flags, native and controlled constraints,
+expressions for every document object, external mapping, solver state, Body and
+attachment context, placement, history stacks, document summary, active
+document, selection, and edit state.
+
+Owned failure aborts its transaction and recomputes only when restoring a
+previously fresh solver. Caller-owned failure assigns the snapshotted `Geometry`
+and `Constraints`, restores construction and constraint flags, recomputes, and
+leaves the caller transaction pending. FreeCAD 1.1.1 probes confirmed these
+assignments restore exact ordering, geometry references, names, active and
+virtual-space flags. Rollback verifies the complete snapshot, including history
+and GUI observations, rather than counts alone. If exact restoration cannot be
+proved, a distinct rollback error is returned.
+
+Indices in public results remain current-order-local. Removed entries have no
+new index. Every survivor mapping is ordered by `old_index`, and later mutations
+may renumber it again. Results contain controlled dataclasses and mappings only;
+no native objects, transaction IDs, memory addresses, or negative IDs escape.
+
+Milestone 18 live broken-source mapping reporting remains unverified because the
+public MCP API cannot delete or invalidate source objects. It is non-blocking
+and remains deferred until a safe fixture or controlled object-deletion
+capability exists.
+
 ## Test Ownership
 
 The pure-Python suite mirrors the production responsibilities rather than
@@ -1749,11 +1842,14 @@ collecting all adapter or transport behavior in single modules:
   `tests/test_freecad_sketch_geometry_creation.py`; external mapping and source
   translation belong in `tests/test_freecad_sketch_external_geometry.py`, and
   dependency categories belong in `tests/test_freecad_sketch_dependencies.py`;
+  Milestone 19 preflight, remapping, transaction, construction no-op, and
+  rollback behavior belong in `tests/test_freecad_sketch_removal.py`;
 - MCP tests are split into document, object, creation, and sketch-geometry
   registrations; tools 25--28 have exact schema and delegation coverage in
-  `tests/test_mcp_sketch_external_geometry_tools.py`, while server composition,
-  authoritative inventory, lifecycle agreement, and HTTP transport remain
-  together;
+  `tests/test_mcp_sketch_external_geometry_tools.py`; tools 29–31 have strict
+  schema, order, and delegation coverage in
+  `tests/test_mcp_sketch_removal_tools.py`; server composition, authoritative
+  inventory, lifecycle agreement, and HTTP transport remain together;
 - `tests/test_module_compatibility.py` exclusively owns legacy/canonical identity
   promises;
 - `tests/test_architecture.py` owns stable import-direction, explicit-registration,

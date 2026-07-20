@@ -32,7 +32,10 @@ from freecad_mcp.commands import (
     RecomputeDocumentHandler,
     RedoDocumentHandler,
     RemoveExternalGeometryHandler,
+    RemoveSketchConstraintsHandler,
+    RemoveSketchGeometryHandler,
     SaveDocumentHandler,
+    SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
     ValidateSketchProfileHandler,
 )
@@ -131,6 +134,11 @@ class AdapterStub:
         self.list_external_geometry_calls: list[tuple[str, str]] = []
         self.remove_external_geometry_calls: list[tuple[str, str, int]] = []
         self.get_sketch_dependencies_calls: list[tuple[str, str]] = []
+        self.remove_sketch_constraints_calls: list[tuple[str, str, tuple[int, ...]]] = []
+        self.remove_sketch_geometry_calls: list[tuple[str, str, tuple[int, ...]]] = []
+        self.set_sketch_geometry_construction_calls: list[
+            tuple[str, str, tuple[int, ...], bool]
+        ] = []
         self.undo_names = ["Add sketch constraints"]
         self.redo_names: list[str] = []
 
@@ -433,6 +441,54 @@ class AdapterStub:
             self.document,
         )
 
+    def remove_sketch_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_indices: tuple[int, ...],
+    ) -> Any:
+        self.remove_sketch_constraints_calls.append(
+            (document_name, sketch_name, constraint_indices)
+        )
+        return _SemanticResultStub(
+            {
+                "removed_constraint_indices": list(constraint_indices),
+                "remaining_constraint_count": 0,
+            }
+        )
+
+    def remove_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+    ) -> Any:
+        self.remove_sketch_geometry_calls.append((document_name, sketch_name, geometry_indices))
+        return _SemanticResultStub(
+            {
+                "removed_geometry_indices": list(geometry_indices),
+                "remaining_geometry_count": 0,
+            }
+        )
+
+    def set_sketch_geometry_construction(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        construction: bool,
+    ) -> Any:
+        self.set_sketch_geometry_construction_calls.append(
+            (document_name, sketch_name, geometry_indices, construction)
+        )
+        return _SemanticResultStub(
+            {
+                "construction": construction,
+                "requested_geometry_indices": list(geometry_indices),
+                "changed_geometry_indices": list(geometry_indices),
+            }
+        )
+
     def add_sketch_constraints(
         self,
         document_name: str,
@@ -592,6 +648,8 @@ class DispatcherStub:
 class _SemanticResultStub:
     def __init__(self, value: dict[str, object]) -> None:
         self.value = value
+        changed = value.get("changed_geometry_indices", ())
+        self.changed_geometry_indices = tuple(changed) if isinstance(changed, list) else ()
 
     def to_dict(self) -> dict[str, object]:
         return self.value
@@ -644,6 +702,15 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             list_external_geometry=ListExternalGeometryHandler(actual_adapter, dispatcher),
             remove_external_geometry=RemoveExternalGeometryHandler(actual_adapter, dispatcher),
             get_sketch_dependencies=GetSketchDependenciesHandler(actual_adapter, dispatcher),
+            remove_sketch_constraints=RemoveSketchConstraintsHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            remove_sketch_geometry=RemoveSketchGeometryHandler(actual_adapter, dispatcher),
+            set_sketch_geometry_construction=SetSketchGeometryConstructionHandler(
+                actual_adapter,
+                dispatcher,
+            ),
             recompute=RecomputeDocumentHandler(actual_adapter, dispatcher),
         ),
         actual_adapter,

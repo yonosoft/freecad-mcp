@@ -137,6 +137,9 @@ add_external_geometry
 list_external_geometry
 remove_external_geometry
 get_sketch_dependencies
+remove_sketch_constraints
+remove_sketch_geometry
+set_sketch_geometry_construction
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -1124,6 +1127,63 @@ Use `list_external_geometry` for reference identity and projection readback,
 `add_external_geometry` for one proven supported projection, and
 `remove_external_geometry` only after the impact is clear. Use `get_sketch` for
 the complete internal sketch state and the analysis tools for profile topology.
+
+### Controlled sketch removal and construction state
+
+Tools 29–31 are `remove_sketch_constraints`, `remove_sketch_geometry`, and
+`set_sketch_geometry_construction`. Their index arrays are required, non-empty,
+unique, strict non-negative integers. Indices always identify the pre-call
+internal sketch order. Geometry and constraint indices are current-order-local
+identities, not persistent IDs; removal results therefore return deterministic
+`old_index` to `new_index` survivor mappings ordered by old index.
+
+`remove_sketch_constraints` removes only the explicitly selected constraints.
+It reports the removed controlled summaries, remaining count, survivor mapping,
+and resulting solver state. Multiple selections are deleted in descending
+pre-call order because FreeCAD renumbers immediately. Supported active and
+virtual-space constraints are eligible. A selected unsupported constraint or a
+constraint whose named or numeric expression dependency would be removed or
+renumbered is refused before mutation; geometry and external references are
+never removed.
+
+`remove_sketch_geometry` accepts internal geometry indices only. FreeCAD's
+native `delGeometry` silently deletes dependent constraints, so the public tool
+preflights all native constraint reference slots and refuses the entire request
+with exact geometry-to-constraint impact when any selected element is used.
+There is no cascade option: call `remove_sketch_constraints` explicitly, then
+retry `remove_sketch_geometry` in the same sketch. External references must use
+`remove_external_geometry`; public callers never pass native negative geometry
+IDs. Successful geometry removal returns controlled removed summaries, geometry
+and constraint remapping, solver state, and before/after profile impact.
+
+`set_sketch_geometry_construction` takes a required strict Boolean desired final
+state, not a toggle instruction. Mixed selections change only mismatched
+geometry and separately report already-correct indices. If every selected item
+already has the requested state, the tool returns a controlled no-change result
+and creates no transaction. Changed calls verify unchanged geometry and
+constraint counts/content, attachment and Body ownership, and updated normal
+profile participation.
+
+Successful owned calls create exactly one `Remove sketch constraints`, `Remove
+sketch geometry`, or `Set sketch geometry construction` history step. They
+recompute and semantically verify the result but never save. Caller-owned
+transactions remain open. Failure restores exact geometry and constraint
+ordering/content, construction flags, external references, expressions,
+attachment, Body ownership, placement, solver state where observable, history,
+active document, file path, modified state, selection, and edit mode; do not
+undo after an internally rolled-back failure. Correct a wrong success through
+exact-name undo and retry in the same sketch. Saved files remain unchanged until
+an explicit save, and unsaved documents remain unsaved.
+
+Known FreeCAD 1.1.1 limits are immediate index renumbering, native geometry
+deletion cascades, construction mutation by toggle-only native API, and no
+persistent geometry or constraint identity. The adapter converts desired state
+to verified toggles and returns remapping instead of hiding those limits.
+
+Milestone 18 live broken-source mapping reporting remains unverified because
+the public MCP API cannot delete or invalidate source objects. This is a
+non-blocking gap to revisit with a safe disposable fixture or a later controlled
+object-deletion capability; Milestone 19 does not broaden object deletion.
 
 ## Documentation
 

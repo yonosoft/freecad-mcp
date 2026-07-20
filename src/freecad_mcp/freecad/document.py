@@ -17,6 +17,7 @@ from freecad_mcp.freecad import (
     sketch_inspection,
     sketch_polygon_creation,
     sketch_rectangle_creation,
+    sketch_removal,
     sketch_rounded_rectangle_creation,
     sketch_slot_creation,
 )
@@ -69,10 +70,13 @@ from freecad_mcp.models import (
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
     SketchConstraintInput,
+    SketchConstraintRemovalResult,
     SketchCreationResult,
     SketchDependencyInspectionResult,
     SketchGeometryAdditionResult,
+    SketchGeometryConstructionResult,
     SketchGeometryInput,
+    SketchGeometryRemovalResult,
     SketchInspectionResult,
     SketchOpenVerticesResult,
     SketchPolygonCreationResult,
@@ -278,3 +282,41 @@ class FreeCADDocumentAdapter:
         sketch_name: str,
     ) -> SketchDependencyInspectionResult:
         return sketch_dependencies.get_sketch_dependencies(document_name, sketch_name)
+
+    def remove_sketch_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_indices: tuple[int, ...],
+    ) -> SketchConstraintRemovalResult:
+        return sketch_removal.remove_sketch_constraints(
+            document_name,
+            sketch_name,
+            constraint_indices,
+        )
+
+    def remove_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+    ) -> SketchGeometryRemovalResult:
+        return sketch_removal.remove_sketch_geometry(
+            document_name,
+            sketch_name,
+            geometry_indices,
+        )
+
+    def set_sketch_geometry_construction(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        construction: bool,
+    ) -> SketchGeometryConstructionResult:
+        return sketch_removal.set_sketch_geometry_construction(
+            document_name,
+            sketch_name,
+            geometry_indices,
+            construction,
+        )

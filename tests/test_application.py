@@ -31,7 +31,10 @@ from freecad_mcp.commands import (
     RecomputeDocumentHandler,
     RedoDocumentHandler,
     RemoveExternalGeometryHandler,
+    RemoveSketchConstraintsHandler,
+    RemoveSketchGeometryHandler,
     SaveDocumentHandler,
+    SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
     ValidateSketchProfileHandler,
 )
@@ -355,6 +358,36 @@ class AdapterStub:
             }
         )
 
+    def remove_sketch_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_indices: tuple[int, ...],
+    ) -> Any:
+        return _SemanticResult({"removed_constraint_indices": list(constraint_indices)})
+
+    def remove_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+    ) -> Any:
+        return _SemanticResult({"removed_geometry_indices": list(geometry_indices)})
+
+    def set_sketch_geometry_construction(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        construction: bool,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "changed_geometry_indices": list(geometry_indices),
+                "construction": construction,
+            }
+        )
+
     def create_sketch_rectangle(
         self,
         request: SketchRectangleRequestInput,
@@ -452,6 +485,8 @@ class DispatcherStub:
 class _SemanticResult:
     def __init__(self, data: dict[str, object]) -> None:
         self.data = data
+        changed = data.get("changed_geometry_indices", ())
+        self.changed_geometry_indices = tuple(changed) if isinstance(changed, list) else ()
 
     def to_dict(self) -> dict[str, object]:
         return self.data
@@ -509,6 +544,12 @@ def make_application() -> Application:
         list_external_geometry=ListExternalGeometryHandler(adapter, dispatcher),
         remove_external_geometry=RemoveExternalGeometryHandler(adapter, dispatcher),
         get_sketch_dependencies=GetSketchDependenciesHandler(adapter, dispatcher),
+        remove_sketch_constraints=RemoveSketchConstraintsHandler(adapter, dispatcher),
+        remove_sketch_geometry=RemoveSketchGeometryHandler(adapter, dispatcher),
+        set_sketch_geometry_construction=SetSketchGeometryConstructionHandler(
+            adapter,
+            dispatcher,
+        ),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
@@ -539,6 +580,26 @@ def test_application_dispatches_both_semantic_curved_profiles() -> None:
 
     assert slot.code == "sketch_slot_created"
     assert rounded.code == "sketch_rounded_rectangle_created"
+
+
+def test_application_dispatches_all_three_controlled_sketch_mutations() -> None:
+    application = make_application()
+
+    constraints = application.remove_sketch_constraints("TestDocument", "Sketch", [2, 0])
+    geometry = application.remove_sketch_geometry("TestDocument", "Sketch", [3, 1])
+    construction = application.set_sketch_geometry_construction(
+        "TestDocument",
+        "Sketch",
+        [1, 0],
+        True,
+    )
+
+    assert constraints.code == "sketch_constraints_removed"
+    assert constraints.data["removed_constraint_indices"] == [0, 2]
+    assert geometry.code == "sketch_geometry_removed"
+    assert geometry.data["removed_geometry_indices"] == [1, 3]
+    assert construction.code == "sketch_geometry_construction_set"
+    assert construction.data["changed_geometry_indices"] == [0, 1]
 
 
 def test_application_dispatches_lifecycle_and_document_commands() -> None:

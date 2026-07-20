@@ -815,14 +815,20 @@ def main() -> None:
     )
     _record(
         "tool_inventory",
-        len(REGISTERED_TOOL_NAMES) == 28
+        len(REGISTERED_TOOL_NAMES) == 31
         and REGISTERED_TOOL_NAMES[:24] == expected_first_twenty_four
-        and REGISTERED_TOOL_NAMES[24:]
+        and REGISTERED_TOOL_NAMES[24:28]
         == (
             "add_external_geometry",
             "list_external_geometry",
             "remove_external_geometry",
             "get_sketch_dependencies",
+        )
+        and REGISTERED_TOOL_NAMES[28:]
+        == (
+            "remove_sketch_constraints",
+            "remove_sketch_geometry",
+            "set_sketch_geometry_construction",
         ),
     )
     _main_product_cases()

@@ -12,6 +12,7 @@ from freecad_mcp.core.result import CommandResult
 from freecad_mcp.models import (
     MAX_SKETCH_CONSTRAINT_BATCH_SIZE,
     MAX_SKETCH_GEOMETRY_BATCH_SIZE,
+    MAX_SKETCH_MUTATION_SELECTION_SIZE,
     AngleBetweenLinesConstraintInput,
     ArcOfCircleGeometryInput,
     CircleGeometryInput,
@@ -1408,6 +1409,90 @@ def _validate_geometry_semantics(
     )
 
 
+def validate_sketch_mutation_selection_request(
+    document_name: object,
+    sketch_name: object,
+    indices: object,
+    *,
+    field: str,
+) -> tuple[int, ...] | CommandResult:
+    """Validate and canonicalize a non-empty strict internal-index selection."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    if not isinstance(indices, list):
+        return CommandResult.failure(
+            code="validation_error",
+            message=f"{field} must be a non-empty array of unique non-negative integers.",
+            data={"field": field, "actual_type": type(indices).__name__},
+        )
+    if not indices:
+        return CommandResult.failure(
+            code="validation_error",
+            message=f"{field} must not be empty.",
+            data={"field": field, "reason": "empty_selection"},
+        )
+    if len(indices) > MAX_SKETCH_MUTATION_SELECTION_SIZE:
+        return CommandResult.failure(
+            code="validation_error",
+            message=f"{field} exceeds the supported selection size.",
+            data={
+                "field": field,
+                "maximum": MAX_SKETCH_MUTATION_SELECTION_SIZE,
+                "actual": len(indices),
+            },
+        )
+    seen: set[int] = set()
+    validated: list[int] = []
+    for position, value in enumerate(indices):
+        item_field = f"{field}[{position}]"
+        if isinstance(value, bool) or not isinstance(value, int):
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"{item_field} must be a strict non-negative integer.",
+                data={"field": item_field, "actual_type": type(value).__name__},
+            )
+        if value < 0:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"{item_field} must be non-negative.",
+                data={"field": item_field, "value": value},
+            )
+        if value in seen:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"{field} entries must be unique.",
+                data={"field": item_field, "value": value, "reason": "duplicate_index"},
+            )
+        seen.add(value)
+        validated.append(value)
+    return tuple(sorted(validated))
+
+
+def validate_set_sketch_geometry_construction_request(
+    document_name: object,
+    sketch_name: object,
+    geometry_indices: object,
+    construction: object,
+) -> tuple[tuple[int, ...], bool] | CommandResult:
+    """Validate desired-state construction input with a strict Boolean."""
+    selection = validate_sketch_mutation_selection_request(
+        document_name,
+        sketch_name,
+        geometry_indices,
+        field="geometry_indices",
+    )
+    if isinstance(selection, CommandResult):
+        return selection
+    if not isinstance(construction, bool):
+        return CommandResult.failure(
+            code="validation_error",
+            message="construction must be a strict Boolean.",
+            data={"field": "construction", "actual_type": type(construction).__name__},
+        )
+    return selection, construction
+
+
 __all__ = [
     "normalize_arc_angles_degrees",
     "validate_add_external_geometry_request",
@@ -1427,5 +1512,7 @@ __all__ = [
     "validate_document_reference",
     "validate_external_geometry_reference_request",
     "validate_object_reference",
+    "validate_set_sketch_geometry_construction_request",
+    "validate_sketch_mutation_selection_request",
     "validate_sketch_profile_analysis_request",
 ]

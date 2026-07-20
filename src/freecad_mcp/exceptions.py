@@ -224,6 +224,64 @@ class SketchConstraintRollbackError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchMutationIndexNotFoundError(RuntimeError):
+    """Raised when a pre-call internal geometry or constraint index is absent."""
+
+    def __init__(self, *, selection: str, index: int) -> None:
+        self.selection = selection
+        self.index = index
+        super().__init__(f"{selection}_index_not_found")
+
+
+class SketchConstraintRemovalUnsafeError(RuntimeError):
+    """Raised before mutation when a selected constraint has unsafe dependencies."""
+
+    def __init__(
+        self,
+        *,
+        reason: str,
+        constraint_indices: tuple[int, ...],
+        dependencies: tuple[dict[str, object], ...] = (),
+    ) -> None:
+        self.reason = reason
+        self.constraint_indices = constraint_indices
+        self.dependencies = dependencies
+        super().__init__(reason)
+
+
+class SketchGeometryRemovalUnsafeError(RuntimeError):
+    """Raised before mutation when geometry deletion would cascade constraints."""
+
+    def __init__(
+        self,
+        *,
+        reason: str,
+        dependencies: tuple[dict[str, object], ...],
+    ) -> None:
+        self.reason = reason
+        self.dependencies = dependencies
+        super().__init__(reason)
+
+
+class SketchControlledMutationError(RuntimeError):
+    """Raised when a Milestone 19 mutation cannot be completed or verified."""
+
+    def __init__(self, *, operation: str, phase: str, reason: str) -> None:
+        self.operation = operation
+        self.phase = phase
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SketchControlledMutationRollbackError(RuntimeError):
+    """Raised when a failed Milestone 19 mutation cannot restore exact state."""
+
+    def __init__(self, *, operation: str, reason: str) -> None:
+        self.operation = operation
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SketchRectangleCreationError(RuntimeError):
     """Raised when one semantic rectangle phase cannot be completed."""
 

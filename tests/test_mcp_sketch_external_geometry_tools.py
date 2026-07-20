@@ -33,9 +33,9 @@ def test_external_geometry_tools_are_exactly_twenty_five_through_twenty_eight() 
     tools = asyncio.run(_server().list_tools())
     names = [item.name for item in tools]
 
-    assert len(names) == 28
+    assert len(names) == 31
     assert tuple(names) == REGISTERED_TOOL_NAMES
-    assert names[-4:] == [
+    assert names[24:28] == [
         "add_external_geometry",
         "list_external_geometry",
         "remove_external_geometry",
