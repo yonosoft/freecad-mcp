@@ -35,9 +35,11 @@ from freecad_mcp.models import (
     SketchGeometryConstructionResult,
     SketchGeometryInput,
     SketchGeometryRemovalResult,
+    SketchGeometryTransformResult,
     SketchGeometryUpdateInput,
     SketchGeometryUpdateResult,
     SketchInspectionResult,
+    SketchMirrorReferenceInput,
     SketchOpenVerticesResult,
     SketchPoint2DInput,
     SketchPolygonCreationResult,
@@ -336,6 +338,71 @@ class SketchTopologyEditingAdapter(Protocol):
         target_point: SketchPoint2DInput,
     ) -> SketchTopologyEditResult:
         """Extend one internal line endpoint to an explicit collinear point."""
+
+
+class SketchGeometryTransformAdapter(Protocol):
+    """Bounded copy-only internal sketch geometry transforms."""
+
+    def mirror_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        reference: SketchMirrorReferenceInput,
+    ) -> SketchGeometryTransformResult:
+        """Append mirror copies about one controlled sketch-local reference."""
+
+    def translate_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        displacement: SketchPoint2DInput,
+    ) -> SketchGeometryTransformResult:
+        """Append copies displaced by one finite vector."""
+
+    def rotate_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        center: SketchPoint2DInput,
+        angle_degrees: float,
+    ) -> SketchGeometryTransformResult:
+        """Append copies rotated about one finite centre."""
+
+    def scale_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        center: SketchPoint2DInput,
+        factor: float,
+    ) -> SketchGeometryTransformResult:
+        """Append uniformly scaled copies about one finite centre."""
+
+    def rectangular_array_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        rows: int,
+        columns: int,
+        row_displacement: SketchPoint2DInput,
+        column_displacement: SketchPoint2DInput,
+    ) -> SketchGeometryTransformResult:
+        """Append bounded source-inclusive row-major array copies."""
+
+    def polar_array_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        center: SketchPoint2DInput,
+        instance_count: int,
+        step_angle_degrees: float,
+    ) -> SketchGeometryTransformResult:
+        """Append bounded source-inclusive polar-array copies."""
 
 
 class SketchConstraintExpressionAdapter(Protocol):

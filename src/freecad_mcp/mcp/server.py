@@ -28,6 +28,9 @@ from freecad_mcp.mcp.sketch_external_geometry_tools import (
     register_sketch_external_geometry_tools,
 )
 from freecad_mcp.mcp.sketch_geometry_tools import register_add_sketch_geometry_tool
+from freecad_mcp.mcp.sketch_geometry_transform_tools import (
+    register_sketch_geometry_transform_tools,
+)
 from freecad_mcp.mcp.sketch_polygon_tools import register_sketch_polygon_tools
 from freecad_mcp.mcp.sketch_rectangle_tools import register_create_sketch_rectangle_tool
 from freecad_mcp.mcp.sketch_reference_constraint_tools import (
@@ -90,6 +93,14 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             " Use trim_sketch_geometry, split_sketch_geometry, and extend_sketch_geometry only "
             "for their documented evidence-bounded internal line-segment cases; inspect complete "
             "returned mappings and correct an unwanted success through its exact history name."
+            " Use the six dedicated sketch geometry transform tools for independent copies only: "
+            "mirror, translate, rotate, uniform scale, rectangular array, or polar array. They "
+            "support unconstrained internal line segments, points, circles, and bounded circular "
+            "arcs, preserve construction state, refuse selected constraints and unproven "
+            "dependencies, and never move or replace originals. Mirror references are limited "
+            "to the sketch axes, origin, an unselected construction line, or an unselected "
+            "internal point. Inspect complete mappings and instance provenance; do not infer "
+            "persistent identity from current sketch indices."
         ),
         host=config.host,
         port=config.port,
@@ -118,5 +129,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_reference_constraint_tool(server, handlers)
     register_sketch_constraint_expression_tools(server, handlers)
     register_sketch_topology_editing_tools(server, handlers)
+    register_sketch_geometry_transform_tools(server, handlers)
 
     return server

@@ -63,6 +63,12 @@ def test_controlled_transaction_names_are_stable_agent_readable_labels() -> None
         "Trim sketch geometry",
         "Split sketch geometry",
         "Extend sketch geometry",
+        "Mirror sketch geometry",
+        "Translate sketch geometry",
+        "Rotate sketch geometry",
+        "Scale sketch geometry",
+        "Rectangular array sketch geometry",
+        "Polar array sketch geometry",
     )
 
 

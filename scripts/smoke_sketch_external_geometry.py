@@ -815,7 +815,7 @@ def main() -> None:
     )
     _record(
         "tool_inventory",
-        len(REGISTERED_TOOL_NAMES) == 42
+        len(REGISTERED_TOOL_NAMES) == 48
         and REGISTERED_TOOL_NAMES[:24] == expected_first_twenty_four
         and REGISTERED_TOOL_NAMES[24:28]
         == (

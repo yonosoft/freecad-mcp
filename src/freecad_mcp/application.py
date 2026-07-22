@@ -519,6 +519,110 @@ class Application:
             target_point=target_point,
         )
 
+    def mirror_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object,
+        reference: object,
+    ) -> CommandResult:
+        """Copy selected geometry reflected across one controlled sketch reference."""
+        return self.documents.mirror_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+            reference=reference,
+        )
+
+    def translate_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object,
+        displacement: object,
+    ) -> CommandResult:
+        """Copy selected geometry by one controlled displacement."""
+        return self.documents.translate_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+            displacement=displacement,
+        )
+
+    def rotate_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object,
+        center: object,
+        angle_degrees: object,
+    ) -> CommandResult:
+        """Copy selected geometry through one controlled planar rotation."""
+        return self.documents.rotate_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+            center=center,
+            angle_degrees=angle_degrees,
+        )
+
+    def scale_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object,
+        center: object,
+        factor: object,
+    ) -> CommandResult:
+        """Copy selected geometry with one controlled uniform scale."""
+        return self.documents.scale_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+            center=center,
+            factor=factor,
+        )
+
+    def rectangular_array_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object,
+        rows: object,
+        columns: object,
+        row_displacement: object,
+        column_displacement: object,
+    ) -> CommandResult:
+        """Copy selected geometry into one bounded rectangular array."""
+        return self.documents.rectangular_array_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+            rows=rows,
+            columns=columns,
+            row_displacement=row_displacement,
+            column_displacement=column_displacement,
+        )
+
+    def polar_array_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_indices: object,
+        center: object,
+        instance_count: object,
+        step_angle_degrees: object,
+    ) -> CommandResult:
+        """Copy selected geometry into one bounded polar array."""
+        return self.documents.polar_array_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_indices=geometry_indices,
+            center=center,
+            instance_count=instance_count,
+            step_angle_degrees=step_angle_degrees,
+        )
+
     def set_sketch_constraint_expression(
         self,
         document_name: object,

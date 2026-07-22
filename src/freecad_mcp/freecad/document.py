@@ -16,6 +16,7 @@ from freecad_mcp.freecad import (
     sketch_editing,
     sketch_external_geometry,
     sketch_geometry_creation,
+    sketch_geometry_transforms,
     sketch_inspection,
     sketch_polygon_creation,
     sketch_rectangle_creation,
@@ -86,9 +87,11 @@ from freecad_mcp.models import (
     SketchGeometryConstructionResult,
     SketchGeometryInput,
     SketchGeometryRemovalResult,
+    SketchGeometryTransformResult,
     SketchGeometryUpdateInput,
     SketchGeometryUpdateResult,
     SketchInspectionResult,
+    SketchMirrorReferenceInput,
     SketchOpenVerticesResult,
     SketchPoint2DInput,
     SketchPolygonCreationResult,
@@ -434,6 +437,90 @@ class FreeCADDocumentAdapter:
             geometry_index,
             endpoint,
             target_point,
+        )
+
+    def mirror_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        reference: SketchMirrorReferenceInput,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.mirror_sketch_geometry(
+            document_name, sketch_name, geometry_indices, reference
+        )
+
+    def translate_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        displacement: SketchPoint2DInput,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.translate_sketch_geometry(
+            document_name, sketch_name, geometry_indices, displacement
+        )
+
+    def rotate_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        center: SketchPoint2DInput,
+        angle_degrees: float,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.rotate_sketch_geometry(
+            document_name, sketch_name, geometry_indices, center, angle_degrees
+        )
+
+    def scale_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        center: SketchPoint2DInput,
+        factor: float,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.scale_sketch_geometry(
+            document_name, sketch_name, geometry_indices, center, factor
+        )
+
+    def rectangular_array_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        rows: int,
+        columns: int,
+        row_displacement: SketchPoint2DInput,
+        column_displacement: SketchPoint2DInput,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.rectangular_array_sketch_geometry(
+            document_name,
+            sketch_name,
+            geometry_indices,
+            rows,
+            columns,
+            row_displacement,
+            column_displacement,
+        )
+
+    def polar_array_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        center: SketchPoint2DInput,
+        instance_count: int,
+        step_angle_degrees: float,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.polar_array_sketch_geometry(
+            document_name,
+            sketch_name,
+            geometry_indices,
+            center,
+            instance_count,
+            step_angle_degrees,
         )
 
     def set_sketch_constraint_name(

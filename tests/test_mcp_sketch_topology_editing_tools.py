@@ -31,9 +31,9 @@ def _server() -> Any:
 def test_milestone_23_appends_exact_tools_forty_through_forty_two() -> None:
     names = [item.name for item in asyncio.run(_server().list_tools())]
 
-    assert len(names) == 42
+    assert len(names) == 48
     assert tuple(names) == REGISTERED_TOOL_NAMES
-    assert names[39:] == [
+    assert names[39:42] == [
         TRIM_SKETCH_GEOMETRY_TOOL,
         SPLIT_SKETCH_GEOMETRY_TOOL,
         EXTEND_SKETCH_GEOMETRY_TOOL,

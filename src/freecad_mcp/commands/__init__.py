@@ -46,6 +46,14 @@ from freecad_mcp.commands.sketch_external_geometry import (
     RemoveExternalGeometryHandler,
 )
 from freecad_mcp.commands.sketch_geometry import AddSketchGeometryHandler
+from freecad_mcp.commands.sketch_geometry_transforms import (
+    MirrorSketchGeometryHandler,
+    PolarArraySketchGeometryHandler,
+    RectangularArraySketchGeometryHandler,
+    RotateSketchGeometryHandler,
+    ScaleSketchGeometryHandler,
+    TranslateSketchGeometryHandler,
+)
 from freecad_mcp.commands.sketch_polygon import (
     CreateSketchEquilateralTriangleHandler,
     CreateSketchRegularPolygonHandler,
@@ -108,6 +116,12 @@ class DocumentHandlers:
     trim_sketch_geometry: TrimSketchGeometryHandler
     split_sketch_geometry: SplitSketchGeometryHandler
     extend_sketch_geometry: ExtendSketchGeometryHandler
+    mirror_sketch_geometry: MirrorSketchGeometryHandler
+    translate_sketch_geometry: TranslateSketchGeometryHandler
+    rotate_sketch_geometry: RotateSketchGeometryHandler
+    scale_sketch_geometry: ScaleSketchGeometryHandler
+    rectangular_array_sketch_geometry: RectangularArraySketchGeometryHandler
+    polar_array_sketch_geometry: PolarArraySketchGeometryHandler
     add_sketch_reference_constraints: AddSketchReferenceConstraintsHandler
     set_sketch_constraint_name: SetSketchConstraintNameHandler
     set_sketch_constraint_expression: SetSketchConstraintExpressionHandler
@@ -144,17 +158,23 @@ __all__ = [
     "ListObjectsHandler",
     "ListSketchConstraintExpressionsHandler",
     "ListSketchOpenVerticesHandler",
+    "MirrorSketchGeometryHandler",
+    "PolarArraySketchGeometryHandler",
     "RecomputeDocumentHandler",
+    "RectangularArraySketchGeometryHandler",
     "RedoDocumentHandler",
     "RemoveExternalGeometryHandler",
     "RemoveSketchConstraintsHandler",
     "RemoveSketchGeometryHandler",
     "ReplaceSketchConstraintHandler",
+    "RotateSketchGeometryHandler",
     "SaveDocumentHandler",
+    "ScaleSketchGeometryHandler",
     "SetSketchConstraintExpressionHandler",
     "SetSketchConstraintNameHandler",
     "SetSketchGeometryConstructionHandler",
     "SplitSketchGeometryHandler",
+    "TranslateSketchGeometryHandler",
     "TrimSketchGeometryHandler",
     "UndoDocumentHandler",
     "UpdateSketchConstraintValueHandler",

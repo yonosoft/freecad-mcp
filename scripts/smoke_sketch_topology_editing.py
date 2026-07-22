@@ -723,9 +723,9 @@ def _persistence_case() -> None:
 
 def main() -> None:
     _check(tuple(App.Version()[:3]) == ("1", "1", "1"), "FreeCAD version")
-    _check(len(REGISTERED_TOOL_NAMES) == 42, "exact tool count")
+    _check(len(REGISTERED_TOOL_NAMES) == 48, "exact tool count")
     _check(
-        REGISTERED_TOOL_NAMES[39:]
+        REGISTERED_TOOL_NAMES[39:42]
         == ("trim_sketch_geometry", "split_sketch_geometry", "extend_sketch_geometry"),
         "Milestone 23 registry order",
     )

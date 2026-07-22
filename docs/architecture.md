@@ -2173,6 +2173,101 @@ The permanent capability matrix is
 `scripts/probe_sketch_topology_editing.py`, and the real-adapter campaign is
 `scripts/smoke_sketch_topology_editing.py`.
 
+## Sketch Geometry-Transform Boundary
+
+Milestone 24 appends six explicit tools at positions 43–48 without changing the
+first 42:
+
+```text
+mcp/sketch_geometry_transform_tools.py
+-> commands/sketch_geometry_transforms.py
+-> SketchGeometryTransformAdapter protocol
+-> FreeCADDocumentAdapter
+-> freecad/sketch_geometry_transforms.py
+-> existing removal snapshot + dependency + topology transaction services
+-> native addGeometry of controlled affine reconstructions
+-> complete semantic readback and mapping verification
+-> SketchGeometryTransformResult
+```
+
+The transport retains separate closed schemas for mirror, translation,
+rotation, uniform scale, rectangular array, and polar array. It does not expose
+a generic matrix, a mode Boolean, or a FreeCAD method selector. Pure validation
+canonicalizes a non-empty unique selection, enforces finite coordinates and
+angles, discriminates mirror references, and caps selections and arrays before
+dispatch. Handlers own controlled error translation; only the adapter imports
+FreeCAD and owns geometry construction, recompute, verification, recovery, and
+result mappings.
+
+### Evidence-bounded copy engine
+
+FreeCAD 1.1 discovery found native `addCopy`, `addMove`, and
+`addRectangularArray`, but their constraint/name semantics, mixed-family move
+reversibility, and missing complete mapping output could not satisfy this
+project's contract. Mirror, rotate, scale, and polar array also lack matching
+SketchObject native methods. Production therefore freezes all six operations as
+copy-only and reconstructs line segments, points, circles, and bounded circular
+arcs through one affine engine. Originals keep exact current indices and state;
+created items append in selected/instance order.
+
+The affine model carries the 2x2 matrix, translation, radius scale, orientation
+relationship, instance index, and controlled provenance. Reflections reverse a
+bounded arc's endpoint order before reconstructing the native counter-clockwise
+parameter interval. Positive uniform scale multiplies radii; translation and
+rotation preserve them. Every expected public entity is computed before the
+transaction, but native objects are constructed only inside the adapter.
+
+Mirror planning supports the built-in horizontal and vertical axes, origin,
+one unselected internal construction line, or one unselected internal point.
+Arrays are source-inclusive: rectangular copies are row-major then canonical
+source order; polar copies are ascending instance then source order. Duplicate
+placements are detected before mutation. The fixed public limits are 50 source
+items, 20 positions per rectangular axis, 100 instances, and 500 created items.
+
+### Preservation and complete mappings
+
+The engine deliberately copies no constraints. Native discovery showed that
+blind copying can duplicate names, omit expression semantics, or substitute
+`Equal` for a dimensional relationship. Preflight therefore refuses every
+selected source referenced by any constraint, with expression-bound, named,
+and ordinary dependency reason precedence. Unrelated constraints are preserved
+as exact identity mappings. Broken/cross-document relationships and downstream
+consumers refuse; existing external mappings remain read-only and exact.
+
+After recompute, verification asserts the expected geometry count, exact
+constraint count and native tuples, original geometry and construction state,
+every created geometry and assigned index, solver health, expressions, external
+mappings, sketch context, document identity, dependencies, GUI observations,
+saved/modified state, and all target/non-target histories. The public result
+contains an original-order mapping for every pre-call geometry and constraint,
+ordered created/copied records, empty modified/replaced/removed and generated-
+constraint collections, construction facts, instance provenance, profile
+impact, solver state, and complete sketch/document readback. Current indices
+remain local ordering, never persistent or native identity.
+
+### Transactions and recovery
+
+Owned operations reuse the Milestone 19 snapshot and Milestone 23 transaction
+architecture. A non-active target is activated before its named transaction,
+the previous active document is restored before final verification, and commit
+occurs only after the complete result is proven. Successful history accepts
+ordinary one-step growth or the native capacity-20 shape that evicts only the
+oldest entry. Rectangular 1x1 returns a no-op without opening a transaction;
+ambiguous overlaps and invalid operations refuse before mutation.
+
+An owned partial failure aborts before commit and passes exact rollback
+verification on the same sketch object. In a caller-owned transaction, the
+adapter neither changes active-document ownership nor opens, commits, aborts,
+undoes, or closes the transaction; it removes only its partial work, recomputes,
+and verifies the caller's complete prior in-transaction state. No path saves.
+
+The frozen public matrix, request rules, error taxonomy, transaction labels,
+and response shape are in
+`docs/sketch-geometry-transform-capabilities.md`. Isolated evidence is in
+`scripts/probe_sketch_geometry_transforms.py`; the permanent production-adapter
+campaign is `scripts/smoke_sketch_geometry_transforms.py`. Whole-sketch and
+cross-sketch transforms remain deferred to Milestone 28.
+
 ## Test Ownership
 
 The pure-Python suite mirrors the production responsibilities rather than

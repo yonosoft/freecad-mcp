@@ -679,7 +679,7 @@ def _persistence_and_isolation_cases() -> None:
 
 def main() -> None:
     _record("freecad_1_1_1", tuple(App.Version()[:3]) == ("1", "1", "1"))
-    _record("exact_42_tool_inventory", len(REGISTERED_TOOL_NAMES) == 42)
+    _record("exact_48_tool_inventory", len(REGISTERED_TOOL_NAMES) == 48)
     _record(
         "milestone_20_tool_order",
         REGISTERED_TOOL_NAMES[31:34]

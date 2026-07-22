@@ -23,7 +23,7 @@ def _server() -> Any:
 def test_reference_constraint_tool_is_exactly_tool_thirty_five() -> None:
     names = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert len(names) == 42
+    assert len(names) == 48
     assert tuple(names) == REGISTERED_TOOL_NAMES
     assert names[:34] == list(REGISTERED_TOOL_NAMES[:34])
     assert names[34] == ADD_SKETCH_REFERENCE_CONSTRAINTS_TOOL

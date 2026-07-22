@@ -69,6 +69,12 @@ def test_rectangle_is_exactly_tool_sixteen_and_preserves_first_fifteen() -> None
         "trim_sketch_geometry",
         "split_sketch_geometry",
         "extend_sketch_geometry",
+        "mirror_sketch_geometry",
+        "translate_sketch_geometry",
+        "rotate_sketch_geometry",
+        "scale_sketch_geometry",
+        "rectangular_array_sketch_geometry",
+        "polar_array_sketch_geometry",
     ]
     assert tuple(actual) == REGISTERED_TOOL_NAMES
 

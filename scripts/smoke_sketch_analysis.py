@@ -561,8 +561,8 @@ def main() -> None:
     _ownership_external_and_preservation_cases()
 
     _record(
-        "exact_42_tool_inventory",
-        len(REGISTERED_TOOL_NAMES) == 42
+        "exact_48_tool_inventory",
+        len(REGISTERED_TOOL_NAMES) == 48
         and REGISTERED_TOOL_NAMES[24:28]
         == (
             "add_external_geometry",

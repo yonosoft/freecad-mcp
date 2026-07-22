@@ -2237,3 +2237,104 @@ and `git status --short --branch`. The public-only campaign is prepared but must
 not be run during implementation:
 `docs/codex-milestone-23-acceptance.md`. Local success does not authorize a
 restart, public acceptance, commit, push, or milestone closure.
+
+## Milestone 24 Geometry-Transform Verification
+
+Tools 43–48 add bounded copy-only mirror, translation, rotation, uniform scale,
+rectangular-array, and polar-array operations. Use the exact FreeCAD embedded
+runtime for discovery and all native verification:
+
+```powershell
+$FreeCADPython = "C:\Program Files\FreeCAD 1.1\bin\python.exe"
+& $FreeCADPython --version
+& $FreeCADPython -c "import FreeCAD; print(FreeCAD.Version())"
+```
+
+Run the isolated discovery coordinator independently of production:
+
+```powershell
+& $FreeCADPython ".\scripts\probe_sketch_geometry_transforms.py"
+```
+
+The probe records native `addCopy`, `addMove`, and `addRectangularArray`
+signatures and semantic state for supported families, construction geometry,
+constraints/names, manual affine copies and moves, rollback injection,
+undo/redo, capacity 20, caller-owned transactions, non-active targets,
+cross-document history, and save/reload. It intentionally imports no production
+module or public handler. Native evidence freezes production as copy-only; do
+not broaden move or constraint-copy semantics from API availability alone.
+
+Develop with focused pure-Python checks:
+
+```powershell
+& $FreeCADPython -m pytest -q `
+  tests\test_freecad_sketch_geometry_transforms.py `
+  tests\test_sketch_geometry_transform_commands.py `
+  tests\test_mcp_sketch_geometry_transform_tools.py `
+  tests\test_application.py `
+  tests\test_runtime.py `
+  tests\test_mcp_server.py `
+  tests\test_freecad_sketch_removal.py `
+  tests\test_freecad_sketch_dependencies.py `
+  tests\test_freecad_sketch_constraint_expressions.py `
+  tests\test_freecad_sketch_topology_editing.py
+
+& $FreeCADPython -m ruff check `
+  src\freecad_mcp\commands\sketch_geometry_transforms.py `
+  src\freecad_mcp\freecad\sketch_geometry_transforms.py `
+  src\freecad_mcp\mcp\sketch_geometry_transform_tools.py `
+  scripts\probe_sketch_geometry_transforms.py `
+  scripts\smoke_sketch_geometry_transforms.py `
+  tests\test_freecad_sketch_geometry_transforms.py `
+  tests\test_sketch_geometry_transform_commands.py `
+  tests\test_mcp_sketch_geometry_transform_tools.py
+
+& $FreeCADPython -m mypy --strict `
+  src\freecad_mcp\commands\sketch_geometry_transforms.py `
+  src\freecad_mcp\freecad\sketch_geometry_transforms.py `
+  src\freecad_mcp\mcp\sketch_geometry_transform_tools.py `
+  src\freecad_mcp\application.py `
+  src\freecad_mcp\freecad\document.py `
+  src\freecad_mcp\models.py `
+  src\freecad_mcp\protocols.py `
+  src\freecad_mcp\runtime.py `
+  src\freecad_mcp\validation.py
+```
+
+The authoritative real-adapter campaign is:
+
+```powershell
+& $FreeCADPython ".\scripts\smoke_sketch_geometry_transforms.py"
+```
+
+It covers all supported source families, all five mirror reference kinds,
+construction preservation, translation, rotation, positive scaling, both array
+orderings, complete geometry/constraint mappings and instance provenance,
+strict no-op/refusal policy, named/expression/dependency preservation and
+refusal, read-only external mappings, undo/redo, exact owned and caller-owned
+rollback, same-object recovery, capacity-20 behavior, non-active target and
+cross-document isolation, no automatic save, and explicit save/reload.
+
+After focused stabilization, run the complete quality gate once:
+
+```powershell
+.\scripts\test.ps1 -PythonExe $FreeCADPython
+```
+
+Then run the permanent Milestone 24 smoke and only the shared-boundary native
+neighbors:
+
+```powershell
+& $FreeCADPython ".\scripts\smoke_sketch_geometry_transforms.py"
+& $FreeCADPython ".\scripts\smoke_document_history.py"
+& $FreeCADPython ".\scripts\smoke_sketch_constraint_expressions.py"
+& $FreeCADPython ".\scripts\smoke_sketch_topology_editing.py"
+& $FreeCADPython ".\scripts\smoke_sketch_external_geometry.py"
+```
+
+Finish with `git diff --check`, a complete architecture/mapping/transaction/
+error-leakage review, and `git status --short --branch`. Public-only acceptance
+is prepared in `docs/codex-milestone-24-acceptance.md` but must run only after a
+human-controlled FreeCAD and MCP server restart. Local verification does not
+authorize a restart, edits to `freecad-test`, acceptance execution, commit,
+push, or milestone closure.

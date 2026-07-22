@@ -248,6 +248,33 @@ local MCP server inside FreeCAD.
   or `Create sketch rounded rectangle` history step. Correct a wrong success by
   exact-name undo in the same sketch; failed atomic curved-profile calls own
   their rollback and must not be followed by undo.
+- Use `mirror_sketch_geometry`, `translate_sketch_geometry`,
+  `rotate_sketch_geometry`, `scale_sketch_geometry`,
+  `rectangular_array_sketch_geometry`, and `polar_array_sketch_geometry` only
+  for independent copies of unconstrained internal line segments, points,
+  circles, and bounded circular arcs. They never move, replace, or remove an
+  original and never copy constraints. Preserve canonical selection and
+  instance ordering, construction state, complete original/copy and identity
+  constraint mappings, and source/instance provenance.
+- Mirror references are limited to the sketch horizontal/vertical axes,
+  origin, an unselected internal construction line, or an unselected internal
+  point. External geometry is read-only and is neither a transform operand nor
+  a mirror reference. Refuse invariant/overlapping copies, selected references,
+  dependent/named/expression-bound sources, broken or cross-document
+  references, and downstream consumers rather than approximating intent.
+- Transform limits are permanent public safety boundaries: at most 50 selected
+  items, at most 100 array instances, at most 500 generated items, and at most
+  20 rows or columns. Rectangular arrays are source-inclusive and row-major;
+  polar arrays are source-inclusive and ascending-instance. A rectangular 1x1
+  request is the only transform no-op. Angles are signed degrees; scaling is
+  positive, uniform, and at least `1e-6`.
+- Owned transform success uses exactly one operation-specific history label;
+  caller-owned transactions remain open. Failed or refused transforms must
+  preserve exact target/non-target state and histories, including capacity 20,
+  and no transform saves automatically. Move modes, copied constraints,
+  whole-sketch/cross-sketch transforms, destination-sketch creation, and merge
+  belong outside the Milestone 24 contract; whole-sketch work remains deferred
+  to Milestone 28.
 
 ## Python Standards
 

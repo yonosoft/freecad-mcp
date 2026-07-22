@@ -14,7 +14,7 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- forty-two typed MCP tools for document creation, inspection, saving,
+- forty-eight typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
@@ -23,7 +23,8 @@ Current capabilities include:
   polygons, straight slots, axis-aligned rounded rectangles, controlled
   external geometry, read-only sketch dependency inspection, controlled sketch
   removal/construction state, precise sketch geometry/constraint editing, and
-  evidence-bounded line-segment trim, split, and extend;
+  evidence-bounded line-segment trim, split, and extend, plus bounded copy-only
+  mirror, translation, rotation, uniform scaling, and array transforms;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -153,6 +154,12 @@ list_sketch_constraint_expressions
 trim_sketch_geometry
 split_sketch_geometry
 extend_sketch_geometry
+mirror_sketch_geometry
+translate_sketch_geometry
+rotate_sketch_geometry
+scale_sketch_geometry
+rectangular_array_sketch_geometry
+polar_array_sketch_geometry
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -1416,6 +1423,77 @@ Caller-owned transactions remain open, failures roll back exactly, the native
 See [the tested topology-editing capability contract](docs/sketch-topology-editing-capabilities.md)
 and [the prepared public MCP acceptance campaign](docs/codex-milestone-23-acceptance.md).
 
+### Copy-only sketch geometry transforms
+
+Tools 43–48 are `mirror_sketch_geometry`, `translate_sketch_geometry`,
+`rotate_sketch_geometry`, `scale_sketch_geometry`,
+`rectangular_array_sketch_geometry`, and `polar_array_sketch_geometry`. They
+append independent copies of a canonical, unique selection of at most 50
+current internal geometry indices. Supported sources are line segments,
+points, circles, and bounded circular arcs, including construction geometry.
+Originals are never moved, replaced, removed, or redirected.
+
+Mirror references are a discriminated union: `horizontal_axis`,
+`vertical_axis`, `origin`, an unselected internal `construction_line`, or an
+unselected `internal_point`. Translation accepts one finite, non-zero
+sketch-local displacement. Rotation accepts a finite centre and signed degrees.
+Scaling is uniform about a finite centre with a positive factor of at least
+`1e-6`. Zero/full-turn rotation, zero translation, factor one, invariant
+mirror/rotation/scale/polar results, selected references, and other ambiguous
+overlapping copies are refused.
+
+Rectangular arrays are source-inclusive, use explicit row and column
+displacements, allow 1–20 positions per axis, at most 100 total instances, and
+at most 500 generated geometry items. Copies are appended by row-major instance
+then canonical source order. A 1×1 request is the sole transaction-free no-op.
+Polar arrays are source-inclusive, accept 2–100 instances and a signed step in
+degrees, use ascending instance then canonical source order, and have the same
+500-item generation limit. Duplicate offsets or angles, including a generated
+full-turn duplicate, are refused.
+
+```json
+{
+  "document_name": "Bracket",
+  "sketch_name": "Sketch",
+  "geometry_indices": [3, 1],
+  "reference": {"kind": "construction_line", "geometry_index": 5}
+}
+```
+
+```json
+{
+  "document_name": "Bracket",
+  "sketch_name": "Sketch",
+  "geometry_indices": [0, 1],
+  "rows": 2,
+  "columns": 3,
+  "row_displacement": {"x": 0.0, "y": 12.0},
+  "column_displacement": {"x": 18.0, "y": 0.0}
+}
+```
+
+Success returns complete original-order geometry and constraint mappings,
+ordered created/copy records, transform-instance provenance, construction
+preservation, solver and profile readback, document state, and the exact
+transaction label. A copy is refused when any selected source has a dependent
+constraint; expression-bound and named constraints receive specific reasons.
+Unrelated constraints, names, expressions, construction flags, external
+mappings, and dependencies remain exact. Broken, cross-document, and downstream
+consumer relationships are refused. External geometry is read-only and is
+neither a selectable operand nor a mirror reference.
+
+Each successful owned request produces one exact named history step. At the
+native 20-entry capacity it may evict only the oldest step. Caller-owned
+transactions remain open and are never committed, aborted, or undone by the
+tool. Refusals and the 1×1 no-op create no history. Failures restore exact state,
+and no transform saves automatically. Move modes, copied constraints,
+non-uniform or negative scaling, external mirror references, whole-sketch and
+cross-sketch operations, destination-sketch creation, and merging are not in
+this contract. Whole-sketch operations remain deferred to Milestone 28.
+
+See [the tested transform capability contract](docs/sketch-geometry-transform-capabilities.md)
+and [the prepared public MCP acceptance campaign](docs/codex-milestone-24-acceptance.md).
+
 ## Documentation
 
 - [Architecture](docs/architecture.md)
@@ -1423,10 +1501,12 @@ and [the prepared public MCP acceptance campaign](docs/codex-milestone-23-accept
 - [Sketch reference-constraint capabilities](docs/sketch-reference-constraint-capabilities.md)
 - [Sketch constraint-expression capabilities](docs/sketch-constraint-expression-capabilities.md)
 - [Sketch topology-editing capabilities](docs/sketch-topology-editing-capabilities.md)
+- [Sketch geometry-transform capabilities](docs/sketch-geometry-transform-capabilities.md)
 - [Milestone 21 autonomous acceptance](docs/codex-milestone-21-acceptance.md)
 - [Milestone 21 stabilization acceptance](docs/codex-milestone-21-stabilization-acceptance.md)
 - [Milestone 22 autonomous acceptance](docs/codex-milestone-22-acceptance.md)
 - [Milestone 23 autonomous acceptance](docs/codex-milestone-23-acceptance.md)
+- [Milestone 24 autonomous acceptance](docs/codex-milestone-24-acceptance.md)
 
 ## License
 

@@ -33,17 +33,23 @@ from freecad_mcp.commands import (
     ListObjectsHandler,
     ListSketchConstraintExpressionsHandler,
     ListSketchOpenVerticesHandler,
+    MirrorSketchGeometryHandler,
+    PolarArraySketchGeometryHandler,
     RecomputeDocumentHandler,
+    RectangularArraySketchGeometryHandler,
     RedoDocumentHandler,
     RemoveExternalGeometryHandler,
     RemoveSketchConstraintsHandler,
     RemoveSketchGeometryHandler,
     ReplaceSketchConstraintHandler,
+    RotateSketchGeometryHandler,
     SaveDocumentHandler,
+    ScaleSketchGeometryHandler,
     SetSketchConstraintExpressionHandler,
     SetSketchConstraintNameHandler,
     SetSketchGeometryConstructionHandler,
     SplitSketchGeometryHandler,
+    TranslateSketchGeometryHandler,
     TrimSketchGeometryHandler,
     UndoDocumentHandler,
     UpdateSketchConstraintValueHandler,
@@ -82,6 +88,7 @@ from freecad_mcp.models import (
     SketchGeometryInput,
     SketchGeometryUpdateInput,
     SketchInspectionResult,
+    SketchMirrorReferenceInput,
     SketchOpenVerticesResult,
     SketchPoint2DInput,
     SketchPolygonCircumcircleReference,
@@ -167,6 +174,7 @@ class AdapterStub:
         self.extend_sketch_geometry_calls: list[
             tuple[str, str, int, SketchTopologyEndpoint, SketchPoint2DInput]
         ] = []
+        self.sketch_geometry_transform_calls: list[tuple[str, tuple[object, ...]]] = []
         self.set_sketch_constraint_name_calls: list[tuple[str, str, int, str | None]] = []
         self.set_sketch_constraint_expression_calls: list[tuple[str, str, int, str]] = []
         self.clear_sketch_constraint_expression_calls: list[tuple[str, str, int]] = []
@@ -631,6 +639,101 @@ class AdapterStub:
             }
         )
 
+    def mirror_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        reference: SketchMirrorReferenceInput,
+    ) -> Any:
+        return self._transform("mirror", document_name, sketch_name, geometry_indices, reference)
+
+    def translate_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        displacement: SketchPoint2DInput,
+    ) -> Any:
+        return self._transform(
+            "translate", document_name, sketch_name, geometry_indices, displacement
+        )
+
+    def rotate_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        center: SketchPoint2DInput,
+        angle_degrees: float,
+    ) -> Any:
+        return self._transform(
+            "rotate", document_name, sketch_name, geometry_indices, center, angle_degrees
+        )
+
+    def scale_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        center: SketchPoint2DInput,
+        factor: float,
+    ) -> Any:
+        return self._transform(
+            "scale", document_name, sketch_name, geometry_indices, center, factor
+        )
+
+    def rectangular_array_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        rows: int,
+        columns: int,
+        row_displacement: SketchPoint2DInput,
+        column_displacement: SketchPoint2DInput,
+    ) -> Any:
+        return self._transform(
+            "rectangular_array",
+            document_name,
+            sketch_name,
+            geometry_indices,
+            rows,
+            columns,
+            row_displacement,
+            column_displacement,
+        )
+
+    def polar_array_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_indices: tuple[int, ...],
+        center: SketchPoint2DInput,
+        instance_count: int,
+        step_angle_degrees: float,
+    ) -> Any:
+        return self._transform(
+            "polar_array",
+            document_name,
+            sketch_name,
+            geometry_indices,
+            center,
+            instance_count,
+            step_angle_degrees,
+        )
+
+    def _transform(self, operation: str, *arguments: object) -> Any:
+        self.sketch_geometry_transform_calls.append((operation, arguments))
+        return _SemanticResultStub(
+            {
+                "operation": operation,
+                "mode": "copy",
+                "changed": True,
+                "no_change": False,
+            }
+        )
+
     def set_sketch_constraint_name(
         self,
         document_name: str,
@@ -952,6 +1055,14 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             trim_sketch_geometry=TrimSketchGeometryHandler(actual_adapter, dispatcher),
             split_sketch_geometry=SplitSketchGeometryHandler(actual_adapter, dispatcher),
             extend_sketch_geometry=ExtendSketchGeometryHandler(actual_adapter, dispatcher),
+            mirror_sketch_geometry=MirrorSketchGeometryHandler(actual_adapter, dispatcher),
+            translate_sketch_geometry=TranslateSketchGeometryHandler(actual_adapter, dispatcher),
+            rotate_sketch_geometry=RotateSketchGeometryHandler(actual_adapter, dispatcher),
+            scale_sketch_geometry=ScaleSketchGeometryHandler(actual_adapter, dispatcher),
+            rectangular_array_sketch_geometry=RectangularArraySketchGeometryHandler(
+                actual_adapter, dispatcher
+            ),
+            polar_array_sketch_geometry=PolarArraySketchGeometryHandler(actual_adapter, dispatcher),
             add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
                 actual_adapter,
                 dispatcher,

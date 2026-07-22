@@ -209,7 +209,7 @@ def _parallel(first: tuple[float, float], second: tuple[float, float]) -> bool:
 
 def _inventory_and_internal_parity() -> None:
     _record("freecad_1_1_1", tuple(App.Version()[:3]) == ("1", "1", "1"))
-    _record("exact_42_tool_inventory", len(REGISTERED_TOOL_NAMES) == 42)
+    _record("exact_48_tool_inventory", len(REGISTERED_TOOL_NAMES) == 48)
     _record(
         "unchanged_milestone_20_tail",
         REGISTERED_TOOL_NAMES[31:34]
