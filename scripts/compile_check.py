@@ -1,11 +1,11 @@
 """Quick syntax/import check for Milestone 25 files."""
+
+import py_compile
 import sys
 
 FREECAD_PATH = r"C:\Program Files\FreeCAD 1.1\bin"
 if FREECAD_PATH not in sys.path:
     sys.path.insert(0, FREECAD_PATH)
-
-import py_compile
 
 files = [
     "src/freecad_mcp/models.py",
