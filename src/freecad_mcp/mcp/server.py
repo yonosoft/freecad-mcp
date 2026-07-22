@@ -18,6 +18,9 @@ from freecad_mcp.mcp.sketch_analysis_tools import register_sketch_analysis_tools
 from freecad_mcp.mcp.sketch_centered_rectangle_tools import (
     register_create_sketch_centered_rectangle_tool,
 )
+from freecad_mcp.mcp.sketch_constraint_expression_tools import (
+    register_sketch_constraint_expression_tools,
+)
 from freecad_mcp.mcp.sketch_constraint_tools import register_add_sketch_constraints_tool
 from freecad_mcp.mcp.sketch_curved_profile_tools import register_sketch_curved_profile_tools
 from freecad_mcp.mcp.sketch_editing_tools import register_sketch_editing_tools
@@ -77,6 +80,10 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             "update_sketch_geometry for a complete same-type final geometry state, "
             "replace_sketch_constraint for one controlled relationship replacement, and "
             "update_sketch_constraint_value for an existing driving dimensional value."
+            " Use set_sketch_constraint_name for stable scalar names, "
+            "set_sketch_constraint_expression for the finite validated expression grammar, "
+            "clear_sketch_constraint_expression before returning to direct datum edits, and "
+            "list_sketch_constraint_expressions for controlled binding and dependency readback."
         ),
         host=config.host,
         port=config.port,
@@ -103,5 +110,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_removal_tools(server, handlers)
     register_sketch_editing_tools(server, handlers)
     register_sketch_reference_constraint_tool(server, handlers)
+    register_sketch_constraint_expression_tools(server, handlers)
 
     return server

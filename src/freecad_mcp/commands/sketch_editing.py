@@ -19,6 +19,7 @@ from freecad_mcp.exceptions import (
     SketchTypeMismatchError,
 )
 from freecad_mcp.protocols import Dispatcher, SketchEditingAdapter
+from freecad_mcp.public_dependencies import public_dependency_records
 from freecad_mcp.validation import (
     validate_replace_sketch_constraint_request,
     validate_update_sketch_constraint_value_request,
@@ -65,7 +66,11 @@ class UpdateSketchGeometryHandler:
                     **identifiers,
                     "geometry_index": exc.geometry_index,
                     "reason": exc.reason,
-                    "dependencies": list(exc.dependencies),
+                    "dependencies": public_dependency_records(
+                        exc.dependencies,
+                        document_name=str(document_name),
+                        sketch_name=str(sketch_name),
+                    ),
                 },
             )
         except Exception as exc:
@@ -122,7 +127,11 @@ class ReplaceSketchConstraintHandler:
                     **identifiers,
                     "constraint_index": exc.constraint_index,
                     "reason": exc.reason,
-                    "dependencies": list(exc.dependencies),
+                    "dependencies": public_dependency_records(
+                        exc.dependencies,
+                        document_name=str(document_name),
+                        sketch_name=str(sketch_name),
+                    ),
                 },
             )
         except Exception as exc:
@@ -179,7 +188,11 @@ class UpdateSketchConstraintValueHandler:
                     **identifiers,
                     "constraint_index": exc.constraint_index,
                     "reason": exc.reason,
-                    "dependencies": list(exc.dependencies),
+                    "dependencies": public_dependency_records(
+                        exc.dependencies,
+                        document_name=str(document_name),
+                        sketch_name=str(sketch_name),
+                    ),
                 },
             )
         except Exception as exc:

@@ -162,7 +162,11 @@ local MCP server inside FreeCAD.
 - Use `update_sketch_constraint_value` only for active driving distance,
   distance-x/y, radius, diameter, or angle constraints. Requests are absolute
   millimetre/degree values, not deltas. Never clear expressions or convert a
-  reference constraint. All three editing tools are transaction-free on
+  reference constraint. A source update may change evaluated scalar values only
+  within the complete expression-dependent closure proven before mutation;
+  preserve each binding, dependency, identity, name, order, type, and state,
+  and continue to refuse direct updates of expression-bound targets or any
+  change outside that closure. All three editing tools are transaction-free on
   semantic no-op and use their exact `Update sketch geometry`, `Replace sketch
   constraint`, or `Update sketch constraint value` history name on owned
   success.

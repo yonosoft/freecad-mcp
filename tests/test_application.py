@@ -11,6 +11,7 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     AddSketchReferenceConstraintsHandler,
     AnalyzeSketchHandler,
+    ClearSketchConstraintExpressionHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
@@ -28,6 +29,7 @@ from freecad_mcp.commands import (
     ListDocumentsHandler,
     ListExternalGeometryHandler,
     ListObjectsHandler,
+    ListSketchConstraintExpressionsHandler,
     ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
@@ -36,6 +38,8 @@ from freecad_mcp.commands import (
     RemoveSketchGeometryHandler,
     ReplaceSketchConstraintHandler,
     SaveDocumentHandler,
+    SetSketchConstraintExpressionHandler,
+    SetSketchConstraintNameHandler,
     SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
     UpdateSketchConstraintValueHandler,
@@ -449,6 +453,56 @@ class AdapterStub:
             {"constraint_index": constraint_index, "value": value, "no_change": False}
         )
 
+    def set_sketch_constraint_name(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        name: str | None,
+    ) -> Any:
+        return _SemanticResult(
+            {"constraint_index": constraint_index, "current_name": name, "no_change": False}
+        )
+
+    def set_sketch_constraint_expression(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        expression: str,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "constraint_index": constraint_index,
+                "current_expression": expression,
+                "no_change": False,
+            }
+        )
+
+    def clear_sketch_constraint_expression(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+    ) -> Any:
+        return _SemanticResult(
+            {"constraint_index": constraint_index, "current_expression": None, "no_change": False}
+        )
+
+    def list_sketch_constraint_expressions(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "expression_count": 0,
+                "expressions": [],
+            }
+        )
+
     def create_sketch_rectangle(
         self,
         request: SketchRectangleRequestInput,
@@ -619,6 +673,19 @@ def make_application() -> Application:
             dispatcher,
         ),
         add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
+            adapter,
+            dispatcher,
+        ),
+        set_sketch_constraint_name=SetSketchConstraintNameHandler(adapter, dispatcher),
+        set_sketch_constraint_expression=SetSketchConstraintExpressionHandler(
+            adapter,
+            dispatcher,
+        ),
+        clear_sketch_constraint_expression=ClearSketchConstraintExpressionHandler(
+            adapter,
+            dispatcher,
+        ),
+        list_sketch_constraint_expressions=ListSketchConstraintExpressionsHandler(
             adapter,
             dispatcher,
         ),

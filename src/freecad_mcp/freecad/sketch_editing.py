@@ -15,12 +15,21 @@ from freecad_mcp.exceptions import (
     SketchGeometryUpdateUnsafeError,
     SketchMutationIndexNotFoundError,
 )
-from freecad_mcp.freecad import sketch_removal
+from freecad_mcp.freecad import (
+    sketch_constraint_expressions,
+    sketch_inspection,
+    sketch_rectangle_creation,
+    sketch_removal,
+)
 from freecad_mcp.freecad.sketch_constraint_creation import (
     _build_constraint,
     _constraint_state,
     _construction_state,
+    _geometry_collection,
+    _geometry_signature,
     _one_constraint_state,
+    _restore_constraint_flags,
+    _restore_construction_state,
     _validate_geometry_compatibility,
 )
 from freecad_mcp.freecad.sketch_topology import TOPOLOGY_TOLERANCE
@@ -104,7 +113,7 @@ def update_sketch_constraint_value(
     )
     if dependencies:
         raise SketchConstraintValueUpdateUnsafeError(
-            reason="expression_dependency",
+            reason="expression_bound_constraint",
             constraint_index=constraint_index,
             dependencies=dependencies,
         )
@@ -146,25 +155,86 @@ def update_sketch_constraint_value(
             document=snapshot.base.document_summary,
         )
 
+    try:
+        expression_snapshot = sketch_constraint_expressions.expression_dependency_snapshot(
+            App,
+            Part,
+            document_name,
+            sketch_name,
+            constraint_index,
+        )
+    except Exception as exc:
+        raise SketchConstraintValueUpdateUnsafeError(
+            reason="unverified_expression_prevents_dependency_proof",
+            constraint_index=constraint_index,
+        ) from exc
+    if not expression_snapshot.proven:
+        raise SketchConstraintValueUpdateUnsafeError(
+            reason="unverified_expression_prevents_dependency_proof",
+            constraint_index=constraint_index,
+        )
+
     _require_healthy_solver(snapshot.sketch.solver, operation, phase="preflight")
+    histories = sketch_constraint_expressions._histories(App)
     caller_owned = sketch_removal._pending_transaction(document, operation)
     sketch_removal._require_history(snapshot, caller_owned, operation)
-    owned = sketch_removal._open_transaction(
-        document,
+    previous_active, switched = _activate_value_update_target(
+        App,
+        document_name,
         caller_owned,
-        UPDATE_SKETCH_CONSTRAINT_VALUE_TRANSACTION_NAME,
         operation,
     )
+    try:
+        owned = sketch_removal._open_transaction(
+            document,
+            caller_owned,
+            UPDATE_SKETCH_CONSTRAINT_VALUE_TRANSACTION_NAME,
+            operation,
+        )
+    except Exception:
+        _restore_value_update_active(App, previous_active, switched, operation)
+        raise
     try:
         unit = "deg" if before.type == "angle" else "mm"
         result = sketch.setDatum(constraint_index, App.Units.Quantity(value, unit))
         if result is not None:
             raise _error(operation, "mutation", "unexpected_set_datum_result")
         sketch_removal._recompute(document, operation)
+        try:
+            after_expression_snapshot = (
+                sketch_constraint_expressions.expression_dependency_snapshot(
+                    App,
+                    Part,
+                    document_name,
+                    sketch_name,
+                    constraint_index,
+                )
+            )
+        except Exception as exc:
+            raise _error(
+                operation,
+                "verification",
+                "expression_dependency_state_changed",
+            ) from exc
         inspected, summary = sketch_removal._controlled_readback(
             document_name, sketch_name, operation
         )
-        _verify_value_update(sketch, snapshot, inspected, constraint_index, before.type, value)
+        _verify_value_update(
+            sketch,
+            snapshot,
+            inspected,
+            constraint_index,
+            before.type,
+            value,
+            expression_snapshot.dependent_nodes,
+        )
+        _verify_expression_dependency_update(
+            expression_snapshot,
+            after_expression_snapshot,
+            sketch_name,
+            constraint_index,
+        )
+        switched = _restore_value_update_active(App, previous_active, switched, operation)
         sketch_removal._verify_common(document, sketch, snapshot, Part, App, Gui, operation)
         after = inspected.constraints[constraint_index]
         if not isinstance(after, SketchConstraintData):
@@ -179,6 +249,7 @@ def update_sketch_constraint_value(
             UPDATE_SKETCH_CONSTRAINT_VALUE_TRANSACTION_NAME,
             operation,
         )
+        _verify_other_document_histories(App, histories, document_name, operation)
         return SketchConstraintValueUpdateResult(
             constraint_index=constraint_index,
             constraint_type=before.type,
@@ -193,6 +264,11 @@ def update_sketch_constraint_value(
     except SketchControlledMutationRollbackError:
         raise
     except Exception as exc:
+        failure = exc
+        try:
+            switched = _restore_value_update_active(App, previous_active, switched, operation)
+        except Exception as restore_exc:
+            failure = restore_exc
         sketch_removal._rollback(
             document,
             sketch,
@@ -203,11 +279,25 @@ def update_sketch_constraint_value(
             App,
             Gui,
             operation,
-            exc,
+            failure,
+            restore_related=lambda: _restore_expression_dependency_sketches(
+                document,
+                expression_snapshot,
+                sketch_name,
+            ),
         )
-        if isinstance(exc, SketchControlledMutationError):
-            raise
-        raise _error(operation, "mutation", "freecad_api_failure") from exc
+        _verify_expression_dependency_rollback(
+            document,
+            expression_snapshot,
+            sketch_name,
+            Part,
+            operation,
+        )
+        if isinstance(failure, SketchControlledMutationError):
+            if failure is exc:
+                raise
+            raise failure from exc
+        raise _error(operation, "mutation", "freecad_api_failure") from failure
 
 
 def replace_sketch_constraint(
@@ -230,7 +320,7 @@ def replace_sketch_constraint(
             constraint_index=constraint_index,
         )
     assert isinstance(before, SketchConstraintData)
-    dependencies = sketch_removal._constraint_expression_dependencies(
+    dependencies = sketch_removal._public_constraint_expression_dependencies(
         document,
         sketch,
         snapshot.sketch,
@@ -480,6 +570,51 @@ def update_sketch_geometry(
         raise _error(operation, "mutation", "freecad_api_failure") from exc
 
 
+def _activate_value_update_target(
+    app: Any,
+    document_name: str,
+    caller_owned: bool,
+    operation: _Operation,
+) -> tuple[str | None, bool]:
+    if caller_owned:
+        return None, False
+    try:
+        return sketch_rectangle_creation._activate_target_document(app, document_name)
+    except Exception as exc:
+        raise _error(operation, "transaction", "target_document_activation_failed") from exc
+
+
+def _restore_value_update_active(
+    app: Any,
+    previous_active: str | None,
+    switched: bool,
+    operation: _Operation,
+) -> bool:
+    if not switched:
+        return False
+    try:
+        sketch_rectangle_creation._restore_active_document(app, previous_active)
+    except Exception as exc:
+        raise _error(operation, "transaction", "active_document_restore_failed") from exc
+    return False
+
+
+def _verify_other_document_histories(
+    app: Any,
+    before: tuple[tuple[str, Any], ...],
+    target_document_name: str,
+    operation: _Operation,
+) -> None:
+    expected = tuple(item for item in before if item[0] != target_document_name)
+    actual = tuple(
+        item
+        for item in sketch_constraint_expressions._histories(app)
+        if item[0] != target_document_name
+    )
+    if actual != expected:
+        raise _error(operation, "verification", "non_target_history_changed")
+
+
 def _runtime_modules() -> tuple[Any, Any, Any, Any]:
     import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
@@ -507,13 +642,20 @@ def _value_expression_dependencies(
     snapshot: Any,
     index: int,
 ) -> tuple[dict[str, object], ...]:
-    dependencies = sketch_removal._constraint_expression_dependencies(
-        document,
-        sketch,
-        snapshot.sketch,
-        (index,),
+    """Report only a binding on the edited target, not source dependents."""
+    del document
+    constraint = _constraint_at(snapshot, index)
+    if not isinstance(constraint, SketchConstraintData):
+        return ()
+    if not sketch_constraint_expressions.constraint_is_expression_bound(sketch, constraint):
+        return ()
+    return (
+        {
+            "constraint_index": index,
+            "constraint_name": constraint.name,
+            "dependency_kind": "expression_binding",
+        },
     )
-    return tuple(item for item in dependencies if item.get("constraint_index") == index)
 
 
 def _require_healthy_solver(
@@ -541,6 +683,7 @@ def _verify_value_update(
     index: int,
     constraint_type: str,
     requested: float,
+    dependent_nodes: tuple[tuple[str, int], ...],
 ) -> None:
     if inspected.geometry_count != snapshot.sketch.geometry_count:
         raise _error("update_constraint_value", "verification", "geometry_count_changed")
@@ -557,6 +700,19 @@ def _verify_value_update(
                     "update_constraint_value",
                     "verification",
                     "constraint_identity_changed",
+                )
+        elif (snapshot.sketch.name, position) in dependent_nodes:
+            if before[:7] != after[:7] or before[8:] != after[8:]:
+                raise _error(
+                    "update_constraint_value",
+                    "verification",
+                    "expression_dependency_state_changed",
+                )
+            if not math.isfinite(float(after[7])):
+                raise _error(
+                    "update_constraint_value",
+                    "verification",
+                    "expression_dependent_value_invalid",
                 )
         elif before != after:
             raise _error(
@@ -575,6 +731,156 @@ def _verify_value_update(
     if _construction_state(sketch, inspected.geometry_count) != snapshot.base.construction:
         raise _error("update_constraint_value", "verification", "construction_state_changed")
     _require_healthy_solver(inspected.solver, "update_constraint_value", phase="verification")
+
+
+def _verify_expression_dependency_update(
+    before: sketch_constraint_expressions._ExpressionDependencySnapshot,
+    after: sketch_constraint_expressions._ExpressionDependencySnapshot,
+    source_sketch_name: str,
+    source_constraint_index: int,
+) -> None:
+    if not after.proven or after.dependent_nodes != before.dependent_nodes:
+        raise _error(
+            "update_constraint_value",
+            "verification",
+            "expression_dependency_state_changed",
+        )
+    before_bindings = {binding.node: binding for binding in before.bindings}
+    after_bindings = {binding.node: binding for binding in after.bindings}
+    for node in before.dependent_nodes:
+        previous_binding = before_bindings.get(node)
+        current_binding = after_bindings.get(node)
+        if (
+            previous_binding is None
+            or current_binding is None
+            or not current_binding.supported
+            or not current_binding.valid
+            or previous_binding.parsed is None
+            or current_binding.parsed is None
+            or current_binding.parsed.canonical != previous_binding.parsed.canonical
+            or current_binding.dependencies != previous_binding.dependencies
+        ):
+            raise _error(
+                "update_constraint_value",
+                "verification",
+                "expression_dependency_state_changed",
+            )
+
+    before_inspections = dict(before.inspections)
+    after_inspections = dict(after.inspections)
+    if before_inspections.keys() != after_inspections.keys():
+        raise _error(
+            "update_constraint_value",
+            "verification",
+            "unrelated_constraint_changed",
+        )
+    source_node = (source_sketch_name, source_constraint_index)
+    dependent_nodes = set(before.dependent_nodes)
+    for sketch_name, previous_sketch in before_inspections.items():
+        current_sketch = after_inspections[sketch_name]
+        if current_sketch.constraint_count != previous_sketch.constraint_count:
+            raise _error(
+                "update_constraint_value",
+                "verification",
+                "constraint_count_changed",
+            )
+        for position, (previous, current) in enumerate(
+            zip(previous_sketch.constraints, current_sketch.constraints, strict=True)
+        ):
+            node = (sketch_name, position)
+            if node == source_node or node in dependent_nodes:
+                if not _constraint_value_effect_is_valid(previous, current):
+                    reason = (
+                        "constraint_identity_changed"
+                        if node == source_node
+                        else "expression_dependency_state_changed"
+                    )
+                    raise _error("update_constraint_value", "verification", reason)
+            elif previous != current:
+                raise _error(
+                    "update_constraint_value",
+                    "verification",
+                    "unrelated_constraint_changed",
+                )
+    for sketch_name in sorted({node[0] for node in dependent_nodes}):
+        _require_healthy_solver(
+            after_inspections[sketch_name].solver,
+            "update_constraint_value",
+            phase="verification",
+        )
+
+
+def _constraint_value_effect_is_valid(before: object, after: object) -> bool:
+    if not isinstance(before, SketchConstraintData) or not isinstance(after, SketchConstraintData):
+        return False
+    before_value = before.value
+    after_value = after.value
+    return (
+        before.index == after.index
+        and before.type == after.type
+        and before.name == after.name
+        and before.active is after.active
+        and before.virtual_space is after.virtual_space
+        and before.driving is after.driving
+        and before.references == after.references
+        and before.expression == after.expression
+        and before.expression_supported is after.expression_supported
+        and before_value is not None
+        and after_value is not None
+        and before_value.unit == after_value.unit
+        and math.isfinite(after_value.value)
+    )
+
+
+def _restore_expression_dependency_sketches(
+    document: Any,
+    snapshot: sketch_constraint_expressions._ExpressionDependencySnapshot,
+    source_sketch_name: str,
+) -> None:
+    """Restore non-source dependent sketches during caller-owned inverse rollback."""
+    for native in snapshot.native_sketches:
+        if native.sketch_name == source_sketch_name:
+            continue
+        sketch = document.getObject(native.sketch_name)
+        if sketch is None:
+            raise RuntimeError("dependent sketch disappeared during rollback")
+        sketch.Geometry = list(native.geometry)
+        sketch.Constraints = list(native.constraints)
+        _restore_construction_state(sketch, native.construction)
+        _restore_constraint_flags(sketch, native.constraint_state)
+
+
+def _verify_expression_dependency_rollback(
+    document: Any,
+    snapshot: sketch_constraint_expressions._ExpressionDependencySnapshot,
+    source_sketch_name: str,
+    part: Any,
+    operation: _Operation,
+) -> None:
+    """Verify exact non-source dependent state after owned or inverse rollback."""
+    inspections = dict(snapshot.inspections)
+    try:
+        for native in snapshot.native_sketches:
+            if native.sketch_name == source_sketch_name:
+                continue
+            sketch = document.getObject(native.sketch_name)
+            if sketch is None:
+                raise RuntimeError("dependent sketch missing after rollback")
+            geometry = _geometry_collection(sketch)
+            construction = _construction_state(sketch, len(geometry))
+            if (
+                _geometry_signature(geometry, construction, part) != native.geometry_signature
+                or construction != native.construction
+                or _constraint_state(sketch) != native.constraint_state
+                or sketch_inspection._inspect_solver(sketch)
+                != inspections[native.sketch_name].solver
+            ):
+                raise RuntimeError("dependent sketch rollback mismatch")
+    except Exception as exc:
+        raise SketchControlledMutationRollbackError(
+            operation=operation,
+            reason="rollback_state_mismatch",
+        ) from exc
 
 
 def _verify_replacement(

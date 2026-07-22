@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
@@ -42,6 +43,7 @@ from freecad_mcp.models import (
     UnsupportedSketchConstraint,
     UnsupportedSketchGeometry,
 )
+from freecad_mcp.public_dependencies import public_dependency_records
 from freecad_mcp.transaction_names import (
     REMOVE_SKETCH_CONSTRAINTS_TRANSACTION_NAME,
     REMOVE_SKETCH_GEOMETRY_TRANSACTION_NAME,
@@ -368,13 +370,85 @@ def _validate_constraint_selection(
                 reason="unsupported_constraint",
                 constraint_indices=(index,),
             )
-    dependencies = _constraint_expression_dependencies(document, sketch, snapshot.sketch, indices)
+    dependencies = _public_constraint_expression_dependencies(
+        document, sketch, snapshot.sketch, indices
+    )
     if dependencies:
         raise SketchConstraintRemovalUnsafeError(
             reason="expression_dependency",
             constraint_indices=indices,
             dependencies=dependencies,
         )
+
+
+def _public_constraint_expression_dependencies(
+    document: Any,
+    sketch: Any,
+    inspected: SketchInspectionResult,
+    indices: tuple[int, ...],
+) -> tuple[dict[str, object], ...]:
+    """Preserve broad native preflight while exposing only public target identities."""
+    from freecad_mcp.freecad import sketch_constraint_expressions
+
+    legacy_dependencies = _constraint_expression_dependencies(
+        document,
+        sketch,
+        inspected,
+        indices,
+    )
+    controlled_dependencies = sketch_constraint_expressions.expression_dependents(
+        document,
+        sketch,
+        inspected,
+        indices,
+    )
+    merged = _merge_expression_dependencies(
+        legacy_dependencies,
+        controlled_dependencies,
+    )
+    return tuple(
+        public_dependency_records(
+            merged,
+            document_name=str(document.Name),
+            sketch_name=str(sketch.Name),
+        )
+    )
+
+
+def _merge_expression_dependencies(
+    first: tuple[dict[str, object], ...],
+    second: tuple[dict[str, object], ...],
+) -> tuple[dict[str, object], ...]:
+    result: list[dict[str, object]] = []
+    seen: set[str] = set()
+    legacy = tuple(
+        item
+        for item in first
+        if not any(_legacy_matches_controlled(item, controlled) for controlled in second)
+    )
+    for item in (*legacy, *second):
+        key = repr(sorted(item.items(), key=lambda pair: pair[0]))
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return tuple(result)
+
+
+def _legacy_matches_controlled(
+    legacy: dict[str, object],
+    controlled: dict[str, object],
+) -> bool:
+    """Identify one legacy raw record already represented by a public graph edge."""
+    if legacy.get("constraint_index") != controlled.get("constraint_index"):
+        return False
+    if legacy.get("object_name") != controlled.get("dependent_sketch_name"):
+        return False
+    path = str(legacy.get("property_path", "")).lstrip(".")
+    dependent_index = controlled.get("dependent_constraint_index")
+    dependent_name = controlled.get("dependent_constraint_name")
+    return path == f"Constraints[{dependent_index}]" or (
+        dependent_name is not None and path == f"Constraints.{dependent_name}"
+    )
 
 
 def _validate_geometry_selection(
@@ -485,6 +559,7 @@ def _constraint_expression_dependencies(
                             "object_name": object_name,
                             "property_path": path,
                             "expression": text,
+                            "dependency_kind": "attached" if own_path else "downstream",
                         }
                     )
     return tuple(
@@ -765,10 +840,11 @@ def _verify_success_history(
     before = snapshot.base.history
     if pending or before is None or history is None:
         raise _error(operation, "verification", "history_state_mismatch")
-    if history[1] != before[1] + 1 or history[2] != 0:
-        raise _error(operation, "verification", "history_count_mismatch")
-    if not history[3] or history[3][0] != name:
-        raise _error(operation, "verification", "history_name_mismatch")
+    expected_names = (name, *before[3])
+    grew = history[1] == before[1] + 1 and history[3] == expected_names
+    capped = before[1] > 0 and history[1] == before[1] and history[3] == expected_names[: before[1]]
+    if history[0] != before[0] or not (grew or capped) or history[2] != 0 or history[4] != ():
+        raise _error(operation, "verification", "history_verification_failed")
 
 
 def _rollback(
@@ -782,6 +858,8 @@ def _rollback(
     gui: Any,
     operation: _Operation,
     original_error: Exception,
+    *,
+    restore_related: Callable[[], None] | None = None,
 ) -> None:
     abort_failed = False
     if owned:
@@ -796,6 +874,8 @@ def _rollback(
             sketch.Constraints = list(snapshot.native_constraints)
             _restore_construction_state(sketch, snapshot.base.construction)
             _restore_constraint_flags(sketch, snapshot.base.constraints)
+            if restore_related is not None:
+                restore_related()
             _recompute(document, operation)
         except Exception as exc:
             raise SketchControlledMutationRollbackError(

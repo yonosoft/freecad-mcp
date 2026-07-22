@@ -8,6 +8,11 @@ from collections.abc import Mapping
 
 from pydantic import TypeAdapter, ValidationError
 
+from freecad_mcp.constraint_expression_language import (
+    ConstraintExpressionError,
+    parse_constraint_expression,
+    validate_constraint_identifier,
+)
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.models import (
     MAX_SKETCH_CONSTRAINT_BATCH_SIZE,
@@ -1812,6 +1817,84 @@ def validate_update_sketch_constraint_value_request(
     return index, converted
 
 
+def validate_set_sketch_constraint_name_request(
+    document_name: object,
+    sketch_name: object,
+    constraint_index: object,
+    name: object,
+) -> tuple[int, str | None] | CommandResult:
+    """Validate one exact scalar constraint name assignment or null clear."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(constraint_index, field="constraint_index")
+    if isinstance(index, CommandResult):
+        return index
+    if name is None:
+        return index, None
+    if not isinstance(name, str):
+        return CommandResult.failure(
+            code="validation_error",
+            message="name must be a controlled identifier or null.",
+            data={"field": "name", "actual_type": type(name).__name__},
+        )
+    if not validate_constraint_identifier(name):
+        return CommandResult.failure(
+            code="validation_error",
+            message="name must be a controlled ASCII identifier of at most 64 characters.",
+            data={"field": "name", "reason": "invalid_constraint_name"},
+        )
+    return index, name
+
+
+def validate_set_sketch_constraint_expression_request(
+    document_name: object,
+    sketch_name: object,
+    constraint_index: object,
+    expression: object,
+) -> tuple[int, str] | CommandResult:
+    """Parse and canonicalize one finite public expression before dispatch."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(constraint_index, field="constraint_index")
+    if isinstance(index, CommandResult):
+        return index
+    if not isinstance(expression, str):
+        return CommandResult.failure(
+            code="validation_error",
+            message="expression must be a string in the controlled expression grammar.",
+            data={"field": "expression", "actual_type": type(expression).__name__},
+        )
+    try:
+        parsed = parse_constraint_expression(expression)
+    except ConstraintExpressionError as exc:
+        data: dict[str, object] = {
+            "field": "expression",
+            "reason": exc.reason,
+        }
+        if exc.position is not None:
+            data["position"] = exc.position
+        return CommandResult.failure(
+            code="validation_error",
+            message="expression is outside the controlled expression grammar.",
+            data=data,
+        )
+    return index, parsed.canonical
+
+
+def validate_sketch_constraint_expression_locator(
+    document_name: object,
+    sketch_name: object,
+    constraint_index: object,
+) -> int | CommandResult:
+    """Validate one document/sketch/current-constraint locator."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    return _validate_strict_mutation_index(constraint_index, field="constraint_index")
+
+
 __all__ = [
     "normalize_arc_angles_degrees",
     "validate_add_external_geometry_request",
@@ -1833,7 +1916,10 @@ __all__ = [
     "validate_external_geometry_reference_request",
     "validate_object_reference",
     "validate_replace_sketch_constraint_request",
+    "validate_set_sketch_constraint_expression_request",
+    "validate_set_sketch_constraint_name_request",
     "validate_set_sketch_geometry_construction_request",
+    "validate_sketch_constraint_expression_locator",
     "validate_sketch_mutation_selection_request",
     "validate_sketch_profile_analysis_request",
     "validate_update_sketch_constraint_value_request",

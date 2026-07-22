@@ -119,6 +119,11 @@ def test_mcp_server_composes_explicit_registration_groups(
         "register_sketch_reference_constraint_tool",
         recorder("sketch_reference_constraint_tool"),
     )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_constraint_expression_tools",
+        recorder("sketch_constraint_expression_tools"),
+    )
 
     server = mcp_server_module.build_mcp_server(handlers, ServerConfig())
 
@@ -140,6 +145,7 @@ def test_mcp_server_composes_explicit_registration_groups(
         "sketch_removal_tools",
         "sketch_editing_tools",
         "sketch_reference_constraint_tool",
+        "sketch_constraint_expression_tools",
     ]
     assert asyncio.run(server.list_tools()) == []
 
@@ -193,7 +199,13 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
         "replace_sketch_constraint",
         "update_sketch_constraint_value",
     ]
-    assert actual_tools[34:] == ["add_sketch_reference_constraints"]
+    assert actual_tools[34:] == [
+        "add_sketch_reference_constraints",
+        "set_sketch_constraint_name",
+        "set_sketch_constraint_expression",
+        "clear_sketch_constraint_expression",
+        "list_sketch_constraint_expressions",
+    ]
 
 
 def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:

@@ -561,8 +561,8 @@ def main() -> None:
     _ownership_external_and_preservation_cases()
 
     _record(
-        "exact_35_tool_inventory",
-        len(REGISTERED_TOOL_NAMES) == 35
+        "exact_39_tool_inventory",
+        len(REGISTERED_TOOL_NAMES) == 39
         and REGISTERED_TOOL_NAMES[24:28]
         == (
             "add_external_geometry",
@@ -582,7 +582,14 @@ def main() -> None:
             "replace_sketch_constraint",
             "update_sketch_constraint_value",
         )
-        and REGISTERED_TOOL_NAMES[34:] == ("add_sketch_reference_constraints",),
+        and REGISTERED_TOOL_NAMES[34] == "add_sketch_reference_constraints"
+        and REGISTERED_TOOL_NAMES[35:]
+        == (
+            "set_sketch_constraint_name",
+            "set_sketch_constraint_expression",
+            "clear_sketch_constraint_expression",
+            "list_sketch_constraint_expressions",
+        ),
     )
     _record(
         "first_24_tool_regression",

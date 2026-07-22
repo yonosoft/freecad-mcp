@@ -65,7 +65,7 @@ def _server() -> Any:
 def test_milestone_20_appends_exact_tools_thirty_two_through_thirty_four() -> None:
     names = [item.name for item in asyncio.run(_server().list_tools())]
 
-    assert len(names) == 35
+    assert len(names) == 39
     assert tuple(names) == REGISTERED_TOOL_NAMES
     assert tuple(names[:31]) == _FIRST_31
     assert names[31:34] == [

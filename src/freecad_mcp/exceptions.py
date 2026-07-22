@@ -335,6 +335,33 @@ class SketchConstraintValueUpdateUnsafeError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchConstraintExpressionError(RuntimeError):
+    """Raised for controlled constraint-name or expression refusal/failure."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        reason: str,
+        constraint_index: int | None = None,
+        dependencies: tuple[dict[str, object], ...] = (),
+    ) -> None:
+        self.code = code
+        self.reason = reason
+        self.constraint_index = constraint_index
+        self.dependencies = dependencies
+        super().__init__(reason)
+
+
+class SketchConstraintExpressionRollbackError(RuntimeError):
+    """Raised when a failed name/expression mutation cannot be restored exactly."""
+
+    def __init__(self, *, operation: str, reason: str) -> None:
+        self.operation = operation
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SketchControlledMutationError(RuntimeError):
     """Raised when a controlled sketch mutation cannot be completed or verified."""
 

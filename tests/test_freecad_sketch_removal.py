@@ -12,7 +12,7 @@ from freecad_mcp.exceptions import (
     SketchGeometryRemovalUnsafeError,
     SketchMutationIndexNotFoundError,
 )
-from freecad_mcp.freecad import sketch_removal
+from freecad_mcp.freecad import sketch_constraint_expressions, sketch_removal
 from freecad_mcp.models import (
     DocumentSummary,
     SketchConstraintData,
@@ -137,12 +137,16 @@ class _Sketch:
 
 class _Document:
     def __init__(self, sketch: _Sketch, *, caller_owned: bool = False) -> None:
+        self.Name = "Model"
         self.sketch = sketch
         self.Objects = (sketch,)
         self.HasPendingTransaction = caller_owned
         self.labels: list[str] = []
         self.commits = 0
         self.aborts = 0
+
+    def getObject(self, name: str) -> _Sketch | None:
+        return self.sketch if name == self.sketch.Name else None
 
     def openTransaction(self, name: str) -> None:
         self.labels.append(name)
@@ -352,6 +356,82 @@ def test_constraint_removal_uses_descending_native_order_and_one_transaction(
         (0, 0),
         (2, 1),
     ]
+
+
+def test_controlled_expression_dependency_replaces_only_matching_raw_record() -> None:
+    matching_raw = {
+        "constraint_index": 0,
+        "constraint_name": "Source",
+        "object_name": "TargetSketch",
+        "property_path": ".Constraints.Target",
+        "expression": "SourceSketch.Constraints.Source / 2",
+    }
+    opaque_raw = {
+        "constraint_index": 0,
+        "constraint_name": "Source",
+        "object_name": "OpaqueSketch",
+        "property_path": "Constraints[1]",
+        "expression": "Spreadsheet.Width",
+    }
+    controlled = {
+        "constraint_index": 0,
+        "constraint_name": "Source",
+        "dependent_document_name": "Model",
+        "dependent_sketch_name": "TargetSketch",
+        "dependent_constraint_index": 1,
+        "dependent_constraint_name": "Target",
+        "dependency_kind": "expression_source",
+    }
+
+    assert sketch_removal._merge_expression_dependencies(
+        (matching_raw, opaque_raw),
+        (controlled,),
+    ) == (opaque_raw, controlled)
+
+
+def test_public_expression_dependencies_sanitize_unmatched_legacy_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inspected = _inspection(1, 1)
+    sketch = SimpleNamespace(Name="SourceSketch")
+    document = SimpleNamespace(Name="Model")
+    legacy = {
+        "constraint_index": 0,
+        "constraint_name": None,
+        "object_name": "DependentSketch",
+        "property_path": "Constraints[3]",
+        "expression": "SourceSketch.Constraints[0] / 2",
+        "dependency_kind": "downstream",
+        "native_object": object(),
+    }
+    monkeypatch.setattr(
+        sketch_removal,
+        "_constraint_expression_dependencies",
+        lambda *_args: (legacy,),
+    )
+    monkeypatch.setattr(
+        sketch_constraint_expressions,
+        "expression_dependents",
+        lambda *_args: (),
+    )
+
+    dependencies = sketch_removal._public_constraint_expression_dependencies(
+        document,
+        sketch,
+        inspected,
+        (0,),
+    )
+
+    assert dependencies == (
+        {
+            "constraint_index": 0,
+            "constraint_name": None,
+            "dependent_document_name": "Model",
+            "dependent_sketch_name": "DependentSketch",
+            "dependent_constraint_index": 3,
+            "dependency_kind": "expression_source",
+        },
+    )
 
 
 def test_geometry_removal_refuses_entire_selection_before_transaction(

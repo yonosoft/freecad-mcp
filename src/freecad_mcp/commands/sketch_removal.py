@@ -18,6 +18,7 @@ from freecad_mcp.exceptions import (
     SketchTypeMismatchError,
 )
 from freecad_mcp.protocols import Dispatcher, SketchControlledMutationAdapter
+from freecad_mcp.public_dependencies import public_dependency_records
 from freecad_mcp.validation import (
     validate_set_sketch_geometry_construction_request,
     validate_sketch_mutation_selection_request,
@@ -58,7 +59,11 @@ class RemoveSketchConstraintsHandler:
                     **identifiers,
                     "reason": exc.reason,
                     "constraint_indices": list(exc.constraint_indices),
-                    "dependencies": list(exc.dependencies),
+                    "dependencies": public_dependency_records(
+                        exc.dependencies,
+                        document_name=str(document_name),
+                        sketch_name=str(sketch_name),
+                    ),
                 },
             )
         except Exception as exc:
@@ -111,7 +116,11 @@ class RemoveSketchGeometryHandler:
                 data={
                     **identifiers,
                     "reason": exc.reason,
-                    "geometry_constraint_dependencies": list(exc.dependencies),
+                    "geometry_constraint_dependencies": public_dependency_records(
+                        exc.dependencies,
+                        document_name=str(document_name),
+                        sketch_name=str(sketch_name),
+                    ),
                 },
             )
         except Exception as exc:

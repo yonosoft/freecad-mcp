@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Callable
 from typing import TypeVar
 
@@ -99,6 +101,11 @@ class _Adapter:
                     {
                         "constraint_index": constraint_indices[0],
                         "constraint_name": "Width",
+                        "object_name": "DependentSketch",
+                        "property_path": ".Constraints.HalfWidth",
+                        "expression": "Sketch.Constraints.Width / 2",
+                        "dependency_kind": "downstream",
+                        "native_object": object(),
                     },
                 ),
             )
@@ -239,7 +246,23 @@ def test_constraint_handler_reports_expression_dependency_without_dispatch_retry
 
     assert result.code == "sketch_constraint_removal_unsafe"
     assert result.data["reason"] == "expression_dependency"
-    assert result.data["dependencies"] == [{"constraint_index": 2, "constraint_name": "Width"}]
+    assert result.data["dependencies"] == [
+        {
+            "constraint_index": 2,
+            "constraint_name": "Width",
+            "dependent_document_name": "Model",
+            "dependent_sketch_name": "DependentSketch",
+            "dependent_constraint_name": "HalfWidth",
+            "dependency_kind": "expression_source",
+        }
+    ]
+    public_response = json.dumps(result.to_dict(), sort_keys=True)
+    assert "property_path" not in public_response
+    assert "native_object" not in public_response
+    assert "Constraints.HalfWidth" not in public_response
+    assert re.search(r"Constraints\[\d+\]", public_response) is None
+    assert re.search(r"<[^>]* object at 0x[0-9a-fA-F]+>", public_response) is None
+    assert re.search(r"0x[0-9a-fA-F]+", public_response) is None
     assert adapter.constraint_calls == [("Model", "Sketch", (2,))]
 
 

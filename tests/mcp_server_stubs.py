@@ -12,6 +12,7 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     AddSketchReferenceConstraintsHandler,
     AnalyzeSketchHandler,
+    ClearSketchConstraintExpressionHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
@@ -29,6 +30,7 @@ from freecad_mcp.commands import (
     ListDocumentsHandler,
     ListExternalGeometryHandler,
     ListObjectsHandler,
+    ListSketchConstraintExpressionsHandler,
     ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
@@ -37,6 +39,8 @@ from freecad_mcp.commands import (
     RemoveSketchGeometryHandler,
     ReplaceSketchConstraintHandler,
     SaveDocumentHandler,
+    SetSketchConstraintExpressionHandler,
+    SetSketchConstraintNameHandler,
     SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
     UpdateSketchConstraintValueHandler,
@@ -153,6 +157,10 @@ class AdapterStub:
         ] = []
         self.replace_sketch_constraint_calls: list[tuple[str, str, int, SketchConstraintInput]] = []
         self.update_sketch_constraint_value_calls: list[tuple[str, str, int, float]] = []
+        self.set_sketch_constraint_name_calls: list[tuple[str, str, int, str | None]] = []
+        self.set_sketch_constraint_expression_calls: list[tuple[str, str, int, str]] = []
+        self.clear_sketch_constraint_expression_calls: list[tuple[str, str, int]] = []
+        self.list_sketch_constraint_expressions_calls: list[tuple[str, str]] = []
         self.undo_names = ["Add sketch constraints"]
         self.redo_names: list[str] = []
 
@@ -557,6 +565,74 @@ class AdapterStub:
             }
         )
 
+    def set_sketch_constraint_name(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        name: str | None,
+    ) -> Any:
+        self.set_sketch_constraint_name_calls.append(
+            (document_name, sketch_name, constraint_index, name)
+        )
+        return _SemanticResultStub(
+            {
+                "constraint_index": constraint_index,
+                "current_name": name,
+                "no_change": False,
+            }
+        )
+
+    def set_sketch_constraint_expression(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        expression: str,
+    ) -> Any:
+        self.set_sketch_constraint_expression_calls.append(
+            (document_name, sketch_name, constraint_index, expression)
+        )
+        return _SemanticResultStub(
+            {
+                "constraint_index": constraint_index,
+                "current_expression": expression,
+                "no_change": False,
+            }
+        )
+
+    def clear_sketch_constraint_expression(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+    ) -> Any:
+        self.clear_sketch_constraint_expression_calls.append(
+            (document_name, sketch_name, constraint_index)
+        )
+        return _SemanticResultStub(
+            {
+                "constraint_index": constraint_index,
+                "current_expression": None,
+                "no_change": False,
+            }
+        )
+
+    def list_sketch_constraint_expressions(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> Any:
+        self.list_sketch_constraint_expressions_calls.append((document_name, sketch_name))
+        return _SemanticResultStub(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "expression_count": 0,
+                "expressions": [],
+            }
+        )
+
     def add_sketch_constraints(
         self,
         document_name: str,
@@ -807,6 +883,22 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
                 dispatcher,
             ),
             add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            set_sketch_constraint_name=SetSketchConstraintNameHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            set_sketch_constraint_expression=SetSketchConstraintExpressionHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            clear_sketch_constraint_expression=ClearSketchConstraintExpressionHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            list_sketch_constraint_expressions=ListSketchConstraintExpressionsHandler(
                 actual_adapter,
                 dispatcher,
             ),

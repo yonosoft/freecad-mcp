@@ -23,6 +23,12 @@ from freecad_mcp.commands.sketch_analysis import (
     ValidateSketchProfileHandler,
 )
 from freecad_mcp.commands.sketch_centered_rectangle import CreateSketchCenteredRectangleHandler
+from freecad_mcp.commands.sketch_constraint_expressions import (
+    ClearSketchConstraintExpressionHandler,
+    ListSketchConstraintExpressionsHandler,
+    SetSketchConstraintExpressionHandler,
+    SetSketchConstraintNameHandler,
+)
 from freecad_mcp.commands.sketch_constraints import AddSketchConstraintsHandler
 from freecad_mcp.commands.sketch_curved_profiles import (
     CreateSketchRoundedRectangleHandler,
@@ -95,6 +101,10 @@ class DocumentHandlers:
     replace_sketch_constraint: ReplaceSketchConstraintHandler
     update_sketch_constraint_value: UpdateSketchConstraintValueHandler
     add_sketch_reference_constraints: AddSketchReferenceConstraintsHandler
+    set_sketch_constraint_name: SetSketchConstraintNameHandler
+    set_sketch_constraint_expression: SetSketchConstraintExpressionHandler
+    clear_sketch_constraint_expression: ClearSketchConstraintExpressionHandler
+    list_sketch_constraint_expressions: ListSketchConstraintExpressionsHandler
     recompute: RecomputeDocumentHandler
 
 
@@ -104,6 +114,7 @@ __all__ = [
     "AddSketchGeometryHandler",
     "AddSketchReferenceConstraintsHandler",
     "AnalyzeSketchHandler",
+    "ClearSketchConstraintExpressionHandler",
     "CreateBodyHandler",
     "CreateDocumentHandler",
     "CreateSketchCenteredRectangleHandler",
@@ -122,6 +133,7 @@ __all__ = [
     "ListDocumentsHandler",
     "ListExternalGeometryHandler",
     "ListObjectsHandler",
+    "ListSketchConstraintExpressionsHandler",
     "ListSketchOpenVerticesHandler",
     "RecomputeDocumentHandler",
     "RedoDocumentHandler",
@@ -130,6 +142,8 @@ __all__ = [
     "RemoveSketchGeometryHandler",
     "ReplaceSketchConstraintHandler",
     "SaveDocumentHandler",
+    "SetSketchConstraintExpressionHandler",
+    "SetSketchConstraintNameHandler",
     "SetSketchGeometryConstructionHandler",
     "UndoDocumentHandler",
     "UpdateSketchConstraintValueHandler",

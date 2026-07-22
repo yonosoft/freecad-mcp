@@ -88,6 +88,7 @@ class SketchStub:
         self.MapMode = "Deactivated"
         self.AttachmentSupport: tuple[object, ...] = ()
         self.ExternalGeo = [None, None]
+        self.ExpressionEngine: tuple[tuple[str, str], ...] = ()
         self.State = ["Up-to-date"]
         self.DoF = 0
         self.FullyConstrained = True

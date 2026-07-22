@@ -217,6 +217,10 @@ rounded-rectangle profiles.
 profile validation, and open-vertex location.
 `mcp.sketch_external_geometry_tools` explicitly appends controlled external
 geometry add/list/remove and sketch dependency inspection.
+`mcp.sketch_removal_tools`, `mcp.sketch_editing_tools`, and
+`mcp.sketch_reference_constraint_tools` append tools 29–35.
+`mcp.sketch_constraint_expression_tools` explicitly appends constraint naming,
+expression set/clear, and expression listing as tools 36–39.
 `mcp.server` is the small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
@@ -232,7 +236,9 @@ exactly tools eighteen and nineteen; `create_sketch_slot` and
 `list_sketch_open_vertices` are exactly tools twenty-two through twenty-four;
 `add_external_geometry`, `list_external_geometry`, `remove_external_geometry`,
 and `get_sketch_dependencies` are exactly tools twenty-five through
-twenty-eight.
+twenty-eight; removal/construction tools are 29–31, editing tools are 32–34,
+reference-constraint addition is 35, and constraint name/expression tools are
+36–39.
 No registration loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
@@ -251,7 +257,13 @@ The registry currently exposes `create_document`, `list_documents`,
 `create_sketch_rounded_rectangle`, `analyze_sketch`,
 `validate_sketch_profile`, `list_sketch_open_vertices`,
 `add_external_geometry`, `list_external_geometry`,
-`remove_external_geometry`, and `get_sketch_dependencies`, in that order.
+`remove_external_geometry`, `get_sketch_dependencies`,
+`remove_sketch_constraints`, `remove_sketch_geometry`,
+`set_sketch_geometry_construction`, `update_sketch_geometry`,
+`replace_sketch_constraint`, `update_sketch_constraint_value`,
+`add_sketch_reference_constraints`, `set_sketch_constraint_name`,
+`set_sketch_constraint_expression`, `clear_sketch_constraint_expression`, and
+`list_sketch_constraint_expressions`, in that order.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -1985,8 +1997,77 @@ The detailed operand and geometry allowlists are maintained in
 `docs/sketch-reference-constraint-capabilities.md`. The principal semantic
 distinction is that Coincident is point-to-point, while Point-on-Object places a
 point on a whole line, arc, or circle. External geometry remains read-only even
-though it has equal public addressing. Names and expressions are outside this
-boundary and remain Milestone 22 work.
+though it has equal public addressing. Name and expression mutation is a
+separate boundary and does not widen reference-constraint construction.
+
+## Constraint-Expression Boundary
+
+Milestone 22 appends four explicit tools at positions 36–39:
+
+```text
+mcp/sketch_constraint_expression_tools.py
+-> commands/sketch_constraint_expressions.py
+-> constraint_expression_language.py
+-> DocumentAdapter protocol
+-> FreeCADDocumentAdapter
+-> freecad/sketch_constraint_expressions.py
+-> shared inspection/dependency/removal/editing safeguards
+```
+
+`constraint_expression_language.py` is a pure-Python lexer, parser,
+canonicalizer, constant-domain validator, reference extractor, and dimensional
+inference engine. It has no FreeCAD, MCP, or command imports. Its closed grammar
+accepts finite numbers, `mm`/`deg`, grouping, unary signs, the four arithmetic
+operators, only dimensionless `sqrt`, and named same-sketch or same-document
+cross-sketch constraint references. This prevents the transport or adapter from
+passing arbitrary strings to FreeCAD's much broader expression engine.
+
+`freecad/sketch_constraint_expressions.py` is the authoritative graph and
+mutation service. It inspects all sketches in the target document, maps native
+numeric or named constraint target paths to current public indices, parses each
+binding, resolves named sources, annotates opaque/broken state, finds exact
+dependents, and detects cycles. Graph records use document/sketch/constraint
+public identities only. The same service feeds list results, `get_sketch`
+expression fields, dependency inspection, source rename/clear preflight,
+removal preflight, and value-edit refusal. Raw opaque expressions and native
+property paths never cross the public boundary.
+
+Source datum editing also captures this same resolved graph before mutation and
+computes its complete dependent closure. The editing verifier permits only
+finite recomputed scalar values at those dependent nodes, while proving stable
+constraint identity/order/type/name/state plus unchanged canonical bindings and
+resolved dependencies. All constraint changes outside the pre-mutation closure
+retain the existing `unrelated_constraint_changed` refusal and atomic rollback.
+
+Only active, non-virtual, driving `distance`, `distance_x`, `distance_y`,
+`radius`, `diameter`, and `angle` constraints with available data participate.
+Names use a separate case-sensitive ASCII identifier policy and exact
+same-sketch uniqueness. Cross-sketch resolution uses internal object `Name`,
+not user-visible `Label`. The initial policy refuses referenced source renames
+or clears, expression-bound target renames, dependent-target expression
+changes, and mutations whose safety cannot be proved because another binding
+is opaque or invalid.
+
+Name and expression changes use the existing complete Milestone 19 mutation
+snapshot. An owned success has one named transaction, recompute, controlled
+readback, target semantic verification, unrelated expression-engine equality,
+full context verification, commit, and exact history/non-target-history checks.
+No-op and all preflight refusals occur before transaction opening. Owned
+failures abort. Caller-owned failures inverse the native expression, restore an
+unbound target's previous datum and solver-moved native geometry, recompute,
+and pass the shared exact rollback verifier without closing the caller's
+transaction. Clear retains the evaluated datum. No operation saves.
+
+The observed 20-entry history limit is handled as native capacity behavior:
+successful commit may evict the oldest entry, while conservative preflight
+ensures a refusal cannot evict anything. Verification accepts only the exact
+growth or exact capped-success shape; it does not synthesize history.
+
+Transport schemas for all four tools are registered explicitly and then made
+`extra="forbid"`. `DocumentHandlers`, application composition, runtime
+composition, and server registration preserve the existing dependency
+direction. The full capability contract is maintained in
+`docs/sketch-constraint-expression-capabilities.md`.
 
 ## Test Ownership
 
@@ -2009,7 +2090,11 @@ collecting all adapter or transport behavior in single modules:
   operand preflight and the tested allowlist belong in
   `tests/test_sketch_reference_constraint_capabilities.py`; owned/caller-owned
   abort-versus-inverse ordering belongs in
-  `tests/test_freecad_sketch_reference_constraints.py`;
+  `tests/test_freecad_sketch_reference_constraints.py`; parser and dimensional
+  semantics belong in `tests/test_constraint_expression_language.py`; graph
+  resolution, exact native calls, and transaction ownership belong in
+  `tests/test_freecad_sketch_constraint_expressions.py`; handler validation and
+  error mapping belong in `tests/test_sketch_constraint_expression_commands.py`;
 - MCP tests are split into document, object, creation, and sketch-geometry
   registrations; tools 25--28 have exact schema and delegation coverage in
   `tests/test_mcp_sketch_external_geometry_tools.py`; tools 29–31 have strict
@@ -2017,7 +2102,9 @@ collecting all adapter or transport behavior in single modules:
   `tests/test_mcp_sketch_removal_tools.py`; tools 32–34 have strict schema,
   order, and delegation coverage in `tests/test_mcp_sketch_editing_tools.py`;
   tool 35 has exact schema, order, and no-chaining coverage in
-  `tests/test_mcp_sketch_reference_constraint_tools.py`;
+  `tests/test_mcp_sketch_reference_constraint_tools.py`; tools 36–39 have strict
+  schema, order, description, and delegation coverage in
+  `tests/test_mcp_sketch_constraint_expression_tools.py`;
   server composition, authoritative
   inventory, lifecycle agreement, and HTTP transport remain together;
 - `tests/test_module_compatibility.py` exclusively owns legacy/canonical identity

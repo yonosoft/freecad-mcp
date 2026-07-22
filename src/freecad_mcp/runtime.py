@@ -11,6 +11,7 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     AddSketchReferenceConstraintsHandler,
     AnalyzeSketchHandler,
+    ClearSketchConstraintExpressionHandler,
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
     CreateSketchEquilateralTriangleHandler,
@@ -27,6 +28,7 @@ from freecad_mcp.commands import (
     ListDocumentsHandler,
     ListExternalGeometryHandler,
     ListObjectsHandler,
+    ListSketchConstraintExpressionsHandler,
     ListSketchOpenVerticesHandler,
     RecomputeDocumentHandler,
     RedoDocumentHandler,
@@ -35,6 +37,8 @@ from freecad_mcp.commands import (
     RemoveSketchGeometryHandler,
     ReplaceSketchConstraintHandler,
     SaveDocumentHandler,
+    SetSketchConstraintExpressionHandler,
+    SetSketchConstraintNameHandler,
     SetSketchGeometryConstructionHandler,
     UndoDocumentHandler,
     UpdateSketchConstraintValueHandler,
@@ -170,6 +174,22 @@ def _build_runtime() -> Runtime:
             dispatcher=dispatcher,
         ),
         add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        set_sketch_constraint_name=SetSketchConstraintNameHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        set_sketch_constraint_expression=SetSketchConstraintExpressionHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        clear_sketch_constraint_expression=ClearSketchConstraintExpressionHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        list_sketch_constraint_expressions=ListSketchConstraintExpressionsHandler(
             adapter=adapter,
             dispatcher=dispatcher,
         ),

@@ -33,6 +33,27 @@ def get_sketch_dependencies(
         external = enumerate_external_geometry(document, sketch, Part)
         attachment = _attachment_sources(sketch)
         expressions = _expression_sources(document, sketch, App)
+        if _has_constraint_expression_entries(sketch):
+            from freecad_mcp.freecad import sketch_constraint_expressions
+
+            controlled_expressions = (
+                sketch_constraint_expressions.list_sketch_constraint_expressions(
+                    document_name,
+                    sketch_name,
+                )
+            )
+            expressions = tuple(
+                sorted(
+                    (
+                        *expressions,
+                        *_controlled_expression_sources(controlled_expressions.bindings),
+                    ),
+                    key=lambda item: (
+                        str(item.get("property_path", "")),
+                        cast(int, item.get("constraint_index", -1)),
+                    ),
+                )
+            )
         consumers = _downstream_consumers(document, sketch)
         constraint_references = tuple(
             {
@@ -80,6 +101,18 @@ def get_sketch_dependencies(
         cross_document_references=cross_document,
         document=summary,
     )
+
+
+def _has_constraint_expression_entries(sketch: Any) -> bool:
+    """Avoid invoking the constraint graph for unrelated object expressions."""
+    for entry in tuple(getattr(sketch, "ExpressionEngine", ())):
+        try:
+            path, _expression = entry
+        except Exception:
+            continue
+        if isinstance(path, str) and path.lstrip(".").startswith("Constraints"):
+            return True
+    return False
 
 
 def _attachment_sources(sketch: Any) -> tuple[dict[str, object], ...]:
@@ -142,6 +175,9 @@ def _expression_sources(document: Any, sketch: Any, app: Any) -> tuple[dict[str,
             raise SketchDependencyInspectionError("expression_entry_unreadable") from exc
         if not isinstance(property_path, str) or not isinstance(expression, str):
             raise SketchDependencyInspectionError("expression_entry_unreadable")
+        normalized_path = property_path.lstrip(".")
+        if normalized_path.startswith("Constraints[") or normalized_path.startswith("Constraints."):
+            continue
         sources: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for match in _SIMPLE_EXPRESSION_SOURCE.finditer(expression):
@@ -178,6 +214,32 @@ def _expression_sources(document: Any, sketch: Any, app: Any) -> tuple[dict[str,
             }
         )
     return tuple(sorted(results, key=lambda item: str(item["property_path"])))
+
+
+def _controlled_expression_sources(bindings: tuple[Any, ...]) -> tuple[dict[str, object], ...]:
+    results: list[dict[str, object]] = []
+    for binding in bindings:
+        sources = [
+            {
+                **dependency.to_dict(),
+                "object_name": dependency.sketch_name,
+                "resolved": True,
+            }
+            for dependency in binding.dependencies
+        ]
+        results.append(
+            {
+                "type": "constraint_expression",
+                "constraint_index": binding.constraint_index,
+                "constraint_name": binding.constraint_name,
+                "canonical_expression": binding.canonical_expression,
+                "supported": binding.supported,
+                "valid": binding.valid,
+                "reason": binding.reason,
+                "sources": sources,
+            }
+        )
+    return tuple(results)
 
 
 def _downstream_consumers(document: Any, sketch: Any) -> tuple[dict[str, object], ...]:
@@ -239,7 +301,8 @@ def _cross_document_references(
                 results.append(
                     {
                         "category": "expression",
-                        "property_path": expression["property_path"],
+                        "property_path": expression.get("property_path"),
+                        "constraint_index": expression.get("constraint_index"),
                         "source_document_name": source.get("document_name"),
                         "source_object_name": source.get("object_name"),
                     }

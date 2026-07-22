@@ -57,6 +57,9 @@ def test_controlled_transaction_names_are_stable_agent_readable_labels() -> None
         "Update sketch geometry",
         "Replace sketch constraint",
         "Update sketch constraint value",
+        "Set sketch constraint name",
+        "Set sketch constraint expression",
+        "Clear sketch constraint expression",
     )
 
 

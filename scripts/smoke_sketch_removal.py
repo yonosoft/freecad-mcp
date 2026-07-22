@@ -526,7 +526,7 @@ def _persistence_and_isolation_cases() -> None:
 
 def main() -> None:
     _record("freecad_1_1_1", tuple(App.Version()[:3]) == ("1", "1", "1"))
-    _record("exact_35_tool_inventory", len(REGISTERED_TOOL_NAMES) == 35)
+    _record("exact_39_tool_inventory", len(REGISTERED_TOOL_NAMES) == 39)
     _record(
         "unchanged_first_28_tools",
         REGISTERED_TOOL_NAMES[:28]
@@ -578,7 +578,14 @@ def main() -> None:
             "replace_sketch_constraint",
             "update_sketch_constraint_value",
         )
-        and REGISTERED_TOOL_NAMES[34:] == ("add_sketch_reference_constraints",),
+        and REGISTERED_TOOL_NAMES[34] == "add_sketch_reference_constraints"
+        and REGISTERED_TOOL_NAMES[35:]
+        == (
+            "set_sketch_constraint_name",
+            "set_sketch_constraint_expression",
+            "clear_sketch_constraint_expression",
+            "list_sketch_constraint_expressions",
+        ),
     )
     _constraint_cases()
     _expression_refusal_case()

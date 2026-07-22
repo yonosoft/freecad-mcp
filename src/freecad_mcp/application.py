@@ -457,6 +457,60 @@ class Application:
             value=value,
         )
 
+    def set_sketch_constraint_name(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraint_index: object,
+        name: object,
+    ) -> CommandResult:
+        """Assign, rename, or clear one supported scalar constraint name."""
+        return self.documents.set_sketch_constraint_name.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraint_index=constraint_index,
+            name=name,
+        )
+
+    def set_sketch_constraint_expression(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraint_index: object,
+        expression: object,
+    ) -> CommandResult:
+        """Set or replace one finite validated scalar constraint expression."""
+        return self.documents.set_sketch_constraint_expression.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraint_index=constraint_index,
+            expression=expression,
+        )
+
+    def clear_sketch_constraint_expression(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraint_index: object,
+    ) -> CommandResult:
+        """Clear one supported expression while preserving its evaluated value."""
+        return self.documents.clear_sketch_constraint_expression.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraint_index=constraint_index,
+        )
+
+    def list_sketch_constraint_expressions(
+        self,
+        document_name: object,
+        sketch_name: object,
+    ) -> CommandResult:
+        """Inspect scalar constraint expressions without mutation."""
+        return self.documents.list_sketch_constraint_expressions.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

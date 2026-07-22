@@ -2035,3 +2035,103 @@ full diff, run `git diff --check`, and inspect `git status`. The autonomous MCP
 client plan is prepared but not executed in
 `docs/codex-milestone-21-acceptance.md`. The shorter post-stabilization rerun is
 `docs/codex-milestone-21-stabilization-acceptance.md`.
+
+## Milestone 22 Constraint-Expression Verification
+
+Tools 36–39 add a pure parser/dimensional checker, an authoritative
+constraint-level dependency graph, adapter mutations, inspection integration,
+and interaction safeguards. Use the FreeCAD 1.1 embedded interpreter for every
+Milestone 22 probe, smoke, or test command; do not substitute a PATH-resolved
+Python:
+
+```powershell
+$FreeCADPython = "C:\Program Files\FreeCAD 1.1\bin\python.exe"
+& $FreeCADPython --version
+& $FreeCADPython -c "import FreeCAD; print(FreeCAD.Version())"
+```
+
+The isolated discovery coordinator launches each worker through
+`sys.executable`, so child probes inherit that verified interpreter:
+
+```powershell
+& $FreeCADPython ".\scripts\probe_sketch_constraint_expressions.py" `
+  --output "$env:TEMP\freecad-m22-native-discovery.json"
+```
+
+It records constraint rename/clear/duplicate behavior, numeric and named target
+paths, all six scalar families, units, same/cross-sketch references, native
+label and arbitrary-property permissiveness, source/target mutation effects,
+undo/redo, persistence, caller-owned transactions, capacity 20, and document
+isolation. The probe is research evidence only; production never probes a user
+document or derives its allowlist dynamically.
+
+Develop against narrow pure-Python slices before the full gate:
+
+```powershell
+& $FreeCADPython -m pytest -q `
+  tests\test_constraint_expression_language.py `
+  tests\test_freecad_sketch_constraint_expressions.py `
+  tests\test_sketch_constraint_expression_commands.py `
+  tests\test_mcp_sketch_constraint_expression_tools.py `
+  tests\test_freecad_sketch_inspection.py `
+  tests\test_freecad_sketch_dependencies.py `
+  tests\test_freecad_sketch_removal.py `
+  tests\test_freecad_sketch_editing.py `
+  tests\test_application.py `
+  tests\test_runtime.py `
+  tests\test_mcp_server.py
+
+& $FreeCADPython -m ruff check `
+  src\freecad_mcp\constraint_expression_language.py `
+  src\freecad_mcp\commands\sketch_constraint_expressions.py `
+  src\freecad_mcp\freecad\sketch_constraint_expressions.py `
+  src\freecad_mcp\mcp\sketch_constraint_expression_tools.py `
+  scripts\probe_sketch_constraint_expressions.py `
+  scripts\smoke_sketch_constraint_expressions.py
+
+& $FreeCADPython -m mypy `
+  src\freecad_mcp\constraint_expression_language.py `
+  src\freecad_mcp\commands\sketch_constraint_expressions.py `
+  src\freecad_mcp\freecad\sketch_constraint_expressions.py `
+  src\freecad_mcp\mcp\sketch_constraint_expression_tools.py
+```
+
+The permanent native campaign is:
+
+```powershell
+& $FreeCADPython ".\scripts\smoke_sketch_constraint_expressions.py"
+```
+
+It covers the SideLength/square-root product story, direct/multiple/chained
+same-sketch and mixed cross-sketch dependents, all six scalar targets,
+canonical/list/dependency inspection, source propagation, bound value refusal,
+source rename/clear/removal/replacement refusal, undo/redo, save/reopen, clear
+then direct value editing, deterministic list order, invalid
+syntax/reference/dimension/cycle cases, opaque native inspection, genuine
+outside-closure mutation refusal, owned and caller-owned exact rollback,
+same-object recovery, caller transaction ownership, capacity 20 success/failure,
+target/non-target history isolation, and no automatic save.
+
+After focused checks, native smoke stabilization, and documentation are green,
+run the complete gate exactly once:
+
+```powershell
+.\scripts\test.ps1 -PythonExe $FreeCADPython
+```
+
+Then run the permanent Milestone 22 smoke and relevant historical native
+neighbors with the same interpreter:
+
+```powershell
+& $FreeCADPython ".\scripts\smoke_sketch_constraint_expressions.py"
+& $FreeCADPython ".\scripts\smoke_document_history.py"
+& $FreeCADPython ".\scripts\smoke_sketch_removal.py"
+& $FreeCADPython ".\scripts\smoke_sketch_editing.py"
+& $FreeCADPython ".\scripts\smoke_sketch_reference_constraints.py"
+& $FreeCADPython ".\scripts\smoke_sketch_external_geometry.py"
+```
+
+Finish with `git diff --check`, a final architectural/safety diff review, and
+`git status --short --branch`. The public-only campaign is prepared but not run
+in `docs/codex-milestone-22-acceptance.md`. Local success does not authorize a
+commit or mark the milestone externally accepted.

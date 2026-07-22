@@ -22,7 +22,10 @@ from freecad_mcp.models import (
     SketchCenteredRectangleCreationResult,
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
+    SketchConstraintExpressionListResult,
+    SketchConstraintExpressionMutationResult,
     SketchConstraintInput,
+    SketchConstraintNameResult,
     SketchConstraintRemovalResult,
     SketchConstraintReplacementResult,
     SketchConstraintValueUpdateResult,
@@ -300,6 +303,43 @@ class SketchEditingAdapter(Protocol):
         """Set one supported driving dimensional datum."""
 
 
+class SketchConstraintExpressionAdapter(Protocol):
+    """Controlled constraint-name and finite expression operations."""
+
+    def set_sketch_constraint_name(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        name: str | None,
+    ) -> SketchConstraintNameResult:
+        """Assign, rename, or clear one supported scalar constraint name."""
+
+    def set_sketch_constraint_expression(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        expression: str,
+    ) -> SketchConstraintExpressionMutationResult:
+        """Set or replace one validated supported expression."""
+
+    def clear_sketch_constraint_expression(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+    ) -> SketchConstraintExpressionMutationResult:
+        """Clear one supported expression and preserve its current value."""
+
+    def list_sketch_constraint_expressions(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchConstraintExpressionListResult:
+        """List deterministic supported and opaque constraint bindings."""
+
+
 class TaskExecutor(Protocol):
     """Supplies thread detection and queued task submission."""
 
@@ -329,6 +369,7 @@ __all__ = [
     "RunnerFactory",
     "ServerRunner",
     "SketchAnalysisAdapter",
+    "SketchConstraintExpressionAdapter",
     "SketchControlledMutationAdapter",
     "SketchCurvedProfileAdapter",
     "SketchDependencyAdapter",

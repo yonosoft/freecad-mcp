@@ -10,6 +10,7 @@ from freecad_mcp.freecad import (
     sketch_analysis,
     sketch_centered_rectangle_creation,
     sketch_constraint_creation,
+    sketch_constraint_expressions,
     sketch_creation,
     sketch_dependencies,
     sketch_editing,
@@ -71,7 +72,10 @@ from freecad_mcp.models import (
     SketchCenteredRectangleCreationResult,
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
+    SketchConstraintExpressionListResult,
+    SketchConstraintExpressionMutationResult,
     SketchConstraintInput,
+    SketchConstraintNameResult,
     SketchConstraintRemovalResult,
     SketchConstraintReplacementResult,
     SketchConstraintValueUpdateResult,
@@ -382,4 +386,54 @@ class FreeCADDocumentAdapter:
             sketch_name,
             constraint_index,
             value,
+        )
+
+    def set_sketch_constraint_name(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        name: str | None,
+    ) -> SketchConstraintNameResult:
+        return sketch_constraint_expressions.set_sketch_constraint_name(
+            document_name,
+            sketch_name,
+            constraint_index,
+            name,
+        )
+
+    def set_sketch_constraint_expression(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        expression: str,
+    ) -> SketchConstraintExpressionMutationResult:
+        return sketch_constraint_expressions.set_sketch_constraint_expression(
+            document_name,
+            sketch_name,
+            constraint_index,
+            expression,
+        )
+
+    def clear_sketch_constraint_expression(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+    ) -> SketchConstraintExpressionMutationResult:
+        return sketch_constraint_expressions.clear_sketch_constraint_expression(
+            document_name,
+            sketch_name,
+            constraint_index,
+        )
+
+    def list_sketch_constraint_expressions(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchConstraintExpressionListResult:
+        return sketch_constraint_expressions.list_sketch_constraint_expressions(
+            document_name,
+            sketch_name,
         )

@@ -5,13 +5,19 @@ from typing import Any
 
 import pytest
 
+from freecad_mcp.constraint_expression_language import parse_constraint_expression
 from freecad_mcp.exceptions import (
     SketchConstraintReplacementUnsafeError,
     SketchConstraintValueUpdateUnsafeError,
     SketchControlledMutationError,
     SketchGeometryUpdateUnsafeError,
 )
-from freecad_mcp.freecad import sketch_editing, sketch_removal
+from freecad_mcp.freecad import (
+    sketch_constraint_expressions,
+    sketch_editing,
+    sketch_rectangle_creation,
+    sketch_removal,
+)
 from freecad_mcp.models import (
     ArcOfCircleGeometryUpdateInput,
     CircleGeometryUpdateInput,
@@ -20,6 +26,7 @@ from freecad_mcp.models import (
     LineSegmentGeometryUpdateInput,
     PointGeometryUpdateInput,
     SketchConstraintData,
+    SketchConstraintExpressionDependency,
     SketchConstraintValue,
     SketchInspectionResult,
     SketchLineGeometry,
@@ -69,6 +76,8 @@ def _constraint(
     virtual: bool = False,
     driving: bool | None = True,
     name: str | None = None,
+    expression: str | None = None,
+    expression_supported: bool | None = None,
 ) -> SketchConstraintData:
     controlled_value = None
     if value is not None:
@@ -83,18 +92,21 @@ def _constraint(
         driving=driving,
         references=(),
         value=controlled_value,
+        expression=expression,
+        expression_supported=expression_supported,
     )
 
 
 def _inspection(
     *,
+    name: str = "Sketch",
     geometry: tuple[Any, ...] = (_line(),),
     constraints: tuple[Any, ...] = (_constraint(0),),
     solver: SketchSolverData | None = None,
 ) -> SketchInspectionResult:
     return SketchInspectionResult(
-        name="Sketch",
-        label="Sketch",
+        name=name,
+        label=name,
         body_name=None,
         visibility=True,
         map_mode="deactivated",
@@ -114,6 +126,8 @@ def _state(
     first: int,
     value: float = 0.0,
     second: int = -2000,
+    *,
+    name: str = "",
 ) -> tuple[Any, ...]:
     return (
         constraint_type,
@@ -124,7 +138,7 @@ def _state(
         -2000,
         0,
         value,
-        "",
+        name,
         True,
         False,
         True,
@@ -150,6 +164,57 @@ def _snapshot(
     )
 
 
+def _expression_binding(
+    sketch_name: str,
+    index: int,
+    constraint_name: str,
+    expression: str,
+    dependencies: tuple[SketchConstraintExpressionDependency, ...],
+) -> sketch_constraint_expressions._Binding:
+    return sketch_constraint_expressions._Binding(
+        sketch_name,
+        index,
+        f"Constraints.{constraint_name}",
+        expression,
+        parse_constraint_expression(expression),
+        True,
+        True,
+        None,
+        dependencies,
+        document_name="Model",
+        constraint_name=constraint_name,
+        constraint_type="distance",
+    )
+
+
+def _expression_dependency(
+    sketch_name: str,
+    index: int,
+    constraint_name: str,
+) -> SketchConstraintExpressionDependency:
+    return SketchConstraintExpressionDependency(
+        "Model",
+        sketch_name,
+        index,
+        constraint_name,
+        "distance",
+    )
+
+
+def _expression_snapshot(
+    inspections: tuple[tuple[str, SketchInspectionResult], ...],
+    bindings: tuple[sketch_constraint_expressions._Binding, ...],
+    dependent_nodes: tuple[tuple[str, int], ...],
+) -> sketch_constraint_expressions._ExpressionDependencySnapshot:
+    return sketch_constraint_expressions._ExpressionDependencySnapshot(
+        inspections=inspections,
+        bindings=bindings,
+        dependent_nodes=dependent_nodes,
+        native_sketches=(),
+        proven=True,
+    )
+
+
 class _App:
     class Units:
         @staticmethod
@@ -163,7 +228,9 @@ class _App:
 
 class _Sketch:
     def __init__(self, states: list[tuple[Any, ...]]) -> None:
+        self.Name = "Sketch"
         self.Constraints = states
+        self.ExpressionEngine: tuple[tuple[str, str], ...] = ()
         self.moves: list[tuple[int, int, object, bool]] = []
         self.datums: list[tuple[int, object]] = []
         self.deleted: list[int] = []
@@ -185,6 +252,7 @@ class _Sketch:
 
 class _Document:
     def __init__(self, *, caller_owned: bool = False) -> None:
+        self.Name = "Model"
         self.HasPendingTransaction = caller_owned
         self.labels: list[str] = []
         self.commits = 0
@@ -216,6 +284,17 @@ def _install(
     monkeypatch.setattr(sketch_removal, "_snapshot", lambda *_args: snapshot)
     monkeypatch.setattr(sketch_removal, "_pending_transaction", lambda *_args: caller_owned)
     monkeypatch.setattr(sketch_removal, "_require_history", lambda *_args: None)
+    monkeypatch.setattr(
+        sketch_constraint_expressions,
+        "_histories",
+        lambda *_args: (),
+    )
+    monkeypatch.setattr(
+        sketch_editing,
+        "_activate_value_update_target",
+        lambda *_args: (None, False),
+    )
+    monkeypatch.setattr(sketch_editing, "_verify_other_document_histories", lambda *_args: None)
     monkeypatch.setattr(sketch_removal, "_recompute", lambda *_args: None)
     monkeypatch.setattr(sketch_removal, "_verify_common", lambda *_args: None)
     monkeypatch.setattr(sketch_removal, "_verify_success_history", lambda *_args: None)
@@ -231,6 +310,19 @@ def _install(
         lambda *_args: (after, snapshot.base.document_summary),
     )
     monkeypatch.setattr(sketch_editing, "_verify_value_update", lambda *_args: None)
+    empty_expression_snapshot = sketch_constraint_expressions._ExpressionDependencySnapshot(
+        inspections=(),
+        bindings=(),
+        dependent_nodes=(),
+        native_sketches=(),
+        proven=True,
+    )
+    monkeypatch.setattr(
+        sketch_constraint_expressions,
+        "expression_dependency_snapshot",
+        lambda *_args: empty_expression_snapshot,
+    )
+    monkeypatch.setattr(sketch_editing, "_verify_expression_dependency_update", lambda *_args: None)
     monkeypatch.setattr(sketch_editing, "_verify_replacement", lambda *_args: None)
     return document
 
@@ -411,6 +503,33 @@ def test_mixed_dimensional_constraint_value_update_remains_unsupported(
     assert sketch.datums == []
 
 
+def test_expression_bound_constraint_value_update_still_refuses_before_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bound = _constraint(
+        0,
+        value=5.0,
+        name="HalfLength",
+        expression="10 mm / 2",
+        expression_supported=True,
+    )
+    inspected = _inspection(constraints=(bound,))
+    snapshot = _snapshot(
+        inspected=inspected,
+        states=(_state("Distance", 0, 5.0, name="HalfLength"),),
+    )
+    sketch = _Sketch(list(snapshot.base.constraints))
+    sketch.ExpressionEngine = (("Constraints.HalfLength", "10 mm / 2"),)
+    document = _install(monkeypatch, snapshot, sketch, inspected)
+
+    with pytest.raises(SketchConstraintValueUpdateUnsafeError) as captured:
+        sketch_editing.update_sketch_constraint_value("Model", "Sketch", 0, 8.0)
+
+    assert captured.value.reason == "expression_bound_constraint"
+    assert sketch.datums == []
+    assert document.labels == []
+
+
 def test_constraint_value_success_uses_quantity_and_one_owned_transaction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -429,6 +548,316 @@ def test_constraint_value_success_uses_quantity_and_one_owned_transaction(
     assert document.commits == 1
 
 
+def test_constraint_value_allows_same_sketch_expression_dependent_recompute(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _constraint(0, value=10.0, name="SourceLength")
+    dependent = _constraint(1, value=5.0, name="HalfLength")
+    before = _inspection(constraints=(source, dependent))
+    after = _inspection(
+        constraints=(
+            _constraint(0, value=20.0, name="SourceLength"),
+            _constraint(1, value=10.0, name="HalfLength"),
+        )
+    )
+    before_states = (
+        _state("Distance", 0, 10.0, name="SourceLength"),
+        _state("Distance", 1, 5.0, name="HalfLength"),
+    )
+    after_states = (
+        _state("Distance", 0, 20.0, name="SourceLength"),
+        _state("Distance", 1, 10.0, name="HalfLength"),
+    )
+    snapshot = _snapshot(inspected=before, states=before_states)
+    sketch = _Sketch(list(before_states))
+    sketch.ExpressionEngine = (("Constraints.HalfLength", "Constraints.SourceLength / 2"),)
+    original_verify = sketch_editing._verify_value_update
+    original_dependency_verify = sketch_editing._verify_expression_dependency_update
+    document = _install(monkeypatch, snapshot, sketch, after)
+    monkeypatch.setattr(sketch_editing, "_verify_value_update", original_verify)
+    monkeypatch.setattr(
+        sketch_editing,
+        "_verify_expression_dependency_update",
+        original_dependency_verify,
+    )
+    parsed = parse_constraint_expression("Constraints.SourceLength / 2")
+    dependency = SketchConstraintExpressionDependency(
+        "Model",
+        "Sketch",
+        0,
+        "SourceLength",
+        "distance",
+    )
+    binding = sketch_constraint_expressions._Binding(
+        "Sketch",
+        1,
+        "Constraints.HalfLength",
+        "Constraints.SourceLength / 2",
+        parsed,
+        True,
+        True,
+        None,
+        (dependency,),
+        document_name="Model",
+        constraint_name="HalfLength",
+        constraint_type="distance",
+    )
+    expression_snapshots = [
+        sketch_constraint_expressions._ExpressionDependencySnapshot(
+            inspections=(("Sketch", before),),
+            bindings=(binding,),
+            dependent_nodes=(("Sketch", 1),),
+            native_sketches=(),
+            proven=True,
+        ),
+        sketch_constraint_expressions._ExpressionDependencySnapshot(
+            inspections=(("Sketch", after),),
+            bindings=(binding,),
+            dependent_nodes=(("Sketch", 1),),
+            native_sketches=(),
+            proven=True,
+        ),
+    ]
+    monkeypatch.setattr(
+        sketch_constraint_expressions,
+        "expression_dependency_snapshot",
+        lambda *_args: expression_snapshots.pop(0),
+    )
+    monkeypatch.setattr(sketch_editing, "_constraint_state", lambda item: tuple(item.Constraints))
+    monkeypatch.setattr(sketch_editing, "_construction_state", lambda *_args: (False,))
+    monkeypatch.setattr(
+        sketch_removal,
+        "_recompute",
+        lambda *_args: setattr(sketch, "Constraints", list(after_states)),
+    )
+    monkeypatch.setattr(sketch_removal, "_rollback", lambda *_args, **_kwargs: None)
+
+    result = sketch_editing.update_sketch_constraint_value("Model", "Sketch", 0, 20.0)
+
+    assert not result.no_change
+    assert sketch.datums == [(0, (20.0, "mm"))]
+    assert document.labels == [UPDATE_SKETCH_CONSTRAINT_VALUE_TRANSACTION_NAME]
+
+
+def test_dependency_verifier_allows_multiple_chained_and_cross_sketch_results() -> None:
+    primary_before = _inspection(
+        name="Primary",
+        constraints=(
+            _constraint(0, value=20.0, name="Source"),
+            _constraint(
+                1,
+                value=10.0,
+                name="Half",
+                expression="Constraints.Source / 2",
+                expression_supported=True,
+            ),
+            _constraint(
+                2,
+                value=5.0,
+                name="Quarter",
+                expression="Constraints.Half / 2",
+                expression_supported=True,
+            ),
+            _constraint(
+                3,
+                value=40.0,
+                name="Double",
+                expression="Constraints.Source * 2",
+                expression_supported=True,
+            ),
+            _constraint(4, value=7.0, name="Unrelated"),
+        ),
+    )
+    primary_after = _inspection(
+        name="Primary",
+        constraints=(
+            _constraint(0, value=30.0, name="Source"),
+            _constraint(
+                1,
+                value=15.0,
+                name="Half",
+                expression="Constraints.Source / 2",
+                expression_supported=True,
+            ),
+            _constraint(
+                2,
+                value=7.5,
+                name="Quarter",
+                expression="Constraints.Half / 2",
+                expression_supported=True,
+            ),
+            _constraint(
+                3,
+                value=60.0,
+                name="Double",
+                expression="Constraints.Source * 2",
+                expression_supported=True,
+            ),
+            _constraint(4, value=7.0, name="Unrelated"),
+        ),
+    )
+    cross_before = _inspection(
+        name="Cross",
+        constraints=(
+            _constraint(
+                0,
+                value=21.0,
+                name="CrossPlus",
+                expression="Primary.Constraints.Source + 1 mm",
+                expression_supported=True,
+            ),
+            _constraint(
+                1,
+                value=10.5,
+                name="CrossHalf",
+                expression="Constraints.CrossPlus / 2",
+                expression_supported=True,
+            ),
+        ),
+    )
+    cross_after = _inspection(
+        name="Cross",
+        constraints=(
+            _constraint(
+                0,
+                value=31.0,
+                name="CrossPlus",
+                expression="Primary.Constraints.Source + 1 mm",
+                expression_supported=True,
+            ),
+            _constraint(
+                1,
+                value=15.5,
+                name="CrossHalf",
+                expression="Constraints.CrossPlus / 2",
+                expression_supported=True,
+            ),
+        ),
+    )
+    bindings = (
+        _expression_binding(
+            "Cross",
+            0,
+            "CrossPlus",
+            "Primary.Constraints.Source + 1 mm",
+            (_expression_dependency("Primary", 0, "Source"),),
+        ),
+        _expression_binding(
+            "Cross",
+            1,
+            "CrossHalf",
+            "Constraints.CrossPlus / 2",
+            (_expression_dependency("Cross", 0, "CrossPlus"),),
+        ),
+        _expression_binding(
+            "Primary",
+            1,
+            "Half",
+            "Constraints.Source / 2",
+            (_expression_dependency("Primary", 0, "Source"),),
+        ),
+        _expression_binding(
+            "Primary",
+            2,
+            "Quarter",
+            "Constraints.Half / 2",
+            (_expression_dependency("Primary", 1, "Half"),),
+        ),
+        _expression_binding(
+            "Primary",
+            3,
+            "Double",
+            "Constraints.Source * 2",
+            (_expression_dependency("Primary", 0, "Source"),),
+        ),
+    )
+    nodes = (("Cross", 0), ("Cross", 1), ("Primary", 1), ("Primary", 2), ("Primary", 3))
+    before = _expression_snapshot(
+        (("Cross", cross_before), ("Primary", primary_before)),
+        bindings,
+        nodes,
+    )
+    after = _expression_snapshot(
+        (("Cross", cross_after), ("Primary", primary_after)),
+        bindings,
+        nodes,
+    )
+
+    sketch_editing._verify_expression_dependency_update(before, after, "Primary", 0)
+
+
+def test_dependency_verifier_rejects_a_change_outside_the_proven_closure() -> None:
+    before_inspection = _inspection(
+        constraints=(
+            _constraint(0, value=10.0, name="Source"),
+            _constraint(
+                1,
+                value=5.0,
+                name="Half",
+                expression="Constraints.Source / 2",
+                expression_supported=True,
+            ),
+            _constraint(2, value=7.0, name="Unrelated"),
+        )
+    )
+    after_inspection = _inspection(
+        constraints=(
+            _constraint(0, value=20.0, name="Source"),
+            _constraint(
+                1,
+                value=10.0,
+                name="Half",
+                expression="Constraints.Source / 2",
+                expression_supported=True,
+            ),
+            _constraint(2, value=9.0, name="Unrelated"),
+        )
+    )
+    binding = _expression_binding(
+        "Sketch",
+        1,
+        "Half",
+        "Constraints.Source / 2",
+        (_expression_dependency("Sketch", 0, "Source"),),
+    )
+    before = _expression_snapshot((("Sketch", before_inspection),), (binding,), (("Sketch", 1),))
+    after = _expression_snapshot((("Sketch", after_inspection),), (binding,), (("Sketch", 1),))
+
+    with pytest.raises(SketchControlledMutationError) as captured:
+        sketch_editing._verify_expression_dependency_update(before, after, "Sketch", 0)
+
+    assert captured.value.reason == "unrelated_constraint_changed"
+
+
+def test_shared_success_history_verifier_accepts_exact_capacity_twenty_shape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    before_names = tuple(f"Before {index:02d}" for index in range(20))
+    before_history = (1, 20, 0, before_names, ())
+    snapshot: Any = SimpleNamespace(base=SimpleNamespace(history=before_history))
+    after_history = (
+        1,
+        20,
+        0,
+        (UPDATE_SKETCH_CONSTRAINT_VALUE_TRANSACTION_NAME, *before_names)[:20],
+        (),
+    )
+    monkeypatch.setattr(sketch_removal, "_pending_transaction", lambda *_args: False)
+    monkeypatch.setattr(
+        sketch_rectangle_creation,
+        "_history_state",
+        lambda *_args: after_history,
+    )
+
+    sketch_removal._verify_success_history(
+        object(),
+        snapshot,
+        False,
+        UPDATE_SKETCH_CONSTRAINT_VALUE_TRANSACTION_NAME,
+        "update_constraint_value",
+    )
+
+
 def test_replacement_no_change_and_duplicate_are_preflight_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -438,7 +867,11 @@ def test_replacement_no_change_and_duplicate_are_preflight_only(
     snapshot = _snapshot(inspected=inspected, states=states)
     sketch = _Sketch(list(states))
     document = _install(monkeypatch, snapshot, sketch, inspected)
-    monkeypatch.setattr(sketch_removal, "_constraint_expression_dependencies", lambda *_args: ())
+    monkeypatch.setattr(
+        sketch_removal,
+        "_public_constraint_expression_dependencies",
+        lambda *_args: (),
+    )
     monkeypatch.setattr(sketch_editing, "_validate_geometry_compatibility", lambda *_args: None)
     monkeypatch.setattr(
         sketch_editing,
@@ -458,6 +891,62 @@ def test_replacement_no_change_and_duplicate_are_preflight_only(
             0,
             HorizontalConstraintInput(type="horizontal", geometry_index=1),
         )
+    assert document.labels == []
+    assert sketch.deleted == []
+
+
+def test_replacement_expression_refusal_uses_exact_public_dependent_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _constraint(0, "distance", name="BaseLength")
+    inspected = _inspection(name="SourceSketch", constraints=(source,))
+    snapshot = _snapshot(
+        inspected=inspected,
+        states=(_state("Distance", 0, 10.0, name="BaseLength"),),
+    )
+    sketch = _Sketch(list(snapshot.base.constraints))
+    sketch.Name = "SourceSketch"
+    document = _install(monkeypatch, snapshot, sketch, inspected)
+    document.Name = "Model"
+    raw_dependency = {
+        "constraint_index": 0,
+        "constraint_name": "BaseLength",
+        "object_name": "DependentSketch",
+        "property_path": "Constraints[0]",
+        "expression": "SourceSketch.Constraints.BaseLength / 2",
+        "dependency_kind": "downstream",
+    }
+    public_dependency = {
+        "constraint_index": 0,
+        "constraint_name": "BaseLength",
+        "dependent_document_name": "Model",
+        "dependent_sketch_name": "DependentSketch",
+        "dependent_constraint_index": 0,
+        "dependent_constraint_name": "HalfLength",
+        "dependency_kind": "expression_source",
+    }
+    monkeypatch.setattr(
+        sketch_removal,
+        "_constraint_expression_dependencies",
+        lambda *_args: (raw_dependency,),
+    )
+    monkeypatch.setattr(
+        sketch_constraint_expressions,
+        "expression_dependents",
+        lambda *_args: (public_dependency,),
+    )
+
+    with pytest.raises(SketchConstraintReplacementUnsafeError) as caught:
+        sketch_editing.replace_sketch_constraint(
+            "Model",
+            "SourceSketch",
+            0,
+            HorizontalConstraintInput(type="horizontal", geometry_index=0),
+        )
+
+    assert caught.value.reason == "expression_dependency"
+    assert caught.value.dependencies == (public_dependency,)
+    assert all("property_path" not in item for item in caught.value.dependencies)
     assert document.labels == []
     assert sketch.deleted == []
 
@@ -492,7 +981,11 @@ def test_replacement_success_reports_append_index_and_survivor_mapping(
     snapshot = _snapshot(inspected=inspected, states=states)
     sketch = _Sketch(list(states))
     document = _install(monkeypatch, snapshot, sketch, inspected)
-    monkeypatch.setattr(sketch_removal, "_constraint_expression_dependencies", lambda *_args: ())
+    monkeypatch.setattr(
+        sketch_removal,
+        "_public_constraint_expression_dependencies",
+        lambda *_args: (),
+    )
     monkeypatch.setattr(sketch_editing, "_validate_geometry_compatibility", lambda *_args: None)
     monkeypatch.setattr(
         sketch_editing,
@@ -539,7 +1032,7 @@ def test_post_mutation_verification_failure_routes_through_rollback(
     monkeypatch.setattr(
         sketch_removal,
         "_rollback",
-        lambda *_args: rolled_back.append("rollback"),
+        lambda *_args, **_kwargs: rolled_back.append("rollback"),
     )
 
     with pytest.raises(SketchControlledMutationError, match="injected"):

@@ -14,7 +14,7 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- thirty-four typed MCP tools for document creation, inspection, saving,
+- thirty-nine typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
@@ -552,7 +552,7 @@ Indices are temporary current-state indices. Only driving dimensional
 constraints are created. Point-specific tangency, line-line tangency, block,
 internal alignment, angle-via-point, B-spline-specific and arbitrary reference
 constraints;
-constraint names, expressions, editing, and deletion; external/internal
+constraint naming/expression assignment in the same creation batch and deletion; external/internal
 geometry references; and arbitrary `Sketcher.Constraint` passthrough remain
 unsupported. Controlled axes are accepted only by `point_on_object` and as the
 `about` reference of `symmetric`. Supported native symmetry reads back as three
@@ -1307,16 +1307,70 @@ and datum-editing schemas remain unchanged and refuse mixed constraints.
 See [the tested capability matrix](docs/sketch-reference-constraint-capabilities.md)
 for every mode, geometry pair, operand-order finding, source propagation, and
 known limit. External reference numbers remain current-order-local; list again
-after removal. Constraint expressions and names remain planned for Milestone
-22.
+after removal.
+
+### Constraint names and expressions
+
+Tools 36–39 are `set_sketch_constraint_name`,
+`set_sketch_constraint_expression`, `clear_sketch_constraint_expression`, and
+`list_sketch_constraint_expressions`. They operate on active, non-virtual,
+driving scalar `distance`, `distance_x`, `distance_y`, `radius`, `diameter`, and
+`angle` constraints. Each mutation targets one current constraint index;
+inspection remains read-only and returns expression-bound constraints in
+deterministic index order.
+
+Constraint names are case-sensitive ASCII identifiers matching
+`[A-Za-z_][A-Za-z0-9_]*`, limited to 64 characters and unique within one
+sketch. Pass `null` to clear a name. Exact no-ops create no history. Renaming or
+clearing a referenced source and renaming an expression-bound target are
+conservatively refused rather than allowing FreeCAD to rewrite expressions.
+
+The public expression language is finite and parsed; arbitrary native
+expression text is never passed through. Expressions are at most 512
+characters and support finite decimal constants, explicit `mm` and `deg`
+units, parentheses, unary `+`/`-`, binary `+`, `-`, `*`, `/`, and only
+`sqrt(...)` on a dimensionless value. References are
+`Constraints.Name` within the target sketch or
+`SketchName.Constraints.Name` within the same document, where `SketchName` is
+the exact internal object name. Examples:
+
+```text
+7 mm
+30 deg
+Constraints.Width / 2
+SourceSketch.Constraints.SideLength / (2 * sqrt(3))
+```
+
+The parser canonicalizes spacing and numbers, resolves every named source,
+infers length/angle/dimensionless values, and rejects missing or ambiguous
+references, dimension errors, direct or indirect cycles, division by a known
+zero, invalid square-root domains, cross-document syntax, labels, spreadsheet
+aliases, arbitrary properties, functions, strings, and Python. Pre-existing
+native expressions outside this grammar are reported as opaque without their
+raw text or property path and block unsafe affected mutations.
+
+An owned successful mutation produces exactly one `Set sketch constraint
+name`, `Set sketch constraint expression`, or `Clear sketch constraint
+expression` history step. Caller-owned transactions remain open. No-op and
+preflight refusal paths are transaction-free. Clear preserves the currently
+evaluated datum so `update_sketch_constraint_value` can control it again.
+Direct value update refuses while bound; referenced source removal and
+replacement refuse with exact dependents; source value updates remain allowed
+and propagate. None of these tools saves automatically, while an explicit save
+persists names and expressions.
+
+See [the tested expression capability contract](docs/sketch-constraint-expression-capabilities.md)
+and [the prepared public MCP acceptance campaign](docs/codex-milestone-22-acceptance.md).
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Development setup and CI](docs/development.md)
 - [Sketch reference-constraint capabilities](docs/sketch-reference-constraint-capabilities.md)
+- [Sketch constraint-expression capabilities](docs/sketch-constraint-expression-capabilities.md)
 - [Milestone 21 autonomous acceptance](docs/codex-milestone-21-acceptance.md)
 - [Milestone 21 stabilization acceptance](docs/codex-milestone-21-stabilization-acceptance.md)
+- [Milestone 22 autonomous acceptance](docs/codex-milestone-22-acceptance.md)
 
 ## License
 

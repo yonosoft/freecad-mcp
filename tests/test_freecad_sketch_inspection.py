@@ -125,6 +125,7 @@ class SketchStub(DocumentObjectStub):
         self.GeometryCount = len(self.Geometry)
         self.Constraints = constraints or []
         self.ConstraintCount = len(self.Constraints)
+        self.ExpressionEngine: tuple[tuple[str, str], ...] = ()
         self._construction = construction or [False] * len(self.Geometry)
         self.ExternalGeo: list[Any] = [object(), object()]
         self.AttachmentOffset: Any = None
@@ -377,6 +378,8 @@ def test_get_sketch_reports_external_constraint_operands_without_native_geo_ids(
                 },
             ],
             "value": None,
+            "expression": None,
+            "expression_supported": None,
         }
     ]
     assert "-3" not in repr(result["constraints"])

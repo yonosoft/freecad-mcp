@@ -815,7 +815,7 @@ def main() -> None:
     )
     _record(
         "tool_inventory",
-        len(REGISTERED_TOOL_NAMES) == 35
+        len(REGISTERED_TOOL_NAMES) == 39
         and REGISTERED_TOOL_NAMES[:24] == expected_first_twenty_four
         and REGISTERED_TOOL_NAMES[24:28]
         == (
@@ -836,7 +836,14 @@ def main() -> None:
             "replace_sketch_constraint",
             "update_sketch_constraint_value",
         )
-        and REGISTERED_TOOL_NAMES[34:] == ("add_sketch_reference_constraints",),
+        and REGISTERED_TOOL_NAMES[34] == "add_sketch_reference_constraints"
+        and REGISTERED_TOOL_NAMES[35:]
+        == (
+            "set_sketch_constraint_name",
+            "set_sketch_constraint_expression",
+            "clear_sketch_constraint_expression",
+            "list_sketch_constraint_expressions",
+        ),
     )
     _main_product_cases()
     _add_undo_redo_and_recovery()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -81,6 +83,23 @@ class _Adapter:
                 reason="duplicate_constraint",
                 constraint_index=constraint_index,
                 dependencies=({"duplicate_constraint_index": 4},),
+            )
+        if self.unsafe == "replacement_expression":
+            raise SketchConstraintReplacementUnsafeError(
+                reason="expression_dependency",
+                constraint_index=constraint_index,
+                dependencies=(
+                    {
+                        "constraint_index": constraint_index,
+                        "constraint_name": "BaseLength",
+                        "object_name": "DependentSketch",
+                        "property_path": "Constraints[0]",
+                        "expression": "SourceSketch.Constraints.BaseLength / 2",
+                        "dependency_kind": "downstream",
+                        "native_object": object(),
+                        "constraint_type": "<Sketcher.Constraint object at 0xDEADBEEF>",
+                    },
+                ),
             )
         return _Result(no_change=self.no_change)
 
@@ -253,6 +272,37 @@ def test_handlers_return_controlled_preflight_refusals(
 
     assert result.code == expected_code
     assert result.data["reason"] == expected_reason
+
+
+def test_replacement_refusal_serializes_only_public_dependency_identities() -> None:
+    adapter = _Adapter()
+    adapter.unsafe = "replacement_expression"
+
+    result = ReplaceSketchConstraintHandler(adapter, _Dispatcher()).execute(
+        "Model",
+        "SourceSketch",
+        0,
+        {"type": "horizontal", "geometry_index": 0},
+    )
+
+    assert result.code == "sketch_constraint_replacement_unsafe"
+    assert result.data["dependencies"] == [
+        {
+            "constraint_index": 0,
+            "constraint_name": "BaseLength",
+            "dependent_document_name": "Model",
+            "dependent_sketch_name": "DependentSketch",
+            "dependent_constraint_index": 0,
+            "dependency_kind": "expression_source",
+        }
+    ]
+    public_response = json.dumps(result.to_dict(), sort_keys=True)
+    assert "property_path" not in public_response
+    assert "native_object" not in public_response
+    assert "Sketcher.Constraint" not in public_response
+    assert re.search(r"Constraints\[\d+\]", public_response) is None
+    assert re.search(r"<[^>]* object at 0x[0-9a-fA-F]+>", public_response) is None
+    assert re.search(r"0x[0-9a-fA-F]+", public_response) is None
 
 
 def test_all_three_no_change_results_have_distinct_success_codes() -> None:

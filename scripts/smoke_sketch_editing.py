@@ -264,7 +264,7 @@ def _value_cases() -> None:
     try:
         _ADAPTER.update_sketch_constraint_value("M20ValueExpression", "Sketch", index, 14.0)
     except SketchConstraintValueUpdateUnsafeError as exc:
-        _record("expression_value_refused", exc.reason == "expression_dependency")
+        _record("expression_value_refused", exc.reason == "expression_bound_constraint")
     else:
         raise AssertionError("expression-backed value update was accepted")
     _record(
@@ -679,7 +679,7 @@ def _persistence_and_isolation_cases() -> None:
 
 def main() -> None:
     _record("freecad_1_1_1", tuple(App.Version()[:3]) == ("1", "1", "1"))
-    _record("exact_35_tool_inventory", len(REGISTERED_TOOL_NAMES) == 35)
+    _record("exact_39_tool_inventory", len(REGISTERED_TOOL_NAMES) == 39)
     _record(
         "milestone_20_tool_order",
         REGISTERED_TOOL_NAMES[31:34]
@@ -688,7 +688,14 @@ def main() -> None:
             "replace_sketch_constraint",
             "update_sketch_constraint_value",
         )
-        and REGISTERED_TOOL_NAMES[34:] == ("add_sketch_reference_constraints",),
+        and REGISTERED_TOOL_NAMES[34] == "add_sketch_reference_constraints"
+        and REGISTERED_TOOL_NAMES[35:]
+        == (
+            "set_sketch_constraint_name",
+            "set_sketch_constraint_expression",
+            "clear_sketch_constraint_expression",
+            "list_sketch_constraint_expressions",
+        ),
     )
     _value_cases()
     _replacement_cases()

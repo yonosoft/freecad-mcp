@@ -7,6 +7,10 @@ import re
 from numbers import Integral, Real
 from typing import Any
 
+from freecad_mcp.constraint_expression_language import (
+    ConstraintExpressionError,
+    parse_constraint_expression,
+)
 from freecad_mcp.exceptions import (
     DocumentNotFoundError,
     ObjectNotFoundError,
@@ -259,6 +263,7 @@ def _inspect_constraints(
         ) from exc
     if reported_count != len(raw_constraints):
         raise SketchConstraintMalformedError(index=None, reason="constraint_count_mismatch")
+    expressions = _constraint_expressions(sketch, raw_constraints)
 
     result: list[SketchConstraint] = []
     for index, item in enumerate(raw_constraints):
@@ -266,6 +271,7 @@ def _inspect_constraints(
         name = _constraint_name(item, index)
         active = _constraint_bool(item, "IsActive", index)
         virtual_space = _constraint_bool(item, "InVirtualSpace", index)
+        expression, expression_supported = expressions.get(index, (None, None))
 
         if freecad_type not in _SUPPORTED_CONSTRAINTS:
             result.append(
@@ -275,6 +281,8 @@ def _inspect_constraints(
                     name=name,
                     active=active,
                     virtual_space=virtual_space,
+                    expression=expression,
+                    expression_supported=expression_supported,
                 )
             )
             continue
@@ -293,6 +301,8 @@ def _inspect_constraints(
                     name=name,
                     active=active,
                     virtual_space=virtual_space,
+                    expression=expression,
+                    expression_supported=expression_supported,
                 )
             )
             continue
@@ -319,9 +329,65 @@ def _inspect_constraints(
                 driving=driving,
                 references=references,
                 value=value,
+                expression=expression,
+                expression_supported=expression_supported,
             )
         )
     return tuple(result)
+
+
+def _constraint_expressions(
+    sketch: Any,
+    constraints: tuple[Any, ...],
+) -> dict[int, tuple[str | None, bool | None]]:
+    """Map native constraint expression paths to controlled current indices."""
+    try:
+        entries = tuple(sketch.ExpressionEngine)
+    except Exception as exc:
+        raise SketchConstraintMalformedError(
+            index=None, reason="constraint_expression_state_unreadable"
+        ) from exc
+    names: dict[str, int] = {}
+    for index, constraint in enumerate(constraints):
+        name = _constraint_name(constraint, index)
+        if name is not None:
+            names[name] = index
+    result: dict[int, tuple[str | None, bool | None]] = {}
+    for entry in entries:
+        try:
+            path, expression = entry
+        except Exception as exc:
+            raise SketchConstraintMalformedError(
+                index=None, reason="constraint_expression_entry_unreadable"
+            ) from exc
+        if not isinstance(path, str) or not isinstance(expression, str):
+            raise SketchConstraintMalformedError(
+                index=None, reason="constraint_expression_entry_unreadable"
+            )
+        normalized = path.lstrip(".")
+        numeric = re.fullmatch(r"Constraints\[(\d+)\]", normalized)
+        named = re.fullmatch(r"Constraints\.([A-Za-z_][A-Za-z0-9_]*)", normalized)
+        if numeric is not None:
+            index = int(numeric.group(1))
+        elif named is not None and named.group(1) in names:
+            index = names[named.group(1)]
+        else:
+            continue
+        if index < 0 or index >= len(constraints):
+            continue
+        if index in result:
+            result[index] = (None, False)
+            continue
+        try:
+            parsed = parse_constraint_expression(
+                expression,
+                allow_native_leading_dot=True,
+            )
+        except ConstraintExpressionError:
+            result[index] = (None, False)
+        else:
+            result[index] = (parsed.canonical, True)
+    return result
 
 
 def _constraint_references(
