@@ -26,7 +26,7 @@ def _server() -> Any:
 def test_constraint_expression_tools_are_exactly_tools_thirty_six_through_thirty_nine() -> None:
     names = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert len(names) == 48
+    assert len(names) == 51
     assert tuple(names) == REGISTERED_TOOL_NAMES
     assert names[35:39] == [
         SET_SKETCH_CONSTRAINT_NAME_TOOL,

@@ -28,6 +28,7 @@ from freecad_mcp.models import (
     SketchConstraintNameResult,
     SketchConstraintRemovalResult,
     SketchConstraintReplacementResult,
+    SketchConstraintStateResult,
     SketchConstraintValueUpdateResult,
     SketchCreationResult,
     SketchDependencyInspectionResult,
@@ -306,6 +307,33 @@ class SketchEditingAdapter(Protocol):
         value: float,
     ) -> SketchConstraintValueUpdateResult:
         """Set one supported driving dimensional datum."""
+
+    def set_sketch_constraint_driving(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        driving: bool,
+    ) -> SketchConstraintStateResult:
+        """Set one supported dimensional constraint to driving or reference state."""
+
+    def set_sketch_constraint_active(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        active: bool,
+    ) -> SketchConstraintStateResult:
+        """Set one supported constraint to active or inactive state."""
+
+    def set_sketch_constraint_virtual_space(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        virtual: bool,
+    ) -> SketchConstraintStateResult:
+        """Move one supported constraint into or out of virtual space."""
 
 
 class SketchTopologyEditingAdapter(Protocol):

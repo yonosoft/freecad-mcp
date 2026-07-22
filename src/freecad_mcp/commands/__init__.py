@@ -29,6 +29,11 @@ from freecad_mcp.commands.sketch_constraint_expressions import (
     SetSketchConstraintExpressionHandler,
     SetSketchConstraintNameHandler,
 )
+from freecad_mcp.commands.sketch_constraint_state import (
+    SetSketchConstraintActiveHandler,
+    SetSketchConstraintDrivingHandler,
+    SetSketchConstraintVirtualSpaceHandler,
+)
 from freecad_mcp.commands.sketch_constraints import AddSketchConstraintsHandler
 from freecad_mcp.commands.sketch_curved_profiles import (
     CreateSketchRoundedRectangleHandler,
@@ -127,6 +132,9 @@ class DocumentHandlers:
     set_sketch_constraint_expression: SetSketchConstraintExpressionHandler
     clear_sketch_constraint_expression: ClearSketchConstraintExpressionHandler
     list_sketch_constraint_expressions: ListSketchConstraintExpressionsHandler
+    set_sketch_constraint_driving: SetSketchConstraintDrivingHandler
+    set_sketch_constraint_active: SetSketchConstraintActiveHandler
+    set_sketch_constraint_virtual_space: SetSketchConstraintVirtualSpaceHandler
     recompute: RecomputeDocumentHandler
 
 
@@ -170,8 +178,11 @@ __all__ = [
     "RotateSketchGeometryHandler",
     "SaveDocumentHandler",
     "ScaleSketchGeometryHandler",
+    "SetSketchConstraintActiveHandler",
+    "SetSketchConstraintDrivingHandler",
     "SetSketchConstraintExpressionHandler",
     "SetSketchConstraintNameHandler",
+    "SetSketchConstraintVirtualSpaceHandler",
     "SetSketchGeometryConstructionHandler",
     "SplitSketchGeometryHandler",
     "TranslateSketchGeometryHandler",

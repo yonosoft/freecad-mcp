@@ -2365,6 +2365,40 @@ class SketchConstraintValueUpdateResult:
 
 
 @dataclass(frozen=True, slots=True)
+class SketchConstraintStateResult:
+    """Verified constraint state transition with complete controlled readback."""
+
+    constraint_index: int
+    constraint_type: str
+    before_constraint: SketchConstraintData
+    after_constraint: SketchConstraintData
+    requested_state: dict[str, object]
+    previous_state: dict[str, object]
+    no_change: bool = False
+    affected_geometry_indices: tuple[int, ...] = ()
+    sketch: SketchInspectionResult | None = None
+    document: DocumentSummary | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        result: dict[str, object] = {
+            "constraint_index": self.constraint_index,
+            "constraint_type": self.constraint_type,
+            "requested_state": dict(self.requested_state),
+            "previous_state": {k: v for k, v in self.previous_state.items()},
+            "before_constraint": self.before_constraint.to_dict(),
+            "after_constraint": self.after_constraint.to_dict(),
+            "changed": not self.no_change,
+            "transaction_committed": not self.no_change,
+            "affected_geometry_indices": list(self.affected_geometry_indices),
+        }
+        if self.sketch is not None:
+            result["sketch"] = self.sketch.to_dict()
+        if self.document is not None:
+            result["document"] = self.document.to_dict()
+        return result
+
+
+@dataclass(frozen=True, slots=True)
 class SketchTopologyGeometryMapping:
     """Complete relationship from one pre-call geometry item to current results."""
 

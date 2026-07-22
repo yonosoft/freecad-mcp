@@ -11,6 +11,7 @@ from freecad_mcp.freecad import (
     sketch_centered_rectangle_creation,
     sketch_constraint_creation,
     sketch_constraint_expressions,
+    sketch_constraint_state,
     sketch_creation,
     sketch_dependencies,
     sketch_editing,
@@ -80,6 +81,7 @@ from freecad_mcp.models import (
     SketchConstraintNameResult,
     SketchConstraintRemovalResult,
     SketchConstraintReplacementResult,
+    SketchConstraintStateResult,
     SketchConstraintValueUpdateResult,
     SketchCreationResult,
     SketchDependencyInspectionResult,
@@ -393,6 +395,48 @@ class FreeCADDocumentAdapter:
             sketch_name,
             constraint_index,
             value,
+        )
+
+    def set_sketch_constraint_driving(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        driving: bool,
+    ) -> SketchConstraintStateResult:
+        return sketch_constraint_state.set_sketch_constraint_driving(
+            document_name,
+            sketch_name,
+            constraint_index,
+            driving,
+        )
+
+    def set_sketch_constraint_active(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        active: bool,
+    ) -> SketchConstraintStateResult:
+        return sketch_constraint_state.set_sketch_constraint_active(
+            document_name,
+            sketch_name,
+            constraint_index,
+            active,
+        )
+
+    def set_sketch_constraint_virtual_space(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        virtual: bool,
+    ) -> SketchConstraintStateResult:
+        return sketch_constraint_state.set_sketch_constraint_virtual_space(
+            document_name,
+            sketch_name,
+            constraint_index,
+            virtual,
         )
 
     def trim_sketch_geometry(

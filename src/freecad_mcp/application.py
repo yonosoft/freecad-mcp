@@ -457,6 +457,51 @@ class Application:
             value=value,
         )
 
+    def set_sketch_constraint_driving(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraint_index: object,
+        driving: object,
+    ) -> CommandResult:
+        """Set one supported dimensional constraint to driving or reference state."""
+        return self.documents.set_sketch_constraint_driving.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraint_index=constraint_index,
+            driving=driving,
+        )
+
+    def set_sketch_constraint_active(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraint_index: object,
+        active: object,
+    ) -> CommandResult:
+        """Set one supported constraint to active or inactive state."""
+        return self.documents.set_sketch_constraint_active.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraint_index=constraint_index,
+            active=active,
+        )
+
+    def set_sketch_constraint_virtual_space(
+        self,
+        document_name: object,
+        sketch_name: object,
+        constraint_index: object,
+        virtual: object,
+    ) -> CommandResult:
+        """Move one supported constraint into or out of virtual space."""
+        return self.documents.set_sketch_constraint_virtual_space.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            constraint_index=constraint_index,
+            virtual=virtual,
+        )
+
     def set_sketch_constraint_name(
         self,
         document_name: object,

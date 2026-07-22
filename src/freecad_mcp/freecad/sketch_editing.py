@@ -62,7 +62,14 @@ from freecad_mcp.transaction_names import (
 )
 from freecad_mcp.validation import normalize_arc_angles_degrees
 
-_Operation = Literal["update_geometry", "replace_constraint", "update_constraint_value"]
+_Operation = Literal[
+    "update_geometry",
+    "replace_constraint",
+    "update_constraint_value",
+    "set_constraint_driving",
+    "set_constraint_active",
+    "set_constraint_virtual_space",
+]
 _DIMENSIONAL_TYPES = {"distance", "distance_x", "distance_y", "radius", "diameter", "angle"}
 _NATIVE_DIMENSIONAL_TYPES = {"Distance", "DistanceX", "DistanceY", "Radius", "Diameter", "Angle"}
 _ANGLE_TOLERANCE_DEGREES = math.degrees(TOPOLOGY_TOLERANCE)

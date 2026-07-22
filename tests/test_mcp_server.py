@@ -134,6 +134,11 @@ def test_mcp_server_composes_explicit_registration_groups(
         "register_sketch_constraint_expression_tools",
         recorder("sketch_constraint_expression_tools"),
     )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_constraint_state_tools",
+        recorder("sketch_constraint_state_tools"),
+    )
 
     server = mcp_server_module.build_mcp_server(handlers, ServerConfig())
 
@@ -158,6 +163,7 @@ def test_mcp_server_composes_explicit_registration_groups(
         "sketch_constraint_expression_tools",
         "sketch_topology_editing_tools",
         "sketch_geometry_transform_tools",
+        "sketch_constraint_state_tools",
     ]
     assert asyncio.run(server.list_tools()) == []
 
@@ -228,6 +234,9 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
         "scale_sketch_geometry",
         "rectangular_array_sketch_geometry",
         "polar_array_sketch_geometry",
+        "set_sketch_constraint_driving",
+        "set_sketch_constraint_active",
+        "set_sketch_constraint_virtual_space",
     ]
 
 

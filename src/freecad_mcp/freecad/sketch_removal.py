@@ -61,6 +61,9 @@ _Operation = Literal[
     "trim_geometry",
     "split_geometry",
     "extend_geometry",
+    "set_constraint_driving",
+    "set_constraint_active",
+    "set_constraint_virtual_space",
 ]
 
 _ROLLBACK_COORDINATE_TOLERANCE = 1.0e-15

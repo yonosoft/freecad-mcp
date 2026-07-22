@@ -56,6 +56,11 @@ from freecad_mcp.commands import (
 )
 from freecad_mcp.commands.body import CreateBodyHandler
 from freecad_mcp.commands.sketch import CreateSketchHandler
+from freecad_mcp.commands.sketch_constraint_state import (
+    SetSketchConstraintActiveHandler,
+    SetSketchConstraintDrivingHandler,
+    SetSketchConstraintVirtualSpaceHandler,
+)
 from freecad_mcp.core.logging import get_logger
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter
 from freecad_mcp.freecad.qt_dispatcher import create_qt_main_thread_dispatcher
@@ -235,6 +240,18 @@ def _build_runtime() -> Runtime:
             dispatcher=dispatcher,
         ),
         list_sketch_constraint_expressions=ListSketchConstraintExpressionsHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        set_sketch_constraint_driving=SetSketchConstraintDrivingHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        set_sketch_constraint_active=SetSketchConstraintActiveHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        set_sketch_constraint_virtual_space=SetSketchConstraintVirtualSpaceHandler(
             adapter=adapter,
             dispatcher=dispatcher,
         ),

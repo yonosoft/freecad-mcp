@@ -15,6 +15,7 @@ from freecad_mcp.commands.sketch_editing import (
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.exceptions import (
     SketchConstraintReplacementUnsafeError,
+    SketchConstraintStateUnsafeError,
     SketchConstraintValueUpdateUnsafeError,
     SketchGeometryUpdateUnsafeError,
 )
@@ -34,8 +35,9 @@ class _Dispatcher:
 
 
 class _Result:
-    def __init__(self, *, no_change: bool = False) -> None:
+    def __init__(self, *, no_change: bool = False, driving: bool | None = None) -> None:
         self.no_change = no_change
+        self.driving = driving
 
     def to_dict(self) -> dict[str, object]:
         return {"no_change": self.no_change}
@@ -46,6 +48,9 @@ class _Adapter:
         self.geometry_calls: list[tuple[str, str, int, SketchGeometryUpdateInput]] = []
         self.replacement_calls: list[tuple[str, str, int, SketchConstraintInput]] = []
         self.value_calls: list[tuple[str, str, int, float]] = []
+        self.driving_calls: list[tuple[str, str, int, bool]] = []
+        self.active_calls: list[tuple[str, str, int, bool]] = []
+        self.virtual_calls: list[tuple[str, str, int, bool]] = []
         self.no_change = False
         self.unsafe: str | None = None
 
@@ -118,6 +123,51 @@ class _Adapter:
                 dependencies=({"object_name": "Sketch", "property_path": ".Constraints[0]"},),
             )
         return _Result(no_change=self.no_change)
+
+    def set_sketch_constraint_driving(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        driving: bool,
+    ) -> Any:
+        self.driving_calls.append((document_name, sketch_name, constraint_index, driving))
+        if self.unsafe == "driving":
+            raise SketchConstraintStateUnsafeError(
+                reason="test_reason",
+                constraint_index=constraint_index,
+            )
+        return _Result(driving=driving, no_change=self.no_change)
+
+    def set_sketch_constraint_active(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        active: bool,
+    ) -> Any:
+        self.active_calls.append((document_name, sketch_name, constraint_index, active))
+        if self.unsafe == "active":
+            raise SketchConstraintStateUnsafeError(
+                reason="test_reason",
+                constraint_index=constraint_index,
+            )
+        return _Result(driving=active, no_change=self.no_change)
+
+    def set_sketch_constraint_virtual_space(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        virtual: bool,
+    ) -> Any:
+        self.virtual_calls.append((document_name, sketch_name, constraint_index, virtual))
+        if self.unsafe == "virtual":
+            raise SketchConstraintStateUnsafeError(
+                reason="test_reason",
+                constraint_index=constraint_index,
+            )
+        return _Result(driving=virtual, no_change=self.no_change)
 
 
 @pytest.mark.parametrize("index", [True, 1.0, "1", -1, None])

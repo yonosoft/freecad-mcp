@@ -21,6 +21,9 @@ from freecad_mcp.mcp.sketch_centered_rectangle_tools import (
 from freecad_mcp.mcp.sketch_constraint_expression_tools import (
     register_sketch_constraint_expression_tools,
 )
+from freecad_mcp.mcp.sketch_constraint_state_tools import (
+    register_sketch_constraint_state_tools,
+)
 from freecad_mcp.mcp.sketch_constraint_tools import register_add_sketch_constraints_tool
 from freecad_mcp.mcp.sketch_curved_profile_tools import register_sketch_curved_profile_tools
 from freecad_mcp.mcp.sketch_editing_tools import register_sketch_editing_tools
@@ -130,5 +133,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_constraint_expression_tools(server, handlers)
     register_sketch_topology_editing_tools(server, handlers)
     register_sketch_geometry_transform_tools(server, handlers)
+    register_sketch_constraint_state_tools(server, handlers)
 
     return server

@@ -2122,6 +2122,70 @@ def validate_replace_sketch_constraint_request(
     return index, parsed[0]
 
 
+def validate_set_sketch_constraint_driving_request(
+    document_name: object,
+    sketch_name: object,
+    constraint_index: object,
+    driving: object,
+) -> tuple[int, bool] | CommandResult:
+    """Validate strict index and Boolean driving intent."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(constraint_index, field="constraint_index")
+    if isinstance(index, CommandResult):
+        return index
+    if not isinstance(driving, bool):
+        return CommandResult.failure(
+            code="validation_error",
+            message="driving must be a strict Boolean.",
+            data={"field": "driving", "actual_type": type(driving).__name__},
+        )
+    return index, driving
+
+
+def validate_set_sketch_constraint_active_request(
+    document_name: object,
+    sketch_name: object,
+    constraint_index: object,
+    active: object,
+) -> tuple[int, bool] | CommandResult:
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(constraint_index, field="constraint_index")
+    if isinstance(index, CommandResult):
+        return index
+    if not isinstance(active, bool):
+        return CommandResult.failure(
+            code="validation_error",
+            message="active must be a strict Boolean.",
+            data={"field": "active", "actual_type": type(active).__name__},
+        )
+    return index, active
+
+
+def validate_set_sketch_constraint_virtual_space_request(
+    document_name: object,
+    sketch_name: object,
+    constraint_index: object,
+    virtual: object,
+) -> tuple[int, bool] | CommandResult:
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(constraint_index, field="constraint_index")
+    if isinstance(index, CommandResult):
+        return index
+    if not isinstance(virtual, bool):
+        return CommandResult.failure(
+            code="validation_error",
+            message="virtual must be a strict Boolean.",
+            data={"field": "virtual", "actual_type": type(virtual).__name__},
+        )
+    return index, virtual
+
+
 def validate_update_sketch_constraint_value_request(
     document_name: object,
     sketch_name: object,
@@ -2256,8 +2320,11 @@ __all__ = [
     "validate_replace_sketch_constraint_request",
     "validate_rotate_sketch_geometry_request",
     "validate_scale_sketch_geometry_request",
+    "validate_set_sketch_constraint_active_request",
+    "validate_set_sketch_constraint_driving_request",
     "validate_set_sketch_constraint_expression_request",
     "validate_set_sketch_constraint_name_request",
+    "validate_set_sketch_constraint_virtual_space_request",
     "validate_set_sketch_geometry_construction_request",
     "validate_sketch_constraint_expression_locator",
     "validate_sketch_mutation_selection_request",

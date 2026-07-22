@@ -335,6 +335,22 @@ class SketchConstraintValueUpdateUnsafeError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchConstraintStateUnsafeError(RuntimeError):
+    """Raised before a constraint state transition that is unsupported or unsafe."""
+
+    def __init__(
+        self,
+        *,
+        reason: str,
+        constraint_index: int,
+        dependencies: tuple[dict[str, object], ...] = (),
+    ) -> None:
+        self.reason = reason
+        self.constraint_index = constraint_index
+        self.dependencies = dependencies
+        super().__init__(reason)
+
+
 class SketchConstraintExpressionError(RuntimeError):
     """Raised for controlled constraint-name or expression refusal/failure."""
 
@@ -784,6 +800,7 @@ __all__ = [
     "SketchConstraintMalformedError",
     "SketchConstraintReplacementUnsafeError",
     "SketchConstraintRollbackError",
+    "SketchConstraintStateUnsafeError",
     "SketchConstraintValueUpdateUnsafeError",
     "SketchCreationError",
     "SketchDependencyInspectionError",

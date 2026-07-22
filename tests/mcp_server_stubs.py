@@ -57,6 +57,12 @@ from freecad_mcp.commands import (
     ValidateSketchProfileHandler,
 )
 from freecad_mcp.commands.sketch import CreateSketchHandler
+from freecad_mcp.commands.sketch_constraint_state import (
+    SetSketchConstraintActiveHandler,
+    SetSketchConstraintDrivingHandler,
+    SetSketchConstraintVirtualSpaceHandler,
+)
+from freecad_mcp.exceptions import SketchConstraintStateUnsafeError
 from freecad_mcp.freecad import sketch_topology
 from freecad_mcp.models import (
     AttachmentInfo,
@@ -115,6 +121,15 @@ from freecad_mcp.models import (
 )
 
 T = TypeVar("T")
+
+
+class _Result:
+    def __init__(self, *, driving: bool, no_change: bool = False) -> None:
+        self.driving = driving
+        self.no_change = no_change
+
+    def to_dict(self) -> dict[str, object]:
+        return {"driving": self.driving, "no_change": self.no_change}
 
 
 class AdapterStub:
@@ -181,6 +196,11 @@ class AdapterStub:
         self.list_sketch_constraint_expressions_calls: list[tuple[str, str]] = []
         self.undo_names = ["Add sketch constraints"]
         self.redo_names: list[str] = []
+        self.driving_calls: list[tuple[str, str, int, bool]] = []
+        self.active_calls: list[tuple[str, str, int, bool]] = []
+        self.virtual_calls: list[tuple[str, str, int, bool]] = []
+        self.no_change = False
+        self.unsafe: str | None = None
 
     def create_document(self, name: str, label: str | None) -> DocumentSummary:
         self.create_calls.append((name, label))
@@ -969,6 +989,51 @@ class AdapterStub:
             ),
         )
 
+    def set_sketch_constraint_driving(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        driving: bool,
+    ) -> Any:
+        self.driving_calls.append((document_name, sketch_name, constraint_index, driving))
+        if self.unsafe == "driving":
+            raise SketchConstraintStateUnsafeError(
+                reason="test_reason",
+                constraint_index=constraint_index,
+            )
+        return _Result(driving=driving, no_change=self.no_change)
+
+    def set_sketch_constraint_active(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        active: bool,
+    ) -> Any:
+        self.active_calls.append((document_name, sketch_name, constraint_index, active))
+        if self.unsafe == "active":
+            raise SketchConstraintStateUnsafeError(
+                reason="test_reason",
+                constraint_index=constraint_index,
+            )
+        return _Result(driving=active, no_change=self.no_change)
+
+    def set_sketch_constraint_virtual_space(
+        self,
+        document_name: str,
+        sketch_name: str,
+        constraint_index: int,
+        virtual: bool,
+    ) -> Any:
+        self.virtual_calls.append((document_name, sketch_name, constraint_index, virtual))
+        if self.unsafe == "virtual":
+            raise SketchConstraintStateUnsafeError(
+                reason="test_reason",
+                constraint_index=constraint_index,
+            )
+        return _Result(driving=virtual, no_change=self.no_change)
+
 
 class DispatcherStub:
     def call(self, operation: Callable[[], T]) -> T:
@@ -1080,6 +1145,18 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
                 dispatcher,
             ),
             list_sketch_constraint_expressions=ListSketchConstraintExpressionsHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            set_sketch_constraint_driving=SetSketchConstraintDrivingHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            set_sketch_constraint_active=SetSketchConstraintActiveHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            set_sketch_constraint_virtual_space=SetSketchConstraintVirtualSpaceHandler(
                 actual_adapter,
                 dispatcher,
             ),
