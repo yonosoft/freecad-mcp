@@ -221,6 +221,10 @@ geometry add/list/remove and sketch dependency inspection.
 `mcp.sketch_reference_constraint_tools` append tools 29–35.
 `mcp.sketch_constraint_expression_tools` explicitly appends constraint naming,
 expression set/clear, and expression listing as tools 36–39.
+`mcp.sketch_topology_editing_tools` appends trim, split, and extend as tools
+40–42. `mcp.sketch_geometry_transform_tools` appends the six copy-only
+transform tools at 43–48. `mcp.sketch_constraint_state_tools` appends driving,
+active, and virtual-space state management as tools 49–51.
 `mcp.server` is the small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
@@ -237,8 +241,9 @@ exactly tools eighteen and nineteen; `create_sketch_slot` and
 `add_external_geometry`, `list_external_geometry`, `remove_external_geometry`,
 and `get_sketch_dependencies` are exactly tools twenty-five through
 twenty-eight; removal/construction tools are 29–31, editing tools are 32–34,
-reference-constraint addition is 35, and constraint name/expression tools are
-36–39.
+reference-constraint addition is 35, constraint name/expression tools are
+36–39, topology-editing tools are 40–42, geometry-transform tools are 43–48,
+and constraint-state tools are 49–51.
 No registration loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
@@ -247,23 +252,9 @@ A dependency-free tool registry is the authoritative source for tool names and
 ordering. FastMCP registration and lifecycle status both consume that registry,
 so reported capabilities cannot drift from the registered set.
 
-The registry currently exposes `create_document`, `list_documents`,
-`get_document`, `save_document`, `list_objects`, `get_object`,
-`recompute_document`, `create_body`, `create_sketch`, `get_sketch`,
-`add_sketch_geometry`, `add_sketch_constraints`, `get_document_history`,
-`undo_document`, `redo_document`, `create_sketch_rectangle`, and
-`create_sketch_centered_rectangle`, `create_sketch_equilateral_triangle`, and
-`create_sketch_regular_polygon`, `create_sketch_slot`, and
-`create_sketch_rounded_rectangle`, `analyze_sketch`,
-`validate_sketch_profile`, `list_sketch_open_vertices`,
-`add_external_geometry`, `list_external_geometry`,
-`remove_external_geometry`, `get_sketch_dependencies`,
-`remove_sketch_constraints`, `remove_sketch_geometry`,
-`set_sketch_geometry_construction`, `update_sketch_geometry`,
-`replace_sketch_constraint`, `update_sketch_constraint_value`,
-`add_sketch_reference_constraints`, `set_sketch_constraint_name`,
-`set_sketch_constraint_expression`, `clear_sketch_constraint_expression`, and
-`list_sketch_constraint_expressions`, in that order.
+The registry currently exposes exactly 51 public tools. The maintained
+[public tool inventory](public-tool-inventory.md) records their exact names and
+order without duplicating registration definitions in architecture prose.
 
 The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
@@ -2262,11 +2253,11 @@ undoes, or closes the transaction; it removes only its partial work, recomputes,
 and verifies the caller's complete prior in-transaction state. No path saves.
 
 The frozen public matrix, request rules, error taxonomy, transaction labels,
-and response shape are in
-`docs/sketch-geometry-transform-capabilities.md`. Isolated evidence is in
-`scripts/probe_sketch_geometry_transforms.py`; the permanent production-adapter
-campaign is `scripts/smoke_sketch_geometry_transforms.py`. Whole-sketch and
-cross-sketch transforms remain deferred to Milestone 28.
+and response shape are summarized in the README and enforced by focused tests.
+Isolated evidence is in `scripts/probe_sketch_geometry_transforms.py`; the
+permanent production-adapter campaign is
+`scripts/smoke_sketch_geometry_transforms.py`. Whole-sketch and cross-sketch
+transforms remain deferred to Milestone 28.
 
 ## Test Ownership
 

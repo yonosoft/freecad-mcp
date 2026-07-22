@@ -41,6 +41,20 @@ def _defined_names(relative_path: str) -> set[str]:
     return names
 
 
+def _layer_paths(layer: str) -> tuple[str, ...]:
+    return tuple(
+        path.relative_to(PACKAGE_ROOT).as_posix()
+        for path in sorted((PACKAGE_ROOT / layer).rglob("*.py"))
+    )
+
+
+def _module_name(relative_path: str) -> str:
+    parts = list(Path(relative_path).with_suffix("").parts)
+    if parts[-1] == "__init__":
+        parts.pop()
+    return ".".join(("freecad_mcp", *parts))
+
+
 def test_structural_modules_do_not_import_implementation_layers() -> None:
     forbidden = {
         "FreeCAD",
@@ -63,6 +77,24 @@ def test_structural_modules_do_not_import_implementation_layers() -> None:
         assert violations == set(), f"{relative_path}: {sorted(violations)}"
 
 
+def test_command_domain_does_not_depend_on_freecad_implementation() -> None:
+    forbidden = {
+        "FreeCAD",
+        "FreeCADGui",
+        "Part",
+        "PySide",
+        "Sketcher",
+        "freecad_mcp.freecad",
+    }
+    for relative_path in _layer_paths("commands"):
+        violations = {
+            module
+            for module in _imported_modules(relative_path)
+            if _matches_prefix(module, forbidden)
+        }
+        assert violations == set(), f"{relative_path}: {sorted(violations)}"
+
+
 def test_freecad_integration_does_not_depend_on_transport_or_application() -> None:
     forbidden = {
         "mcp",
@@ -72,36 +104,7 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         "freecad_mcp.mcp",
         "freecad_mcp.runtime",
     }
-    helpers = (
-        "freecad/document_operations.py",
-        "freecad/object_inspection.py",
-        "freecad/body_creation.py",
-        "freecad/sketch_creation.py",
-        "freecad/sketch_geometry_creation.py",
-        "freecad/sketch_constraint_creation.py",
-        "freecad/sketch_centered_rectangle_creation.py",
-        "freecad/sketch_polygon_creation.py",
-        "freecad/sketch_polygon_profile.py",
-        "freecad/sketch_curved_profile.py",
-        "freecad/sketch_curved_profile_creation.py",
-        "freecad/sketch_slot_profile.py",
-        "freecad/sketch_slot_creation.py",
-        "freecad/sketch_rounded_rectangle_profile.py",
-        "freecad/sketch_rounded_rectangle_creation.py",
-        "freecad/sketch_rectangle_creation.py",
-        "freecad/sketch_rectangle_profile.py",
-        "freecad/sketch_inspection.py",
-        "freecad/sketch_analysis.py",
-        "freecad/sketch_topology.py",
-        "freecad/sketch_external_geometry.py",
-        "freecad/sketch_dependencies.py",
-        "freecad/sketch_removal.py",
-        "freecad/sketch_editing.py",
-        "freecad/document_history.py",
-        "freecad/history_guard.py",
-        "freecad/qt_dispatcher.py",
-    )
-    for relative_path in helpers:
+    for relative_path in _layer_paths("freecad"):
         violations = {
             module
             for module in _imported_modules(relative_path)
@@ -110,7 +113,7 @@ def test_freecad_integration_does_not_depend_on_transport_or_application() -> No
         assert violations == set(), f"{relative_path}: {sorted(violations)}"
 
 
-def test_mcp_registration_does_not_depend_on_freecad_implementation() -> None:
+def test_mcp_transport_does_not_depend_on_freecad_implementation() -> None:
     forbidden = {
         "FreeCAD",
         "FreeCADGui",
@@ -118,108 +121,13 @@ def test_mcp_registration_does_not_depend_on_freecad_implementation() -> None:
         "freecad_mcp.freecad",
         "freecad_mcp.runtime",
     }
-    registration_modules = (
-        "mcp/document_tools.py",
-        "mcp/object_tools.py",
-        "mcp/creation_tools.py",
-        "mcp/sketch_geometry_tools.py",
-        "mcp/sketch_constraint_tools.py",
-        "mcp/document_history_tools.py",
-        "mcp/sketch_rectangle_tools.py",
-        "mcp/sketch_centered_rectangle_tools.py",
-        "mcp/sketch_polygon_tools.py",
-        "mcp/sketch_curved_profile_tools.py",
-        "mcp/sketch_analysis_tools.py",
-        "mcp/sketch_external_geometry_tools.py",
-        "mcp/sketch_removal_tools.py",
-        "mcp/sketch_editing_tools.py",
-        "mcp/server.py",
-    )
-    for relative_path in registration_modules:
+    for relative_path in _layer_paths("mcp"):
         violations = {
             module
             for module in _imported_modules(relative_path)
             if _matches_prefix(module, forbidden)
         }
         assert violations == set(), f"{relative_path}: {sorted(violations)}"
-
-
-def test_mcp_tools_are_registered_explicitly_without_metadata_loops() -> None:
-    registration_modules = (
-        "mcp/document_tools.py",
-        "mcp/object_tools.py",
-        "mcp/creation_tools.py",
-        "mcp/sketch_geometry_tools.py",
-        "mcp/sketch_constraint_tools.py",
-        "mcp/document_history_tools.py",
-        "mcp/sketch_rectangle_tools.py",
-        "mcp/sketch_centered_rectangle_tools.py",
-        "mcp/sketch_polygon_tools.py",
-        "mcp/sketch_curved_profile_tools.py",
-        "mcp/sketch_analysis_tools.py",
-        "mcp/sketch_external_geometry_tools.py",
-        "mcp/sketch_removal_tools.py",
-        "mcp/sketch_editing_tools.py",
-    )
-    registered_constants: list[str] = []
-    for relative_path in registration_modules:
-        tree = _tree(relative_path)
-        assert not any(
-            isinstance(node, (ast.For, ast.AsyncFor, ast.While)) for node in ast.walk(tree)
-        )
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            for decorator in node.decorator_list:
-                if not (
-                    isinstance(decorator, ast.Call)
-                    and isinstance(decorator.func, ast.Attribute)
-                    and decorator.func.attr == "tool"
-                ):
-                    continue
-                name_keyword = next(
-                    keyword for keyword in decorator.keywords if keyword.arg == "name"
-                )
-                assert isinstance(name_keyword.value, ast.Name)
-                registered_constants.append(name_keyword.value.id)
-
-    assert registered_constants == [
-        "CREATE_DOCUMENT_TOOL",
-        "LIST_DOCUMENTS_TOOL",
-        "GET_DOCUMENT_TOOL",
-        "SAVE_DOCUMENT_TOOL",
-        "RECOMPUTE_DOCUMENT_TOOL",
-        "LIST_OBJECTS_TOOL",
-        "GET_OBJECT_TOOL",
-        "GET_SKETCH_TOOL",
-        "CREATE_BODY_TOOL",
-        "CREATE_SKETCH_TOOL",
-        "ADD_SKETCH_GEOMETRY_TOOL",
-        "ADD_SKETCH_CONSTRAINTS_TOOL",
-        "GET_DOCUMENT_HISTORY_TOOL",
-        "UNDO_DOCUMENT_TOOL",
-        "REDO_DOCUMENT_TOOL",
-        "CREATE_SKETCH_RECTANGLE_TOOL",
-        "CREATE_SKETCH_CENTERED_RECTANGLE_TOOL",
-        "CREATE_SKETCH_EQUILATERAL_TRIANGLE_TOOL",
-        "CREATE_SKETCH_REGULAR_POLYGON_TOOL",
-        "CREATE_SKETCH_SLOT_TOOL",
-        "CREATE_SKETCH_ROUNDED_RECTANGLE_TOOL",
-        "ANALYZE_SKETCH_TOOL",
-        "VALIDATE_SKETCH_PROFILE_TOOL",
-        "LIST_SKETCH_OPEN_VERTICES_TOOL",
-        "ADD_EXTERNAL_GEOMETRY_TOOL",
-        "LIST_EXTERNAL_GEOMETRY_TOOL",
-        "REMOVE_EXTERNAL_GEOMETRY_TOOL",
-        "GET_SKETCH_DEPENDENCIES_TOOL",
-        "REMOVE_SKETCH_CONSTRAINTS_TOOL",
-        "REMOVE_SKETCH_GEOMETRY_TOOL",
-        "SET_SKETCH_GEOMETRY_CONSTRUCTION_TOOL",
-        "UPDATE_SKETCH_GEOMETRY_TOOL",
-        "REPLACE_SKETCH_CONSTRAINT_TOOL",
-        "UPDATE_SKETCH_CONSTRAINT_VALUE_TOOL",
-    ]
-    assert _imported_modules("tool_registry.py") == set()
 
 
 def test_canonical_symbols_have_explicit_owning_modules() -> None:
@@ -387,33 +295,11 @@ def test_canonical_symbols_have_explicit_owning_modules() -> None:
         assert expected_names <= _defined_names(relative_path)
 
 
-def test_representative_modules_import_in_clean_processes() -> None:
-    modules = (
-        "freecad_mcp.models",
-        "freecad_mcp.protocols",
-        "freecad_mcp.exceptions",
-        "freecad_mcp.validation",
-        "freecad_mcp.application",
-        "freecad_mcp.freecad.document",
-        "freecad_mcp.mcp.document_tools",
-        "freecad_mcp.mcp.object_tools",
-        "freecad_mcp.mcp.creation_tools",
-        "freecad_mcp.mcp.sketch_geometry_tools",
-        "freecad_mcp.mcp.sketch_constraint_tools",
-        "freecad_mcp.mcp.sketch_centered_rectangle_tools",
-        "freecad_mcp.mcp.sketch_polygon_tools",
-        "freecad_mcp.mcp.sketch_curved_profile_tools",
-        "freecad_mcp.mcp.sketch_analysis_tools",
-        "freecad_mcp.mcp.sketch_removal_tools",
-        "freecad_mcp.mcp.sketch_editing_tools",
-        "freecad_mcp.freecad.sketch_analysis",
-        "freecad_mcp.freecad.sketch_topology",
-        "freecad_mcp.freecad.sketch_removal",
-        "freecad_mcp.freecad.sketch_editing",
-        "freecad_mcp.mcp.document_history_tools",
-        "freecad_mcp.mcp.sketch_rectangle_tools",
-        "freecad_mcp.mcp.server",
-        "freecad_mcp.runtime",
+def test_all_layer_modules_import_in_clean_processes() -> None:
+    modules = tuple(
+        _module_name(relative_path)
+        for layer in ("commands", "freecad", "mcp")
+        for relative_path in _layer_paths(layer)
     )
     for module in modules:
         result = subprocess.run(

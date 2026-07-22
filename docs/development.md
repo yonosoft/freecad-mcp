@@ -145,10 +145,10 @@ with the active Python 3.11 interpreter:
 .\.venv\Scripts\python.exe scripts\ci.py
 ```
 
-It runs Ruff lint, Ruff formatting check, Mypy, and Pytest, in that order. It
-does not install FreeCAD or run live GUI acceptance. GitHub Actions and Forgejo
-Actions invoke this same script after `pip install -e ".[dev]"`, so the hosted
-checks remain equivalent.
+It runs repository-wide bytecode compilation, Ruff lint, Ruff formatting
+check, Mypy, and Pytest, in that order. It does not install FreeCAD or run live
+GUI acceptance. GitHub Actions and Forgejo Actions invoke this same script
+after `pip install -e ".[dev]"`, so the hosted checks remain equivalent.
 
 GitHub uses an Ubuntu hosted runner. Codeberg uses Forgejo Actions: enable the
 repository's **Actions** unit and provide a repository or organization runner
@@ -209,6 +209,9 @@ Add tests beside the responsibility they exercise:
   exact point/edge/constraint order, all centre branches, transaction ownership,
   corruption injection, and rollback in
   `test_freecad_sketch_centered_rectangle_creation.py`;
+- exact public catalogue order, uniqueness, registration completeness,
+  lifecycle agreement, documented inventory, and maintained Markdown links
+  belong in `test_tool_catalogue.py`;
 - MCP schemas, descriptions, and delegation belong in
   `test_mcp_document_tools.py`, `test_mcp_object_tools.py`, or
   `test_mcp_creation_tools.py`; the exact geometry union and tool-eleven
@@ -581,9 +584,9 @@ regressions, same-sketch recovery, and the tool-selection distinction. The
 installed campaign passes 47/47 and emits version, revision, interpreter,
 scenario count, pass count, and zero incidental helpers as JSON.
 
-The separate live endpoint campaign is prepared in
-[`aiderdesk-milestone-15b-acceptance.md`](aiderdesk-milestone-15b-acceptance.md)
-and is intentionally not executed by the implementation task.
+The former milestone-specific live endpoint plan is no longer retained. Its
+lasting public contract and native verification guidance are preserved in this
+document and the focused tests described above.
 
 ### Native Sketch Reference Live Acceptance Plan (Not Executed Here)
 
@@ -2031,10 +2034,7 @@ The required final native neighbors are:
 
 Broader geometry-creation and attachment campaigns remain outside this change
 surface: Milestone 21 does not alter their construction algorithms. Review the
-full diff, run `git diff --check`, and inspect `git status`. The autonomous MCP
-client plan is prepared but not executed in
-`docs/codex-milestone-21-acceptance.md`. The shorter post-stabilization rerun is
-`docs/codex-milestone-21-stabilization-acceptance.md`.
+full diff, run `git diff --check`, and inspect `git status`.
 
 ## Milestone 22 Constraint-Expression Verification
 
@@ -2333,8 +2333,6 @@ neighbors:
 ```
 
 Finish with `git diff --check`, a complete architecture/mapping/transaction/
-error-leakage review, and `git status --short --branch`. Public-only acceptance
-is prepared in `docs/codex-milestone-24-acceptance.md` but must run only after a
-human-controlled FreeCAD and MCP server restart. Local verification does not
-authorize a restart, edits to `freecad-test`, acceptance execution, commit,
+error-leakage review, and `git status --short --branch`. Local verification does
+not authorize a restart, edits to `freecad-test`, acceptance execution, commit,
 push, or milestone closure.

@@ -15,7 +15,6 @@ from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import (
     CREATE_SKETCH_ROUNDED_RECTANGLE_TOOL,
     CREATE_SKETCH_SLOT_TOOL,
-    REGISTERED_TOOL_NAMES,
 )
 from mcp_server_stubs import make_handlers
 
@@ -28,9 +27,6 @@ def _server() -> Any:
 def test_curved_profiles_are_exactly_tools_twenty_and_twenty_one() -> None:
     actual = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert len(actual) == 51
-    assert tuple(actual) == REGISTERED_TOOL_NAMES
-    assert actual[:19] == list(REGISTERED_TOOL_NAMES[:19])
     assert actual[19:21] == ["create_sketch_slot", "create_sketch_rounded_rectangle"]
 
 
@@ -264,10 +260,8 @@ def test_curved_profile_descriptions_lock_selection_dimensions_and_recovery() ->
         assert phrase in CREATE_SKETCH_ROUNDED_RECTANGLE_DESCRIPTION
 
 
-def test_first_nineteen_and_constraint_union_remain_exactly_stable() -> None:
+def test_constraint_union_remains_exactly_stable() -> None:
     server = _server()
-    tools = asyncio.run(server.list_tools())
-    assert [tool.name for tool in tools[:19]] == list(REGISTERED_TOOL_NAMES[:19])
     constraints = server._tool_manager.get_tool("add_sketch_constraints")
     assert constraints is not None
     variants = constraints.parameters["properties"]["constraints"]["items"]["oneOf"]

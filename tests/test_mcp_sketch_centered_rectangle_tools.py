@@ -14,7 +14,6 @@ from freecad_mcp.models import SketchCenteredRectangleRequestInput
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import (
     CREATE_SKETCH_CENTERED_RECTANGLE_TOOL,
-    REGISTERED_TOOL_NAMES,
 )
 from mcp_server_stubs import make_handlers
 
@@ -28,8 +27,6 @@ def test_centered_rectangle_is_exactly_tool_seventeen() -> None:
     actual = [tool.name for tool in asyncio.run(_server().list_tools())]
 
     assert actual[15:17] == ["create_sketch_rectangle", "create_sketch_centered_rectangle"]
-    assert len(actual) == 51
-    assert tuple(actual) == REGISTERED_TOOL_NAMES
 
 
 def test_centered_rectangle_tool_has_strict_exact_public_schema() -> None:

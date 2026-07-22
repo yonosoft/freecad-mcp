@@ -20,7 +20,6 @@ from freecad_mcp.tool_registry import (
     MIRROR_SKETCH_GEOMETRY_TOOL,
     POLAR_ARRAY_SKETCH_GEOMETRY_TOOL,
     RECTANGULAR_ARRAY_SKETCH_GEOMETRY_TOOL,
-    REGISTERED_TOOL_NAMES,
     ROTATE_SKETCH_GEOMETRY_TOOL,
     SCALE_SKETCH_GEOMETRY_TOOL,
     TRANSLATE_SKETCH_GEOMETRY_TOOL,
@@ -36,8 +35,6 @@ def _server() -> Any:
 def test_milestone_24_appends_exact_tools_forty_three_through_forty_eight() -> None:
     names = [item.name for item in asyncio.run(_server().list_tools())]
 
-    assert len(names) == 51
-    assert tuple(names) == REGISTERED_TOOL_NAMES
     assert names[42:48] == [
         MIRROR_SKETCH_GEOMETRY_TOOL,
         TRANSLATE_SKETCH_GEOMETRY_TOOL,

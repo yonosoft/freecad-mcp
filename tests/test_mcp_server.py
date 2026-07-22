@@ -15,10 +15,8 @@ from freecad_mcp.mcp.runner import UvicornMCPRunner
 from freecad_mcp.mcp.server import build_mcp_server
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService
-from freecad_mcp.tool_registry import CREATE_DOCUMENT_TOOL, REGISTERED_TOOL_NAMES
+from freecad_mcp.tool_registry import CREATE_DOCUMENT_TOOL
 from mcp_server_stubs import make_handlers
-
-TOOL_NAMES = list(REGISTERED_TOOL_NAMES)
 
 
 def test_mcp_server_composes_explicit_registration_groups(
@@ -168,7 +166,7 @@ def test_mcp_server_composes_explicit_registration_groups(
     assert asyncio.run(server.list_tools()) == []
 
 
-def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> None:
+def test_registered_tools_match_lifecycle_status() -> None:
     handlers, _ = make_handlers()
     config = ServerConfig()
     server = build_mcp_server(handlers, config)
@@ -176,7 +174,6 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
 
     actual_tools = [tool.name for tool in asyncio.run(server.list_tools())]
 
-    assert actual_tools == list(REGISTERED_TOOL_NAMES)
     assert lifecycle.status().data["tools"] == actual_tools
     assert "MCP_CreateDocument" not in actual_tools
     assert "list_objects" in actual_tools
@@ -187,57 +184,6 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
     assert "get_sketch" in actual_tools
     assert "add_sketch_geometry" in actual_tools
     assert "add_sketch_constraints" in actual_tools
-    assert actual_tools[12:24] == [
-        "get_document_history",
-        "undo_document",
-        "redo_document",
-        "create_sketch_rectangle",
-        "create_sketch_centered_rectangle",
-        "create_sketch_equilateral_triangle",
-        "create_sketch_regular_polygon",
-        "create_sketch_slot",
-        "create_sketch_rounded_rectangle",
-        "analyze_sketch",
-        "validate_sketch_profile",
-        "list_sketch_open_vertices",
-    ]
-    assert actual_tools[24:28] == [
-        "add_external_geometry",
-        "list_external_geometry",
-        "remove_external_geometry",
-        "get_sketch_dependencies",
-    ]
-    assert actual_tools[28:31] == [
-        "remove_sketch_constraints",
-        "remove_sketch_geometry",
-        "set_sketch_geometry_construction",
-    ]
-    assert actual_tools[31:34] == [
-        "update_sketch_geometry",
-        "replace_sketch_constraint",
-        "update_sketch_constraint_value",
-    ]
-    assert actual_tools[34:39] == [
-        "add_sketch_reference_constraints",
-        "set_sketch_constraint_name",
-        "set_sketch_constraint_expression",
-        "clear_sketch_constraint_expression",
-        "list_sketch_constraint_expressions",
-    ]
-    assert actual_tools[39:] == [
-        "trim_sketch_geometry",
-        "split_sketch_geometry",
-        "extend_sketch_geometry",
-        "mirror_sketch_geometry",
-        "translate_sketch_geometry",
-        "rotate_sketch_geometry",
-        "scale_sketch_geometry",
-        "rectangular_array_sketch_geometry",
-        "polar_array_sketch_geometry",
-        "set_sketch_constraint_driving",
-        "set_sketch_constraint_active",
-        "set_sketch_constraint_virtual_space",
-    ]
 
 
 def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:
@@ -269,7 +215,7 @@ def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:
     finally:
         runner.stop()
 
-    assert tool_names == TOOL_NAMES
+    assert CREATE_DOCUMENT_TOOL in tool_names
     assert structured_result == {
         "ok": True,
         "document": {

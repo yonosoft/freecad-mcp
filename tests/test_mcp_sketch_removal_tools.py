@@ -15,43 +15,11 @@ from freecad_mcp.mcp.sketch_removal_tools import (
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import (
     ADD_SKETCH_CONSTRAINTS_TOOL,
-    REGISTERED_TOOL_NAMES,
     REMOVE_SKETCH_CONSTRAINTS_TOOL,
     REMOVE_SKETCH_GEOMETRY_TOOL,
     SET_SKETCH_GEOMETRY_CONSTRUCTION_TOOL,
 )
 from mcp_server_stubs import make_handlers
-
-_FIRST_28 = (
-    "create_document",
-    "list_documents",
-    "get_document",
-    "save_document",
-    "list_objects",
-    "get_object",
-    "recompute_document",
-    "create_body",
-    "create_sketch",
-    "get_sketch",
-    "add_sketch_geometry",
-    "add_sketch_constraints",
-    "get_document_history",
-    "undo_document",
-    "redo_document",
-    "create_sketch_rectangle",
-    "create_sketch_centered_rectangle",
-    "create_sketch_equilateral_triangle",
-    "create_sketch_regular_polygon",
-    "create_sketch_slot",
-    "create_sketch_rounded_rectangle",
-    "analyze_sketch",
-    "validate_sketch_profile",
-    "list_sketch_open_vertices",
-    "add_external_geometry",
-    "list_external_geometry",
-    "remove_external_geometry",
-    "get_sketch_dependencies",
-)
 
 
 def _server() -> Any:
@@ -62,9 +30,6 @@ def _server() -> Any:
 def test_milestone_19_appends_exact_tools_twenty_nine_through_thirty_one() -> None:
     names = [item.name for item in asyncio.run(_server().list_tools())]
 
-    assert len(names) == 51
-    assert tuple(names) == REGISTERED_TOOL_NAMES
-    assert tuple(names[:28]) == _FIRST_28
     assert names[28:31] == [
         REMOVE_SKETCH_CONSTRAINTS_TOOL,
         REMOVE_SKETCH_GEOMETRY_TOOL,

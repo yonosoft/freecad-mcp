@@ -18,7 +18,7 @@ from freecad_mcp.models import (
     VerticalPointsConstraintInput,
 )
 from freecad_mcp.server.config import ServerConfig
-from freecad_mcp.tool_registry import ADD_SKETCH_CONSTRAINTS_TOOL, REGISTERED_TOOL_NAMES
+from freecad_mcp.tool_registry import ADD_SKETCH_CONSTRAINTS_TOOL
 from mcp_server_stubs import make_handlers
 
 DESCRIPTION = (
@@ -228,40 +228,6 @@ def test_add_sketch_constraints_remains_exactly_tool_twelve() -> None:
         tool.name for tool in asyncio.run(build_mcp_server(handlers, ServerConfig()).list_tools())
     ]
 
-    assert actual[:12] == [
-        "create_document",
-        "list_documents",
-        "get_document",
-        "save_document",
-        "list_objects",
-        "get_object",
-        "recompute_document",
-        "create_body",
-        "create_sketch",
-        "get_sketch",
-        "add_sketch_geometry",
-        "add_sketch_constraints",
-    ]
-    assert actual[12:21] == [
-        "get_document_history",
-        "undo_document",
-        "redo_document",
-        "create_sketch_rectangle",
-        "create_sketch_centered_rectangle",
-        "create_sketch_equilateral_triangle",
-        "create_sketch_regular_polygon",
-        "create_sketch_slot",
-        "create_sketch_rounded_rectangle",
-    ]
-    assert actual[21:24] == [
-        "analyze_sketch",
-        "validate_sketch_profile",
-        "list_sketch_open_vertices",
-    ]
-    assert actual == list(REGISTERED_TOOL_NAMES)
-    assert actual[:11] == list(REGISTERED_TOOL_NAMES[:11])
-    assert actual[9] == "get_sketch"
-    assert actual[10] == "add_sketch_geometry"
     assert actual[11] == ADD_SKETCH_CONSTRAINTS_TOOL
 
 

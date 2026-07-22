@@ -15,7 +15,6 @@ from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import (
     CREATE_SKETCH_EQUILATERAL_TRIANGLE_TOOL,
     CREATE_SKETCH_REGULAR_POLYGON_TOOL,
-    REGISTERED_TOOL_NAMES,
 )
 from mcp_server_stubs import make_handlers
 
@@ -28,8 +27,6 @@ def _server() -> Any:
 def test_polygon_profiles_are_exactly_tools_eighteen_and_nineteen() -> None:
     actual = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert len(actual) == 51
-    assert tuple(actual) == REGISTERED_TOOL_NAMES
     assert actual[17:19] == [
         "create_sketch_equilateral_triangle",
         "create_sketch_regular_polygon",
@@ -227,11 +224,9 @@ def test_polygon_tool_rejects_out_of_contract_side_counts(side_count: object) ->
         )
 
 
-def test_first_seventeen_schemas_and_constraint_union_remain_unchanged() -> None:
+def test_rectangle_schemas_and_constraint_union_remain_unchanged() -> None:
     server = _server()
-    tools = asyncio.run(server.list_tools())
 
-    assert [tool.name for tool in tools[:17]] == list(REGISTERED_TOOL_NAMES[:17])
     rectangle = server._tool_manager.get_tool("create_sketch_rectangle")
     centered = server._tool_manager.get_tool("create_sketch_centered_rectangle")
     constraints = server._tool_manager.get_tool("add_sketch_constraints")

@@ -18,7 +18,6 @@ from freecad_mcp.tool_registry import (
     ADD_EXTERNAL_GEOMETRY_TOOL,
     GET_SKETCH_DEPENDENCIES_TOOL,
     LIST_EXTERNAL_GEOMETRY_TOOL,
-    REGISTERED_TOOL_NAMES,
     REMOVE_EXTERNAL_GEOMETRY_TOOL,
 )
 from mcp_server_stubs import make_handlers
@@ -33,8 +32,6 @@ def test_external_geometry_tools_are_exactly_twenty_five_through_twenty_eight() 
     tools = asyncio.run(_server().list_tools())
     names = [item.name for item in tools]
 
-    assert len(names) == 51
-    assert tuple(names) == REGISTERED_TOOL_NAMES
     assert names[24:28] == [
         "add_external_geometry",
         "list_external_geometry",

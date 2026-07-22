@@ -10,7 +10,6 @@ from freecad_mcp.mcp.server import build_mcp_server
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import (
     ADD_SKETCH_REFERENCE_CONSTRAINTS_TOOL,
-    REGISTERED_TOOL_NAMES,
 )
 from mcp_server_stubs import make_handlers
 
@@ -23,9 +22,6 @@ def _server() -> Any:
 def test_reference_constraint_tool_is_exactly_tool_thirty_five() -> None:
     names = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert len(names) == 51
-    assert tuple(names) == REGISTERED_TOOL_NAMES
-    assert names[:34] == list(REGISTERED_TOOL_NAMES[:34])
     assert names[34] == ADD_SKETCH_REFERENCE_CONSTRAINTS_TOOL
 
 

@@ -15,7 +15,7 @@ def register_sketch_reference_constraint_tool(
     server: FastMCP[Any],
     handlers: DocumentHandlers,
 ) -> None:
-    """Append the dedicated Milestone 21 tool after the unchanged first 34."""
+    """Register the dedicated reference-constraint tool."""
 
     @server.tool(
         name=ADD_SKETCH_REFERENCE_CONSTRAINTS_TOOL,

@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 CHECKS = (
+    ("Compile", ("-m", "compileall", "-q", "src", "tests", "scripts")),
     ("Ruff lint", ("-m", "ruff", "check", ".")),
     ("Ruff formatting", ("-m", "ruff", "format", "--check", ".")),
     ("Mypy", ("-m", "mypy")),

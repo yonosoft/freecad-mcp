@@ -14,7 +14,7 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- forty-eight typed MCP tools for document creation, inspection, saving,
+- 51 typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
@@ -24,7 +24,9 @@ Current capabilities include:
   external geometry, read-only sketch dependency inspection, controlled sketch
   removal/construction state, precise sketch geometry/constraint editing, and
   evidence-bounded line-segment trim, split, and extend, plus bounded copy-only
-  mirror, translation, rotation, uniform scaling, and array transforms;
+  mirror, translation, rotation, uniform scaling, and array transforms, plus
+  controlled driving/reference, active/inactive, and virtual-space constraint
+  state;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -108,59 +110,11 @@ Restart FreeCAD, select **MCP**, and use **Start Server**, **Stop Server**, or
 }
 ```
 
-The exact tool names and order are defined by the authoritative
-`src/freecad_mcp/tool_registry.py` registry:
-
-```text
-create_document
-list_documents
-get_document
-save_document
-list_objects
-get_object
-recompute_document
-create_body
-create_sketch
-get_sketch
-add_sketch_geometry
-add_sketch_constraints
-get_document_history
-undo_document
-redo_document
-create_sketch_rectangle
-create_sketch_centered_rectangle
-create_sketch_equilateral_triangle
-create_sketch_regular_polygon
-create_sketch_slot
-create_sketch_rounded_rectangle
-analyze_sketch
-validate_sketch_profile
-list_sketch_open_vertices
-add_external_geometry
-list_external_geometry
-remove_external_geometry
-get_sketch_dependencies
-remove_sketch_constraints
-remove_sketch_geometry
-set_sketch_geometry_construction
-update_sketch_geometry
-replace_sketch_constraint
-update_sketch_constraint_value
-add_sketch_reference_constraints
-set_sketch_constraint_name
-set_sketch_constraint_expression
-clear_sketch_constraint_expression
-list_sketch_constraint_expressions
-trim_sketch_geometry
-split_sketch_geometry
-extend_sketch_geometry
-mirror_sketch_geometry
-translate_sketch_geometry
-rotate_sketch_geometry
-scale_sketch_geometry
-rectangular_array_sketch_geometry
-polar_array_sketch_geometry
-```
+The exact 51 tool names and order are defined by the authoritative
+`src/freecad_mcp/tool_registry.py` registry and listed in the
+[public tool inventory](docs/public-tool-inventory.md). Tools 49–51 are
+`set_sketch_constraint_driving`, `set_sketch_constraint_active`, and
+`set_sketch_constraint_virtual_space`.
 
 `create_body` requires exact internal document and body names, accepts an
 optional visible label, creates one `PartDesign::Body` in a transaction,
@@ -1320,10 +1274,9 @@ Mixed constraints block removal of their internal geometry and external
 reference until the constraint is explicitly removed. Milestone 20 replacement
 and datum-editing schemas remain unchanged and refuse mixed constraints.
 
-See [the tested capability matrix](docs/sketch-reference-constraint-capabilities.md)
-for every mode, geometry pair, operand-order finding, source propagation, and
-known limit. External reference numbers remain current-order-local; list again
-after removal.
+The controlled capability boundaries, operand rules, source propagation, and
+known limits are summarized above. External reference numbers remain
+current-order-local; list again after removal.
 
 ### Constraint names and expressions
 
@@ -1375,8 +1328,7 @@ replacement refuse with exact dependents; source value updates remain allowed
 and propagate. None of these tools saves automatically, while an explicit save
 persists names and expressions.
 
-See [the tested expression capability contract](docs/sketch-constraint-expression-capabilities.md)
-and [the prepared public MCP acceptance campaign](docs/codex-milestone-22-acceptance.md).
+The permanent expression capability contract and limits are summarized above.
 
 ### Controlled sketch trim, split, and extend
 
@@ -1420,8 +1372,8 @@ geometry`, `Split sketch geometry`, or `Extend sketch geometry` history step.
 Caller-owned transactions remain open, failures roll back exactly, the native
 20-entry undo capacity is verified, and no operation saves automatically.
 
-See [the tested topology-editing capability contract](docs/sketch-topology-editing-capabilities.md)
-and [the prepared public MCP acceptance campaign](docs/codex-milestone-23-acceptance.md).
+The permanent topology-editing capability contract and limits are summarized
+above.
 
 ### Copy-only sketch geometry transforms
 
@@ -1491,22 +1443,27 @@ non-uniform or negative scaling, external mirror references, whole-sketch and
 cross-sketch operations, destination-sketch creation, and merging are not in
 this contract. Whole-sketch operations remain deferred to Milestone 28.
 
-See [the tested transform capability contract](docs/sketch-geometry-transform-capabilities.md)
-and [the prepared public MCP acceptance campaign](docs/codex-milestone-24-acceptance.md).
+### Controlled sketch constraint state
+
+Tools 49–51 are `set_sketch_constraint_driving`,
+`set_sketch_constraint_active`, and `set_sketch_constraint_virtual_space`.
+Each takes one current constraint index and a desired Boolean final state; none
+is a toggle. Driving/reference conversion is limited to supported dimensional
+constraints, while active and virtual-space state support all controlled
+constraint types. Mutations that would disable an expression dependency source
+are refused, and expression-bound constraints cannot be converted to reference
+state.
+
+An already-matching request is a transaction-free no-op. A successful owned
+change uses the corresponding `Set sketch constraint ...` history name,
+preserves constraint identity, name, expression, unrelated geometry and
+constraints, verifies readback, and never saves automatically.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Development setup and CI](docs/development.md)
-- [Sketch reference-constraint capabilities](docs/sketch-reference-constraint-capabilities.md)
-- [Sketch constraint-expression capabilities](docs/sketch-constraint-expression-capabilities.md)
-- [Sketch topology-editing capabilities](docs/sketch-topology-editing-capabilities.md)
-- [Sketch geometry-transform capabilities](docs/sketch-geometry-transform-capabilities.md)
-- [Milestone 21 autonomous acceptance](docs/codex-milestone-21-acceptance.md)
-- [Milestone 21 stabilization acceptance](docs/codex-milestone-21-stabilization-acceptance.md)
-- [Milestone 22 autonomous acceptance](docs/codex-milestone-22-acceptance.md)
-- [Milestone 23 autonomous acceptance](docs/codex-milestone-23-acceptance.md)
-- [Milestone 24 autonomous acceptance](docs/codex-milestone-24-acceptance.md)
+- [Public MCP tool inventory](docs/public-tool-inventory.md)
 
 ## License
 

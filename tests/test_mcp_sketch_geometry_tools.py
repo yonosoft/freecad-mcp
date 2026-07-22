@@ -6,7 +6,7 @@ from typing import Any, cast
 from freecad_mcp.mcp.server import build_mcp_server
 from freecad_mcp.models import LineSegmentGeometryInput, PointGeometryInput
 from freecad_mcp.server.config import ServerConfig
-from freecad_mcp.tool_registry import ADD_SKETCH_GEOMETRY_TOOL, REGISTERED_TOOL_NAMES
+from freecad_mcp.tool_registry import ADD_SKETCH_GEOMETRY_TOOL
 from mcp_server_stubs import make_handlers
 
 
@@ -157,44 +157,12 @@ def test_add_sketch_geometry_has_exact_description_and_schema() -> None:
     }
 
 
-def test_add_sketch_geometry_remains_tool_eleven_without_changing_first_ten() -> None:
+def test_add_sketch_geometry_remains_tool_eleven() -> None:
     handlers, _ = make_handlers()
     actual = [
         tool.name for tool in asyncio.run(build_mcp_server(handlers, ServerConfig()).list_tools())
     ]
 
-    assert actual[:12] == [
-        "create_document",
-        "list_documents",
-        "get_document",
-        "save_document",
-        "list_objects",
-        "get_object",
-        "recompute_document",
-        "create_body",
-        "create_sketch",
-        "get_sketch",
-        "add_sketch_geometry",
-        "add_sketch_constraints",
-    ]
-    assert actual[12:21] == [
-        "get_document_history",
-        "undo_document",
-        "redo_document",
-        "create_sketch_rectangle",
-        "create_sketch_centered_rectangle",
-        "create_sketch_equilateral_triangle",
-        "create_sketch_regular_polygon",
-        "create_sketch_slot",
-        "create_sketch_rounded_rectangle",
-    ]
-    assert actual[21:24] == [
-        "analyze_sketch",
-        "validate_sketch_profile",
-        "list_sketch_open_vertices",
-    ]
-    assert actual == list(REGISTERED_TOOL_NAMES)
-    assert actual[9] == "get_sketch"
     assert actual[10] == ADD_SKETCH_GEOMETRY_TOOL
 
 
