@@ -39,6 +39,7 @@ from freecad_mcp.models import (
     SketchGeometryUpdateResult,
     SketchInspectionResult,
     SketchOpenVerticesResult,
+    SketchPoint2DInput,
     SketchPolygonCreationResult,
     SketchProfileAnalysisRequestInput,
     SketchProfileValidationResult,
@@ -51,6 +52,8 @@ from freecad_mcp.models import (
     SketchSemanticPolygonRequest,
     SketchSlotCreationResult,
     SketchSlotRequestInput,
+    SketchTopologyEditResult,
+    SketchTopologyEndpoint,
 )
 
 T = TypeVar("T")
@@ -303,6 +306,38 @@ class SketchEditingAdapter(Protocol):
         """Set one supported driving dimensional datum."""
 
 
+class SketchTopologyEditingAdapter(Protocol):
+    """Evidence-bounded trim, split, and extend operations."""
+
+    def trim_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        pick_point: SketchPoint2DInput,
+    ) -> SketchTopologyEditResult:
+        """Trim a deterministic portion of one internal line segment."""
+
+    def split_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        point: SketchPoint2DInput,
+    ) -> SketchTopologyEditResult:
+        """Split one internal line segment at an on-source point."""
+
+    def extend_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        endpoint: SketchTopologyEndpoint,
+        target_point: SketchPoint2DInput,
+    ) -> SketchTopologyEditResult:
+        """Extend one internal line endpoint to an explicit collinear point."""
+
+
 class SketchConstraintExpressionAdapter(Protocol):
     """Controlled constraint-name and finite expression operations."""
 
@@ -376,5 +411,6 @@ __all__ = [
     "SketchEditingAdapter",
     "SketchExternalGeometryAdapter",
     "SketchPolygonAdapter",
+    "SketchTopologyEditingAdapter",
     "TaskExecutor",
 ]

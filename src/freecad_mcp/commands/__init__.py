@@ -60,6 +60,11 @@ from freecad_mcp.commands.sketch_removal import (
     RemoveSketchGeometryHandler,
     SetSketchGeometryConstructionHandler,
 )
+from freecad_mcp.commands.sketch_topology_editing import (
+    ExtendSketchGeometryHandler,
+    SplitSketchGeometryHandler,
+    TrimSketchGeometryHandler,
+)
 from freecad_mcp.commands.status import report_status
 
 
@@ -100,6 +105,9 @@ class DocumentHandlers:
     update_sketch_geometry: UpdateSketchGeometryHandler
     replace_sketch_constraint: ReplaceSketchConstraintHandler
     update_sketch_constraint_value: UpdateSketchConstraintValueHandler
+    trim_sketch_geometry: TrimSketchGeometryHandler
+    split_sketch_geometry: SplitSketchGeometryHandler
+    extend_sketch_geometry: ExtendSketchGeometryHandler
     add_sketch_reference_constraints: AddSketchReferenceConstraintsHandler
     set_sketch_constraint_name: SetSketchConstraintNameHandler
     set_sketch_constraint_expression: SetSketchConstraintExpressionHandler
@@ -125,6 +133,7 @@ __all__ = [
     "CreateSketchRoundedRectangleHandler",
     "CreateSketchSlotHandler",
     "DocumentHandlers",
+    "ExtendSketchGeometryHandler",
     "GetDocumentHandler",
     "GetDocumentHistoryHandler",
     "GetObjectHandler",
@@ -145,6 +154,8 @@ __all__ = [
     "SetSketchConstraintExpressionHandler",
     "SetSketchConstraintNameHandler",
     "SetSketchGeometryConstructionHandler",
+    "SplitSketchGeometryHandler",
+    "TrimSketchGeometryHandler",
     "UndoDocumentHandler",
     "UpdateSketchConstraintValueHandler",
     "UpdateSketchGeometryHandler",

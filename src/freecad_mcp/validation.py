@@ -49,12 +49,14 @@ from freecad_mcp.models import (
     SketchGeometryInput,
     SketchGeometryUpdateInput,
     SketchHorizontalAxisReferenceInput,
+    SketchPoint2DInput,
     SketchProfileAnalysisRequestInput,
     SketchRectangleRequestInput,
     SketchReferenceConstraintInput,
     SketchRegularPolygonRequestInput,
     SketchRoundedRectangleRequestInput,
     SketchSlotRequestInput,
+    SketchTopologyEndpoint,
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
     TangentConstraintInput,
@@ -120,6 +122,7 @@ _SKETCH_ROUNDED_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchRoundedRectangleReq
 _EXTERNAL_GEOMETRY_SOURCE_ADAPTER: TypeAdapter[ExternalGeometrySourceInput] = TypeAdapter(
     ExternalGeometrySourceInput
 )
+_SKETCH_POINT_2D_INPUT_ADAPTER: TypeAdapter[SketchPoint2DInput] = TypeAdapter(SketchPoint2DInput)
 
 
 def _validate_object_name(value: object, *, field: str, subject: str) -> CommandResult | None:
@@ -1758,6 +1761,72 @@ def validate_update_sketch_geometry_request(
     return index, parsed
 
 
+def validate_sketch_topology_point_request(
+    document_name: object,
+    sketch_name: object,
+    geometry_index: object,
+    point: object,
+    *,
+    field: str,
+) -> tuple[int, SketchPoint2DInput] | CommandResult:
+    """Validate a strict internal index and one finite sketch-coordinate point."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(geometry_index, field="geometry_index")
+    if isinstance(index, CommandResult):
+        return index
+    try:
+        parsed = _SKETCH_POINT_2D_INPUT_ADAPTER.validate_python(point)
+    except ValidationError as exc:
+        error = exc.errors(include_url=False, include_context=False, include_input=False)[0]
+        location = ".".join(str(part) for part in error.get("loc", ()))
+        return CommandResult.failure(
+            code="validation_error",
+            message=f"{field} must contain exactly finite strict x and y coordinates.",
+            data={
+                "field": field + (f".{location}" if location else ""),
+                "geometry_index": index,
+                "reason": str(error.get("type", "invalid_point")),
+            },
+        )
+    return index, parsed
+
+
+def validate_extend_sketch_geometry_request(
+    document_name: object,
+    sketch_name: object,
+    geometry_index: object,
+    endpoint: object,
+    target_point: object,
+) -> tuple[int, SketchTopologyEndpoint, SketchPoint2DInput] | CommandResult:
+    """Validate the strict line-extension endpoint and explicit target point."""
+    validated = validate_sketch_topology_point_request(
+        document_name,
+        sketch_name,
+        geometry_index,
+        target_point,
+        field="target_point",
+    )
+    if isinstance(validated, CommandResult):
+        return validated
+    index, point = validated
+    if not isinstance(endpoint, str) or endpoint not in {
+        SketchTopologyEndpoint.START.value,
+        SketchTopologyEndpoint.END.value,
+    }:
+        return CommandResult.failure(
+            code="validation_error",
+            message="endpoint must be exactly 'start' or 'end'.",
+            data={
+                "field": "endpoint",
+                "actual_type": type(endpoint).__name__,
+                "allowed": ["start", "end"],
+            },
+        )
+    return index, SketchTopologyEndpoint(endpoint), point
+
+
 def validate_replace_sketch_constraint_request(
     document_name: object,
     sketch_name: object,
@@ -1913,6 +1982,7 @@ __all__ = [
     "validate_create_sketch_slot_request",
     "validate_document_history_request",
     "validate_document_reference",
+    "validate_extend_sketch_geometry_request",
     "validate_external_geometry_reference_request",
     "validate_object_reference",
     "validate_replace_sketch_constraint_request",
@@ -1922,6 +1992,7 @@ __all__ = [
     "validate_sketch_constraint_expression_locator",
     "validate_sketch_mutation_selection_request",
     "validate_sketch_profile_analysis_request",
+    "validate_sketch_topology_point_request",
     "validate_update_sketch_constraint_value_request",
     "validate_update_sketch_geometry_request",
 ]

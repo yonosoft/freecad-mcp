@@ -815,7 +815,7 @@ def main() -> None:
     )
     _record(
         "tool_inventory",
-        len(REGISTERED_TOOL_NAMES) == 39
+        len(REGISTERED_TOOL_NAMES) == 42
         and REGISTERED_TOOL_NAMES[:24] == expected_first_twenty_four
         and REGISTERED_TOOL_NAMES[24:28]
         == (
@@ -837,7 +837,7 @@ def main() -> None:
             "update_sketch_constraint_value",
         )
         and REGISTERED_TOOL_NAMES[34] == "add_sketch_reference_constraints"
-        and REGISTERED_TOOL_NAMES[35:]
+        and REGISTERED_TOOL_NAMES[35:39]
         == (
             "set_sketch_constraint_name",
             "set_sketch_constraint_expression",

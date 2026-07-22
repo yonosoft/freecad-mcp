@@ -22,6 +22,7 @@ from freecad_mcp.commands import (
     CreateSketchRoundedRectangleHandler,
     CreateSketchSlotHandler,
     DocumentHandlers,
+    ExtendSketchGeometryHandler,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
     GetObjectHandler,
@@ -42,6 +43,8 @@ from freecad_mcp.commands import (
     SetSketchConstraintExpressionHandler,
     SetSketchConstraintNameHandler,
     SetSketchGeometryConstructionHandler,
+    SplitSketchGeometryHandler,
+    TrimSketchGeometryHandler,
     UndoDocumentHandler,
     UpdateSketchConstraintValueHandler,
     UpdateSketchGeometryHandler,
@@ -80,6 +83,7 @@ from freecad_mcp.models import (
     SketchGeometryUpdateInput,
     SketchInspectionResult,
     SketchOpenVerticesResult,
+    SketchPoint2DInput,
     SketchPolygonCircumcircleReference,
     SketchPolygonCreationResult,
     SketchPolygonEdge,
@@ -100,6 +104,7 @@ from freecad_mcp.models import (
     SketchSlotCreationResult,
     SketchSlotRequestInput,
     SketchSolverData,
+    SketchTopologyEndpoint,
 )
 
 T = TypeVar("T")
@@ -157,6 +162,11 @@ class AdapterStub:
         ] = []
         self.replace_sketch_constraint_calls: list[tuple[str, str, int, SketchConstraintInput]] = []
         self.update_sketch_constraint_value_calls: list[tuple[str, str, int, float]] = []
+        self.trim_sketch_geometry_calls: list[tuple[str, str, int, SketchPoint2DInput]] = []
+        self.split_sketch_geometry_calls: list[tuple[str, str, int, SketchPoint2DInput]] = []
+        self.extend_sketch_geometry_calls: list[
+            tuple[str, str, int, SketchTopologyEndpoint, SketchPoint2DInput]
+        ] = []
         self.set_sketch_constraint_name_calls: list[tuple[str, str, int, str | None]] = []
         self.set_sketch_constraint_expression_calls: list[tuple[str, str, int, str]] = []
         self.clear_sketch_constraint_expression_calls: list[tuple[str, str, int]] = []
@@ -565,6 +575,62 @@ class AdapterStub:
             }
         )
 
+    def trim_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        pick_point: SketchPoint2DInput,
+    ) -> Any:
+        self.trim_sketch_geometry_calls.append(
+            (document_name, sketch_name, geometry_index, pick_point)
+        )
+        return _SemanticResultStub(
+            {
+                "operation": "trim",
+                "original_geometry_index": geometry_index,
+                "changed": True,
+                "no_change": False,
+            }
+        )
+
+    def split_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        point: SketchPoint2DInput,
+    ) -> Any:
+        self.split_sketch_geometry_calls.append((document_name, sketch_name, geometry_index, point))
+        return _SemanticResultStub(
+            {
+                "operation": "split",
+                "original_geometry_index": geometry_index,
+                "changed": True,
+                "no_change": False,
+            }
+        )
+
+    def extend_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        endpoint: SketchTopologyEndpoint,
+        target_point: SketchPoint2DInput,
+    ) -> Any:
+        self.extend_sketch_geometry_calls.append(
+            (document_name, sketch_name, geometry_index, endpoint, target_point)
+        )
+        return _SemanticResultStub(
+            {
+                "operation": "extend",
+                "original_geometry_index": geometry_index,
+                "changed": True,
+                "no_change": False,
+            }
+        )
+
     def set_sketch_constraint_name(
         self,
         document_name: str,
@@ -812,6 +878,7 @@ class _SemanticResultStub:
         changed = value.get("changed_geometry_indices", ())
         self.changed_geometry_indices = tuple(changed) if isinstance(changed, list) else ()
         self.no_change = bool(value.get("no_change", False))
+        self.changed = bool(value.get("changed", not self.no_change))
 
     def to_dict(self) -> dict[str, object]:
         return self.value
@@ -882,6 +949,9 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
                 actual_adapter,
                 dispatcher,
             ),
+            trim_sketch_geometry=TrimSketchGeometryHandler(actual_adapter, dispatcher),
+            split_sketch_geometry=SplitSketchGeometryHandler(actual_adapter, dispatcher),
+            extend_sketch_geometry=ExtendSketchGeometryHandler(actual_adapter, dispatcher),
             add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
                 actual_adapter,
                 dispatcher,

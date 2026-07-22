@@ -23,6 +23,7 @@ from freecad_mcp.freecad import (
     sketch_removal,
     sketch_rounded_rectangle_creation,
     sketch_slot_creation,
+    sketch_topology_editing,
 )
 from freecad_mcp.freecad.document_operations import (
     _active_document_name as _active_document_name,
@@ -89,6 +90,7 @@ from freecad_mcp.models import (
     SketchGeometryUpdateResult,
     SketchInspectionResult,
     SketchOpenVerticesResult,
+    SketchPoint2DInput,
     SketchPolygonCreationResult,
     SketchProfileAnalysisRequestInput,
     SketchProfileValidationResult,
@@ -101,6 +103,8 @@ from freecad_mcp.models import (
     SketchSemanticPolygonRequest,
     SketchSlotCreationResult,
     SketchSlotRequestInput,
+    SketchTopologyEditResult,
+    SketchTopologyEndpoint,
 )
 
 
@@ -386,6 +390,50 @@ class FreeCADDocumentAdapter:
             sketch_name,
             constraint_index,
             value,
+        )
+
+    def trim_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        pick_point: SketchPoint2DInput,
+    ) -> SketchTopologyEditResult:
+        return sketch_topology_editing.trim_sketch_geometry(
+            document_name,
+            sketch_name,
+            geometry_index,
+            pick_point,
+        )
+
+    def split_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        point: SketchPoint2DInput,
+    ) -> SketchTopologyEditResult:
+        return sketch_topology_editing.split_sketch_geometry(
+            document_name,
+            sketch_name,
+            geometry_index,
+            point,
+        )
+
+    def extend_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        endpoint: SketchTopologyEndpoint,
+        target_point: SketchPoint2DInput,
+    ) -> SketchTopologyEditResult:
+        return sketch_topology_editing.extend_sketch_geometry(
+            document_name,
+            sketch_name,
+            geometry_index,
+            endpoint,
+            target_point,
         )
 
     def set_sketch_constraint_name(

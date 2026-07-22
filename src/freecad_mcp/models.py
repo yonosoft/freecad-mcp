@@ -401,6 +401,13 @@ SketchConstraintValueInput = Annotated[
 ]
 
 
+class SketchTopologyEndpoint(StrEnum):
+    """Supported open-geometry endpoint selector for topology extension."""
+
+    START = "start"
+    END = "end"
+
+
 class SketchAnalysisRequestInput(_SketchGeometryInputModel):
     """Strict request for a broad read-only sketch analysis."""
 
@@ -2300,6 +2307,151 @@ class SketchConstraintValueUpdateResult:
 
 
 @dataclass(frozen=True, slots=True)
+class SketchTopologyGeometryMapping:
+    """Complete relationship from one pre-call geometry item to current results."""
+
+    original_index: int
+    outcome: Literal["unchanged", "modified", "removed", "replaced", "split"]
+    resulting_indices: tuple[int, ...]
+    semantic_relationship: str
+    orientation_relationship: Literal["preserved", "reversed", "not_applicable"]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "original_index": self.original_index,
+            "outcome": self.outcome,
+            "resulting_indices": list(self.resulting_indices),
+            "semantic_relationship": self.semantic_relationship,
+            "orientation_relationship": self.orientation_relationship,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchTopologyConstraintMapping:
+    """Complete relationship from one pre-call constraint to current results."""
+
+    original_index: int
+    outcome: Literal[
+        "unchanged",
+        "modified",
+        "transferred",
+        "removed",
+        "replaced",
+        "split",
+    ]
+    resulting_indices: tuple[int, ...]
+    name_preserved: bool
+    expression_preserved: bool
+    operands_remapped: bool
+    state_preserved: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "original_index": self.original_index,
+            "outcome": self.outcome,
+            "resulting_indices": list(self.resulting_indices),
+            "name_preserved": self.name_preserved,
+            "expression_preserved": self.expression_preserved,
+            "operands_remapped": self.operands_remapped,
+            "state_preserved": self.state_preserved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchTopologyCreatedGeometry:
+    """One newly assigned current geometry index and its public reason."""
+
+    index: int
+    geometry: SketchGeometry
+    reason: Literal["topology_result", "native_generation"]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": self.geometry.to_dict()["type"],
+            "reason": self.reason,
+            "geometry": self.geometry.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchTopologyCreatedConstraint:
+    """One newly assigned current constraint index and its public reason."""
+
+    index: int
+    constraint: SketchConstraint
+    reason: Literal["joining_constraint", "native_transfer", "native_generation"]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": self.constraint.to_dict()["type"],
+            "reason": self.reason,
+            "constraint": self.constraint.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchTopologyEditResult:
+    """Verified strict topology edit with complete ordered public mappings."""
+
+    operation: Literal["trim", "split", "extend"]
+    original_geometry_index: int
+    changed: bool
+    transaction_name: str
+    transaction_committed: bool
+    geometry_mappings: tuple[SketchTopologyGeometryMapping, ...]
+    constraint_mappings: tuple[SketchTopologyConstraintMapping, ...]
+    created_geometry: tuple[SketchTopologyCreatedGeometry, ...]
+    removed_geometry: tuple[SketchGeometry, ...]
+    created_constraints: tuple[SketchTopologyCreatedConstraint, ...]
+    removed_constraints: tuple[SketchConstraint, ...]
+    modified_geometry_indices: tuple[int, ...]
+    modified_constraint_indices: tuple[int, ...]
+    details: Mapping[str, object]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        generated = tuple(
+            item for item in self.created_constraints if item.reason == "native_generation"
+        )
+        joining = tuple(
+            item for item in self.created_constraints if item.reason == "joining_constraint"
+        )
+        transferred = tuple(
+            item for item in self.constraint_mappings if item.outcome == "transferred"
+        )
+        return {
+            "operation": self.operation,
+            "original_geometry_index": self.original_geometry_index,
+            "changed": self.changed,
+            "no_change": not self.changed,
+            "transaction_name": self.transaction_name,
+            "transaction_committed": self.transaction_committed,
+            "geometry_mappings": [item.to_dict() for item in self.geometry_mappings],
+            "constraint_mappings": [item.to_dict() for item in self.constraint_mappings],
+            "created_geometry_indices": [item.index for item in self.created_geometry],
+            "removed_geometry_indices": [item.index for item in self.removed_geometry],
+            "modified_geometry_indices": list(self.modified_geometry_indices),
+            "created_constraint_indices": [item.index for item in self.created_constraints],
+            "removed_constraint_indices": [item.index for item in self.removed_constraints],
+            "modified_constraint_indices": list(self.modified_constraint_indices),
+            "created_geometry": [item.to_dict() for item in self.created_geometry],
+            "removed_geometry": [item.to_dict() for item in self.removed_geometry],
+            "created_constraints": [item.to_dict() for item in self.created_constraints],
+            "removed_constraints": [item.to_dict() for item in self.removed_constraints],
+            "transferred_constraints": [item.to_dict() for item in transferred],
+            "automatically_generated_constraints": [item.to_dict() for item in generated],
+            "generated_joining_constraints": [item.to_dict() for item in joining],
+            "solver": self.sketch.solver.to_dict(),
+            **dict(self.details),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SketchConstraintExpressionDependency:
     """Resolved public identity for one named scalar expression source."""
 
@@ -2728,6 +2880,12 @@ __all__ = [
     "SketchSlotProfile",
     "SketchSlotRequestInput",
     "SketchSolverData",
+    "SketchTopologyConstraintMapping",
+    "SketchTopologyCreatedConstraint",
+    "SketchTopologyCreatedGeometry",
+    "SketchTopologyEditResult",
+    "SketchTopologyEndpoint",
+    "SketchTopologyGeometryMapping",
     "SketchVerticalAxisReferenceInput",
     "UnsupportedSketchConstraint",
     "UnsupportedSketchGeometry",

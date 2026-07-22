@@ -20,6 +20,7 @@ from freecad_mcp.commands import (
     CreateSketchRoundedRectangleHandler,
     CreateSketchSlotHandler,
     DocumentHandlers,
+    ExtendSketchGeometryHandler,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
     GetObjectHandler,
@@ -40,6 +41,8 @@ from freecad_mcp.commands import (
     SetSketchConstraintExpressionHandler,
     SetSketchConstraintNameHandler,
     SetSketchGeometryConstructionHandler,
+    SplitSketchGeometryHandler,
+    TrimSketchGeometryHandler,
     UndoDocumentHandler,
     UpdateSketchConstraintValueHandler,
     UpdateSketchGeometryHandler,
@@ -170,6 +173,18 @@ def _build_runtime() -> Runtime:
             dispatcher=dispatcher,
         ),
         update_sketch_constraint_value=UpdateSketchConstraintValueHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        trim_sketch_geometry=TrimSketchGeometryHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        split_sketch_geometry=SplitSketchGeometryHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        extend_sketch_geometry=ExtendSketchGeometryHandler(
             adapter=adapter,
             dispatcher=dispatcher,
         ),

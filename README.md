@@ -14,7 +14,7 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- thirty-nine typed MCP tools for document creation, inspection, saving,
+- forty-two typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
@@ -22,7 +22,8 @@ Current capabilities include:
   lower-left and centre-defined rectangles, equilateral triangles, and regular
   polygons, straight slots, axis-aligned rounded rectangles, controlled
   external geometry, read-only sketch dependency inspection, controlled sketch
-  removal/construction state, and precise sketch geometry/constraint editing;
+  removal/construction state, precise sketch geometry/constraint editing, and
+  evidence-bounded line-segment trim, split, and extend;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
 - Windows development install scripts;
 - pure-Python quality tooling and unit tests, with documented live FreeCAD
@@ -144,6 +145,14 @@ set_sketch_geometry_construction
 update_sketch_geometry
 replace_sketch_constraint
 update_sketch_constraint_value
+add_sketch_reference_constraints
+set_sketch_constraint_name
+set_sketch_constraint_expression
+clear_sketch_constraint_expression
+list_sketch_constraint_expressions
+trim_sketch_geometry
+split_sketch_geometry
+extend_sketch_geometry
 ```
 
 `create_body` requires exact internal document and body names, accepts an
@@ -1362,15 +1371,62 @@ persists names and expressions.
 See [the tested expression capability contract](docs/sketch-constraint-expression-capabilities.md)
 and [the prepared public MCP acceptance campaign](docs/codex-milestone-22-acceptance.md).
 
+### Controlled sketch trim, split, and extend
+
+Tools 40–42 are `trim_sketch_geometry`, `split_sketch_geometry`, and
+`extend_sketch_geometry`. Their initial public domain is deliberately narrow:
+the operated item must be one unconstrained internal line segment. Normal and
+construction lines are supported; arcs, circles, points, external operated
+geometry, and all other geometry families are refused.
+
+`trim_sketch_geometry` accepts one finite `pick_point` on the source. Every
+internal boundary must also be a line segment, external geometry must be empty,
+and the selected portion must be bounded by one or two unique, strict interior
+intersections. Endpoint, coincident, overlapping, equal-position, exact-pick,
+no-intersection, and near-zero results are refused. The original index keeps
+the first source-parameter result; a middle trim appends the second result.
+
+`split_sketch_geometry` accepts one finite on-source `point`. A strict interior
+point modifies the original index to the first source-parameter piece, appends
+the second, and reports FreeCAD's generated joining Coincident constraint. A
+point at or within the fixed `1e-7` sketch-unit tolerance of either endpoint is
+a transaction-free no-op. Off-source and outside points are refused.
+
+`extend_sketch_geometry` accepts `endpoint: "start" | "end"` and a finite
+explicit `target_point`. The target must be collinear and strictly beyond the
+selected endpoint. Equality within `1e-7` is a transaction-free no-op;
+shortening and non-collinear targets are refused. The source index and
+orientation are preserved and no geometry or constraint is generated.
+
+Every constraint that references the operated line causes preflight refusal.
+The response distinguishes expression-bound, named, and other dependent
+constraints and returns their current public indices. Unrelated constraints,
+names, expressions, active/reference/virtual state, construction state,
+external mappings, dependencies, and non-target documents remain exact.
+Broken, cross-document, or downstream topology dependencies are refused.
+
+Success returns complete original-order `geometry_mappings` and
+`constraint_mappings`, exact created/removed/modified index lists and entity
+summaries, generated/joining constraints, solver readback, profile impact, and
+complete sketch/document readback. Owned changes use exactly one `Trim sketch
+geometry`, `Split sketch geometry`, or `Extend sketch geometry` history step.
+Caller-owned transactions remain open, failures roll back exactly, the native
+20-entry undo capacity is verified, and no operation saves automatically.
+
+See [the tested topology-editing capability contract](docs/sketch-topology-editing-capabilities.md)
+and [the prepared public MCP acceptance campaign](docs/codex-milestone-23-acceptance.md).
+
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Development setup and CI](docs/development.md)
 - [Sketch reference-constraint capabilities](docs/sketch-reference-constraint-capabilities.md)
 - [Sketch constraint-expression capabilities](docs/sketch-constraint-expression-capabilities.md)
+- [Sketch topology-editing capabilities](docs/sketch-topology-editing-capabilities.md)
 - [Milestone 21 autonomous acceptance](docs/codex-milestone-21-acceptance.md)
 - [Milestone 21 stabilization acceptance](docs/codex-milestone-21-stabilization-acceptance.md)
 - [Milestone 22 autonomous acceptance](docs/codex-milestone-22-acceptance.md)
+- [Milestone 23 autonomous acceptance](docs/codex-milestone-23-acceptance.md)
 
 ## License
 

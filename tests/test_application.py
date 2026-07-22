@@ -21,6 +21,7 @@ from freecad_mcp.commands import (
     CreateSketchRoundedRectangleHandler,
     CreateSketchSlotHandler,
     DocumentHandlers,
+    ExtendSketchGeometryHandler,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
     GetObjectHandler,
@@ -41,6 +42,8 @@ from freecad_mcp.commands import (
     SetSketchConstraintExpressionHandler,
     SetSketchConstraintNameHandler,
     SetSketchGeometryConstructionHandler,
+    SplitSketchGeometryHandler,
+    TrimSketchGeometryHandler,
     UndoDocumentHandler,
     UpdateSketchConstraintValueHandler,
     UpdateSketchGeometryHandler,
@@ -75,6 +78,7 @@ from freecad_mcp.models import (
     SketchGeometryUpdateInput,
     SketchInspectionResult,
     SketchOpenVerticesResult,
+    SketchPoint2DInput,
     SketchPolygonCircumcircleReference,
     SketchPolygonCreationResult,
     SketchPolygonEdge,
@@ -93,6 +97,7 @@ from freecad_mcp.models import (
     SketchSemanticPolygonRequest,
     SketchSlotRequestInput,
     SketchSolverData,
+    SketchTopologyEndpoint,
 )
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService
@@ -453,6 +458,56 @@ class AdapterStub:
             {"constraint_index": constraint_index, "value": value, "no_change": False}
         )
 
+    def trim_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        pick_point: SketchPoint2DInput,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "operation": "trim",
+                "original_geometry_index": geometry_index,
+                "pick_point": pick_point.model_dump(),
+                "changed": True,
+            }
+        )
+
+    def split_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        point: SketchPoint2DInput,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "operation": "split",
+                "original_geometry_index": geometry_index,
+                "point": point.model_dump(),
+                "changed": True,
+            }
+        )
+
+    def extend_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        geometry_index: int,
+        endpoint: SketchTopologyEndpoint,
+        target_point: SketchPoint2DInput,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "operation": "extend",
+                "original_geometry_index": geometry_index,
+                "endpoint": endpoint.value,
+                "target_point": target_point.model_dump(),
+                "changed": True,
+            }
+        )
+
     def set_sketch_constraint_name(
         self,
         document_name: str,
@@ -603,6 +658,7 @@ class _SemanticResult:
         changed = data.get("changed_geometry_indices", ())
         self.changed_geometry_indices = tuple(changed) if isinstance(changed, list) else ()
         self.no_change = bool(data.get("no_change", False))
+        self.changed = bool(data.get("changed", not self.no_change))
 
     def to_dict(self) -> dict[str, object]:
         return self.data
@@ -672,6 +728,9 @@ def make_application() -> Application:
             adapter,
             dispatcher,
         ),
+        trim_sketch_geometry=TrimSketchGeometryHandler(adapter, dispatcher),
+        split_sketch_geometry=SplitSketchGeometryHandler(adapter, dispatcher),
+        extend_sketch_geometry=ExtendSketchGeometryHandler(adapter, dispatcher),
         add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
             adapter,
             dispatcher,
@@ -861,6 +920,26 @@ def test_application_dispatches_all_external_geometry_and_dependency_commands() 
     assert listed.code == "external_geometry_listed"
     assert removed.code == "external_geometry_removed"
     assert dependencies.code == "sketch_dependencies_retrieved"
+
+
+def test_application_dispatches_all_three_topology_editing_commands() -> None:
+    application = make_application()
+
+    trim = application.trim_sketch_geometry("TestDocument", "BaseSketch", 0, {"x": 2.0, "y": 0.0})
+    split = application.split_sketch_geometry("TestDocument", "BaseSketch", 1, {"x": 5.0, "y": 0.0})
+    extend = application.extend_sketch_geometry(
+        "TestDocument", "BaseSketch", 2, "end", {"x": 15.0, "y": 0.0}
+    )
+
+    assert [trim.code, split.code, extend.code] == [
+        "sketch_geometry_trimmed",
+        "sketch_geometry_split",
+        "sketch_geometry_extended",
+    ]
+    assert trim.data["pick_point"] == {"x": 2.0, "y": 0.0}
+    assert split.data["point"] == {"x": 5.0, "y": 0.0}
+    assert extend.data["endpoint"] == "end"
+    assert extend.data["target_point"] == {"x": 15.0, "y": 0.0}
 
 
 def test_application_dispatches_equilateral_triangle_with_dedicated_semantics() -> None:

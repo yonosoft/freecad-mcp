@@ -60,6 +60,9 @@ def test_controlled_transaction_names_are_stable_agent_readable_labels() -> None
         "Set sketch constraint name",
         "Set sketch constraint expression",
         "Clear sketch constraint expression",
+        "Trim sketch geometry",
+        "Split sketch geometry",
+        "Extend sketch geometry",
     )
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -57,7 +58,12 @@ _Operation = Literal[
     "update_geometry",
     "replace_constraint",
     "update_constraint_value",
+    "trim_geometry",
+    "split_geometry",
+    "extend_geometry",
 ]
+
+_ROLLBACK_COORDINATE_TOLERANCE = 1.0e-15
 
 
 @dataclass(frozen=True, slots=True)
@@ -944,7 +950,10 @@ def _verify_rollback(
     )
     gui_state = sketch_external_geometry._gui_state(gui, str(document.Name))
     checks = (
-        _geometry_signature(geometry, construction, part) == snapshot.base.geometry_signature,
+        _geometry_rollback_signatures_equal(
+            _geometry_signature(geometry, construction, part),
+            snapshot.base.geometry_signature,
+        ),
         construction == snapshot.base.construction,
         _constraint_state(sketch) == snapshot.base.constraints,
         sketch_external_geometry._reference_state(references) == snapshot.external_state,
@@ -979,6 +988,23 @@ def _verify_rollback(
             operation=operation,
             reason="solver_state_mismatch",
         )
+
+
+def _geometry_rollback_signatures_equal(actual: object, expected: object) -> bool:
+    """Ignore only sub-femtometre solver noise when verifying restored geometry."""
+    if isinstance(actual, float) and isinstance(expected, float):
+        return math.isclose(
+            actual,
+            expected,
+            rel_tol=0.0,
+            abs_tol=_ROLLBACK_COORDINATE_TOLERANCE,
+        )
+    if isinstance(actual, tuple) and isinstance(expected, tuple):
+        return len(actual) == len(expected) and all(
+            _geometry_rollback_signatures_equal(current, prior)
+            for current, prior in zip(actual, expected, strict=True)
+        )
+    return actual == expected
 
 
 def _error(operation: _Operation, phase: str, reason: str) -> SketchControlledMutationError:

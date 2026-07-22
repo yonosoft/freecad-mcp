@@ -2069,6 +2069,110 @@ composition, and server registration preserve the existing dependency
 direction. The full capability contract is maintained in
 `docs/sketch-constraint-expression-capabilities.md`.
 
+## Sketch Topology-Editing Boundary
+
+Milestone 23 appends three explicit tools at positions 40–42 without changing
+the first 39:
+
+```text
+mcp/sketch_topology_editing_tools.py
+-> commands/sketch_topology_editing.py
+-> SketchTopologyEditingAdapter protocol
+-> FreeCADDocumentAdapter
+-> freecad/sketch_topology_editing.py
+-> existing snapshot/dependency/history/rollback services
+-> native SketchObject.trim / split / extend
+-> controlled readback and complete mapping verification
+-> SketchTopologyEditResult
+```
+
+The transport exposes three closed schemas rather than a generic topology
+operation. Points use the existing finite strict two-coordinate model; extend
+adds one exact `start | end` enum. Handler validation and safe error translation
+remain FreeCAD-independent. The adapter owns all native signatures, geometric
+planning, semantic verification, transaction ownership, and result mappings.
+
+The native discovery surface is intentionally larger than production. Direct
+FreeCAD 1.1.1 probes established `trim(int, Vector)`, `split(int, Vector)`, and
+`extend(int, float, int)`, including constraint deletion/transfer hazards,
+generated constraints, circles/arcs, construction state, histories, caller
+transactions, undo/redo, and persistence. Production freezes the smaller common
+domain that can prove complete mappings: unconstrained internal line segments,
+with construction lines included and every other operated family refused.
+
+### Deterministic planning
+
+Planning uses public inspected geometry and a fixed `1e-7` sketch-coordinate
+tolerance before a transaction opens. Line projection produces a normalized
+source parameter and perpendicular distance. Trim uses finite-segment cross
+products to enumerate and sort internal line-boundary intersections by source
+parameter then boundary index. It rejects endpoint, coincident/overlapping,
+equal-position, exact-pick, unsupported-boundary, external-boundary, and
+near-zero outcomes. Split canonicalizes the accepted Cartesian point back onto
+the source. Extend converts an explicit collinear endpoint target to the native
+positive increment and PointPos 1/2 selector; it never asks FreeCAD to choose an
+implicit intersection.
+
+The planner does not match topology by approximate geometry identity after the
+fact. Native probes established the exact supported survivor assignment: trim
+and split retain the first source-parameter result at the original index, append
+the second when present, and preserve orientation. Extend modifies the original
+index in place. Those rules plus exact count/readback assertions define the
+mapping; duplicate unrelated geometry cannot create mapping ambiguity.
+
+### Constraint and mapping verification
+
+Preflight reuses Milestone 19 native operand scanning and Milestones 21–22
+dependency/expression inspection. Any pre-existing constraint referencing the
+operated line refuses, with expression-bound then named then ordinary dependency
+reason precedence. This prevents FreeCAD's observed silent dimensional loss,
+expression detachment, and solver-driven movement of the unselected endpoint.
+Broken, cross-document, and downstream topology dependencies refuse; trim also
+requires zero external geometry and all internal boundaries to be line
+segments.
+
+After recompute, verification compares the complete geometry collection,
+construction flags, pre-existing native constraint tuples, public constraint
+readback, generated native operands/state, expressions, external mappings,
+sketch context, placement, Body ownership, GUI observations, solver, and
+document identity. Trim's generated Point-on-Object constraints and split's
+generated Coincident constraint are asserted at exact appended indices. Native
+constraint state proves their driving/active/virtual flags; public geometric
+constraints legitimately serialize `driving: null` because the public
+inspection model reserves that scalar for dimensional constraints.
+
+`SketchTopologyEditResult` carries one original-order geometry mapping for every
+pre-call internal item and one original-order constraint mapping for every
+pre-call constraint. The supported result domain uses unchanged, modified, and
+one-to-many split mappings, plus separate exact created/removed/modified entity
+lists. Generated constraints are distinguished as native generation versus
+split joining constraints. No native GeoId or object identity crosses the
+boundary.
+
+### Transactions, history, and recovery
+
+The service reuses the complete Milestone 19 snapshot and exact rollback
+verifier. Owned operations activate a non-active target before opening one
+`Trim sketch geometry`, `Split sketch geometry`, or `Extend sketch geometry`
+transaction, restore the previous active document, complete all semantic and
+non-target-history checks while the transaction is open, then commit. Target
+history verification accepts only exact ordinary growth or the proven
+capacity-20 success shape. Refusals and endpoint/equality no-ops open no
+transaction.
+
+Caller-owned calls neither switch the active document nor open, commit, abort,
+undo, or close the caller transaction. On a partial native or verification
+failure, the shared same-object path restores geometry, constraints, flags,
+solver, modified state, and controlled context inside that transaction, then
+verifies that it remains open. Owned failures abort before commit. Every open
+document's history is captured, and non-target histories are rechecked before
+commit so an isolation defect remains rollback-safe. No operation calls save.
+
+The permanent capability matrix is
+`docs/sketch-topology-editing-capabilities.md`; isolated native evidence is in
+`scripts/probe_sketch_topology_editing.py`, and the real-adapter campaign is
+`scripts/smoke_sketch_topology_editing.py`.
+
 ## Test Ownership
 
 The pure-Python suite mirrors the production responsibilities rather than
@@ -2095,6 +2199,11 @@ collecting all adapter or transport behavior in single modules:
   resolution, exact native calls, and transaction ownership belong in
   `tests/test_freecad_sketch_constraint_expressions.py`; handler validation and
   error mapping belong in `tests/test_sketch_constraint_expression_commands.py`;
+  topology planning, exact native argument translation, mapping verification,
+  history isolation, and rollback routing belong in
+  `tests/test_freecad_sketch_topology_editing.py`; topology handler validation
+  and error translation belong in
+  `tests/test_sketch_topology_editing_commands.py`;
 - MCP tests are split into document, object, creation, and sketch-geometry
   registrations; tools 25--28 have exact schema and delegation coverage in
   `tests/test_mcp_sketch_external_geometry_tools.py`; tools 29–31 have strict
@@ -2104,7 +2213,9 @@ collecting all adapter or transport behavior in single modules:
   tool 35 has exact schema, order, and no-chaining coverage in
   `tests/test_mcp_sketch_reference_constraint_tools.py`; tools 36–39 have strict
   schema, order, description, and delegation coverage in
-  `tests/test_mcp_sketch_constraint_expression_tools.py`;
+  `tests/test_mcp_sketch_constraint_expression_tools.py`; tools 40–42 have
+  strict schema, order, description, and typed delegation coverage in
+  `tests/test_mcp_sketch_topology_editing_tools.py`;
   server composition, authoritative
   inventory, lifecycle agreement, and HTTP transport remain together;
 - `tests/test_module_compatibility.py` exclusively owns legacy/canonical identity

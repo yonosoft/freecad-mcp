@@ -252,6 +252,19 @@ def test_survivor_remapping_is_ordered_by_pre_call_index() -> None:
     ]
 
 
+def test_rollback_geometry_comparison_ignores_only_machine_scale_solver_noise() -> None:
+    expected = (("line_segment", (0.0, 0.0, 0.0), (4.0, 0.0, 0.0)), False)
+
+    assert sketch_removal._geometry_rollback_signatures_equal(
+        (("line_segment", (-4.336808689942018e-19, 0.0, 0.0), (4.0, 0.0, 0.0)), False),
+        expected,
+    )
+    assert not sketch_removal._geometry_rollback_signatures_equal(
+        (("line_segment", (1.0e-12, 0.0, 0.0), (4.0, 0.0, 0.0)), False),
+        expected,
+    )
+
+
 def test_geometry_dependency_preflight_covers_all_native_reference_slots() -> None:
     dependencies = sketch_removal._geometry_dependencies(
         (_state(0), _state(3, 1), _state(4, 5, 2)),

@@ -381,6 +381,26 @@ class SketchControlledMutationRollbackError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchTopologyEditUnsafeError(RuntimeError):
+    """Raised before topology mutation when the frozen contract cannot prove safety."""
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        code: str,
+        reason: str,
+        geometry_index: int,
+        details: dict[str, object] | None = None,
+    ) -> None:
+        self.operation = operation
+        self.code = code
+        self.reason = reason
+        self.geometry_index = geometry_index
+        self.details = {} if details is None else details
+        super().__init__(reason)
+
+
 class SketchRectangleCreationError(RuntimeError):
     """Raised when one semantic rectangle phase cannot be completed."""
 
@@ -792,6 +812,7 @@ __all__ = [
     "SketchSlotCreationError",
     "SketchSlotRollbackError",
     "SketchSlotVerificationError",
+    "SketchTopologyEditUnsafeError",
     "SketchTypeMismatchError",
     "UndoNotAvailableError",
 ]

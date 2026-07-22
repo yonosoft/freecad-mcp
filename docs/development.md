@@ -2135,3 +2135,105 @@ Finish with `git diff --check`, a final architectural/safety diff review, and
 `git status --short --branch`. The public-only campaign is prepared but not run
 in `docs/codex-milestone-22-acceptance.md`. Local success does not authorize a
 commit or mark the milestone externally accepted.
+
+## Milestone 23 Topology-Editing Verification
+
+Tools 40–42 add evidence-bounded line-segment trim, split, and extend. Use the
+exact FreeCAD 1.1.1 embedded interpreter for discovery and native verification:
+
+```powershell
+$FreeCADPython = "C:\Program Files\FreeCAD 1.1\bin\python.exe"
+& $FreeCADPython --version
+& $FreeCADPython -c "import FreeCAD; print(FreeCAD.Version())"
+```
+
+The permanent isolated discovery coordinator runs every native case in its own
+process. It is research evidence and must never be imported into production:
+
+```powershell
+& $FreeCADPython ".\scripts\probe_sketch_topology_editing.py" `
+  --output "$env:TEMP\freecad-m23-native-discovery.json"
+```
+
+It records the exact `trim(int, Vector)`, `split(int, Vector)`, and
+`extend(int, float, int)` signatures and complete semantic before/after state
+for line, arc, circle, construction, external, constrained, named,
+expression-bound, endpoint, invalid, capacity-20, caller-owned, undo/redo, and
+save/reload cases. Crash-prone or uncertain combinations remain isolated from
+the main smoke process.
+
+Develop with focused pure-Python checks:
+
+```powershell
+& $FreeCADPython -m pytest -q `
+  tests\test_freecad_sketch_topology_editing.py `
+  tests\test_sketch_topology_editing_commands.py `
+  tests\test_mcp_sketch_topology_editing_tools.py `
+  tests\test_application.py `
+  tests\test_runtime.py `
+  tests\test_mcp_server.py `
+  tests\test_freecad_sketch_removal.py `
+  tests\test_freecad_sketch_editing.py `
+  tests\test_freecad_sketch_dependencies.py `
+  tests\test_freecad_sketch_constraint_expressions.py
+
+& $FreeCADPython -m ruff check `
+  src\freecad_mcp\commands\sketch_topology_editing.py `
+  src\freecad_mcp\freecad\sketch_topology_editing.py `
+  src\freecad_mcp\mcp\sketch_topology_editing_tools.py `
+  scripts\probe_sketch_topology_editing.py `
+  scripts\smoke_sketch_topology_editing.py `
+  tests\test_freecad_sketch_topology_editing.py `
+  tests\test_sketch_topology_editing_commands.py `
+  tests\test_mcp_sketch_topology_editing_tools.py
+
+& $FreeCADPython -m mypy --strict `
+  src\freecad_mcp\commands\sketch_topology_editing.py `
+  src\freecad_mcp\freecad\sketch_topology_editing.py `
+  src\freecad_mcp\mcp\sketch_topology_editing_tools.py `
+  src\freecad_mcp\freecad\document.py `
+  src\freecad_mcp\models.py `
+  src\freecad_mcp\protocols.py `
+  src\freecad_mcp\runtime.py `
+  src\freecad_mcp\validation.py
+```
+
+The authoritative real-adapter campaign is:
+
+```powershell
+& $FreeCADPython ".\scripts\smoke_sketch_topology_editing.py"
+```
+
+It covers complete supported trim/split/extend mappings, generated
+Point-on-Object and Coincident constraints, construction state, unrelated
+names/expressions, deterministic ambiguity and degeneracy refusals, off-source
+and shortening policies, unsupported/external/downstream dependency refusal,
+undo/redo, exact owned and caller-owned rollback, same-object recovery,
+capacity-20 success/failure, non-active target and cross-document history
+isolation, no automatic save, and explicit save/reload.
+
+After adversarial diff review and focused checks are green, run the complete
+quality gate once:
+
+```powershell
+.\scripts\test.ps1 -PythonExe $FreeCADPython
+```
+
+Then run the Milestone 23 smoke and selected shared-boundary historical native
+neighbors:
+
+```powershell
+& $FreeCADPython ".\scripts\smoke_sketch_topology_editing.py"
+& $FreeCADPython ".\scripts\smoke_document_history.py"
+& $FreeCADPython ".\scripts\smoke_sketch_removal.py"
+& $FreeCADPython ".\scripts\smoke_sketch_editing.py"
+& $FreeCADPython ".\scripts\smoke_sketch_reference_constraints.py"
+& $FreeCADPython ".\scripts\smoke_sketch_constraint_expressions.py"
+& $FreeCADPython ".\scripts\smoke_sketch_external_geometry.py"
+```
+
+Finish with `git diff --check`, a final mapping/transaction/error-leakage review,
+and `git status --short --branch`. The public-only campaign is prepared but must
+not be run during implementation:
+`docs/codex-milestone-23-acceptance.md`. Local success does not authorize a
+restart, public acceptance, commit, push, or milestone closure.

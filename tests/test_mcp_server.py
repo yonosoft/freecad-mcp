@@ -116,6 +116,11 @@ def test_mcp_server_composes_explicit_registration_groups(
     )
     monkeypatch.setattr(
         mcp_server_module,
+        "register_sketch_topology_editing_tools",
+        recorder("sketch_topology_editing_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
         "register_sketch_reference_constraint_tool",
         recorder("sketch_reference_constraint_tool"),
     )
@@ -146,6 +151,7 @@ def test_mcp_server_composes_explicit_registration_groups(
         "sketch_editing_tools",
         "sketch_reference_constraint_tool",
         "sketch_constraint_expression_tools",
+        "sketch_topology_editing_tools",
     ]
     assert asyncio.run(server.list_tools()) == []
 
@@ -199,12 +205,17 @@ def test_registered_tools_match_lifecycle_status_in_deterministic_order() -> Non
         "replace_sketch_constraint",
         "update_sketch_constraint_value",
     ]
-    assert actual_tools[34:] == [
+    assert actual_tools[34:39] == [
         "add_sketch_reference_constraints",
         "set_sketch_constraint_name",
         "set_sketch_constraint_expression",
         "clear_sketch_constraint_expression",
         "list_sketch_constraint_expressions",
+    ]
+    assert actual_tools[39:] == [
+        "trim_sketch_geometry",
+        "split_sketch_geometry",
+        "extend_sketch_geometry",
     ]
 
 

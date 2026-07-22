@@ -34,6 +34,9 @@ from freecad_mcp.mcp.sketch_reference_constraint_tools import (
     register_sketch_reference_constraint_tool,
 )
 from freecad_mcp.mcp.sketch_removal_tools import register_sketch_removal_tools
+from freecad_mcp.mcp.sketch_topology_editing_tools import (
+    register_sketch_topology_editing_tools,
+)
 from freecad_mcp.server.config import ServerConfig
 
 
@@ -84,6 +87,9 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             "set_sketch_constraint_expression for the finite validated expression grammar, "
             "clear_sketch_constraint_expression before returning to direct datum edits, and "
             "list_sketch_constraint_expressions for controlled binding and dependency readback."
+            " Use trim_sketch_geometry, split_sketch_geometry, and extend_sketch_geometry only "
+            "for their documented evidence-bounded internal line-segment cases; inspect complete "
+            "returned mappings and correct an unwanted success through its exact history name."
         ),
         host=config.host,
         port=config.port,
@@ -111,5 +117,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_editing_tools(server, handlers)
     register_sketch_reference_constraint_tool(server, handlers)
     register_sketch_constraint_expression_tools(server, handlers)
+    register_sketch_topology_editing_tools(server, handlers)
 
     return server

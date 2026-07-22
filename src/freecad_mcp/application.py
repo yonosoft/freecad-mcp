@@ -472,6 +472,53 @@ class Application:
             name=name,
         )
 
+    def trim_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_index: object,
+        pick_point: object,
+    ) -> CommandResult:
+        """Trim one evidence-supported internal line-segment portion."""
+        return self.documents.trim_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_index=geometry_index,
+            pick_point=pick_point,
+        )
+
+    def split_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_index: object,
+        point: object,
+    ) -> CommandResult:
+        """Split one evidence-supported internal line segment."""
+        return self.documents.split_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_index=geometry_index,
+            point=point,
+        )
+
+    def extend_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        geometry_index: object,
+        endpoint: object,
+        target_point: object,
+    ) -> CommandResult:
+        """Extend one evidence-supported internal line endpoint."""
+        return self.documents.extend_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            geometry_index=geometry_index,
+            endpoint=endpoint,
+            target_point=target_point,
+        )
+
     def set_sketch_constraint_expression(
         self,
         document_name: object,

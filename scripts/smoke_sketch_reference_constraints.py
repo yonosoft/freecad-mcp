@@ -209,7 +209,7 @@ def _parallel(first: tuple[float, float], second: tuple[float, float]) -> bool:
 
 def _inventory_and_internal_parity() -> None:
     _record("freecad_1_1_1", tuple(App.Version()[:3]) == ("1", "1", "1"))
-    _record("exact_39_tool_inventory", len(REGISTERED_TOOL_NAMES) == 39)
+    _record("exact_42_tool_inventory", len(REGISTERED_TOOL_NAMES) == 42)
     _record(
         "unchanged_milestone_20_tail",
         REGISTERED_TOOL_NAMES[31:34]
@@ -225,7 +225,7 @@ def _inventory_and_internal_parity() -> None:
     )
     _record(
         "milestone_22_tool_order",
-        REGISTERED_TOOL_NAMES[35:]
+        REGISTERED_TOOL_NAMES[35:39]
         == (
             "set_sketch_constraint_name",
             "set_sketch_constraint_expression",
