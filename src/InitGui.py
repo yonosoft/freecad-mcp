@@ -59,11 +59,11 @@ class MCPWorkbench(Gui.Workbench):
     ToolTip = "Typed local MCP tools and shared CAD commands"
 
     def Initialize(self) -> None:
-        from freecad_mcp.gui.commands import COMMAND_IDS, register_commands
+        from freecad_mcp.gui.commands import COMMAND_IDS, MENU_ENTRIES, register_commands
 
         register_commands()
         self.appendToolbar(self.MenuText, COMMAND_IDS)
-        self.appendMenu(self.MenuText, COMMAND_IDS)
+        self.appendMenu(self.MenuText, MENU_ENTRIES)
 
     def Activated(self) -> None:
         return None
@@ -81,6 +81,9 @@ MCPWorkbench.Icon = _WORKBENCH_ICON
 try:
     if _WORKBENCH_ID not in Gui.listWorkbenches():
         Gui.addWorkbench(MCPWorkbench())
+    from freecad_mcp.gui.autostart import schedule_server_start
+
+    schedule_server_start()
 except Exception as exc:
     App.Console.PrintError(
         f"[{_WORKBENCH_NAME}] Startup failed during InitGui.py workbench registration: {exc}\n"
