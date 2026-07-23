@@ -40,7 +40,7 @@ def _create_qt_executor(QtCore: Any, application: Any) -> Any:
             self.dispatch_requested.emit((operation, future))
             return future
 
-        @QtCore.Slot(object)  # type: ignore
+        @QtCore.Slot(object)  # type: ignore[misc]
         def _execute(self, payload: tuple[Callable[[], object], Future[object]]) -> None:
             operation, future = payload
             if not future.set_running_or_notify_cancel():

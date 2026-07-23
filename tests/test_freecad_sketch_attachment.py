@@ -463,7 +463,7 @@ def test_create_sketch_rollback_removes_support(
         )
 
     # After abort, no sketch should remain in the document
-    obj_names = [obj.Name for obj in doc_stub.Objects]  # type: ignore[attr-defined]
+    obj_names = [obj.Name for obj in doc_stub.Objects]
     assert "BaseSketch" not in obj_names
 
     # After abort, body's Group should not contain the sketch

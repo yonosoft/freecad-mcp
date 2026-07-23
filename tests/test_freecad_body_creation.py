@@ -374,5 +374,5 @@ def test_create_body_failure_does_not_leave_orphan_body(
         FreeCADDocumentAdapter().create_body("TestDoc", "Body", None)
 
     # After abort, the document should not contain the orphan object
-    body_names = [obj.Name for obj in doc_stub.Objects]  # type: ignore[attr-defined]
+    body_names = [obj.Name for obj in doc_stub.Objects]
     assert "Body" not in body_names

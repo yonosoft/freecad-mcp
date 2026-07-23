@@ -150,6 +150,25 @@ check, Mypy, and Pytest, in that order. It does not install FreeCAD or run live
 GUI acceptance. GitHub Actions and Forgejo Actions invoke this same script
 after `pip install -e ".[dev]"`, so the hosted checks remain equivalent.
 
+The supported Python line is 3.11. Exact CI tool versions (Ruff, Mypy, Pytest)
+are pinned in ``pyproject.toml``. Local verification should use a fresh
+Python 3.11 virtual environment:
+
+```powershell
+
+   py -3.11 -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+
+```
+
+The canonical quality gate on every platform is:
+
+```text
+
+   python scripts/ci.py
+
+```
+
 GitHub uses an Ubuntu hosted runner. Codeberg uses Forgejo Actions: enable the
 repository's **Actions** unit and provide a repository or organization runner
 with the `docker` label before its workflow can run. Codeberg's hosted Actions
