@@ -11,7 +11,7 @@ local MCP server inside FreeCAD.
 - Visible workbench name: `MCP`.
 - Workbench class: `MCPWorkbench`.
 - FreeCAD command IDs use the uppercase `MCP_` prefix, such as
-  `MCP_ReportStatus`, `MCP_StopServer`, and `MCP_StartServer`.
+  `MCP_StartServer`, `MCP_StopServer`, and `MCP_StartServerOnStartup`.
 - Python package: `freecad_mcp`.
 - Do not rename the Python package to `mcp`; the MCP SDK may use the `mcp`
   namespace.
