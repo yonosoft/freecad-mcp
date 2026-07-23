@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from freecad_mcp.freecad import (
     body_creation,
     document_history,
@@ -9,6 +11,7 @@ from freecad_mcp.freecad import (
     object_inspection,
     sketch_analysis,
     sketch_centered_rectangle_creation,
+    sketch_chamfer,
     sketch_constraint_creation,
     sketch_constraint_expressions,
     sketch_constraint_state,
@@ -16,6 +19,7 @@ from freecad_mcp.freecad import (
     sketch_dependencies,
     sketch_editing,
     sketch_external_geometry,
+    sketch_fillet,
     sketch_geometry_creation,
     sketch_geometry_transforms,
     sketch_inspection,
@@ -481,6 +485,40 @@ class FreeCADDocumentAdapter:
             geometry_index,
             endpoint,
             target_point,
+        )
+
+    def chamfer_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        first_geometry_index: int,
+        distance: float,
+    ) -> SketchTopologyEditResult:
+        return cast(
+            SketchTopologyEditResult,
+            sketch_chamfer.chamfer_sketch_geometry(
+                document_name,
+                sketch_name,
+                first_geometry_index,
+                distance,
+            ),
+        )
+
+    def fillet_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        first_geometry_index: int,
+        radius: float,
+    ) -> SketchTopologyEditResult:
+        return cast(
+            SketchTopologyEditResult,
+            sketch_fillet.fillet_sketch_geometry(
+                document_name,
+                sketch_name,
+                first_geometry_index,
+                radius,
+            ),
         )
 
     def mirror_sketch_geometry(

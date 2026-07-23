@@ -23,6 +23,7 @@ from freecad_mcp.commands.sketch_analysis import (
     ValidateSketchProfileHandler,
 )
 from freecad_mcp.commands.sketch_centered_rectangle import CreateSketchCenteredRectangleHandler
+from freecad_mcp.commands.sketch_chamfer import ChamferSketchGeometryHandler
 from freecad_mcp.commands.sketch_constraint_expressions import (
     ClearSketchConstraintExpressionHandler,
     ListSketchConstraintExpressionsHandler,
@@ -50,6 +51,7 @@ from freecad_mcp.commands.sketch_external_geometry import (
     ListExternalGeometryHandler,
     RemoveExternalGeometryHandler,
 )
+from freecad_mcp.commands.sketch_fillet import FilletSketchGeometryHandler
 from freecad_mcp.commands.sketch_geometry import AddSketchGeometryHandler
 from freecad_mcp.commands.sketch_geometry_transforms import (
     MirrorSketchGeometryHandler,
@@ -135,6 +137,8 @@ class DocumentHandlers:
     set_sketch_constraint_driving: SetSketchConstraintDrivingHandler
     set_sketch_constraint_active: SetSketchConstraintActiveHandler
     set_sketch_constraint_virtual_space: SetSketchConstraintVirtualSpaceHandler
+    chamfer_sketch_geometry: ChamferSketchGeometryHandler
+    fillet_sketch_geometry: FilletSketchGeometryHandler
     recompute: RecomputeDocumentHandler
 
 
@@ -144,6 +148,7 @@ __all__ = [
     "AddSketchGeometryHandler",
     "AddSketchReferenceConstraintsHandler",
     "AnalyzeSketchHandler",
+    "ChamferSketchGeometryHandler",
     "ClearSketchConstraintExpressionHandler",
     "CreateBodyHandler",
     "CreateDocumentHandler",
@@ -156,6 +161,7 @@ __all__ = [
     "CreateSketchSlotHandler",
     "DocumentHandlers",
     "ExtendSketchGeometryHandler",
+    "FilletSketchGeometryHandler",
     "GetDocumentHandler",
     "GetDocumentHistoryHandler",
     "GetObjectHandler",

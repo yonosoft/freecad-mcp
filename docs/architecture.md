@@ -252,7 +252,7 @@ A dependency-free tool registry is the authoritative source for tool names and
 ordering. FastMCP registration and lifecycle status both consume that registry,
 so reported capabilities cannot drift from the registered set.
 
-The registry currently exposes exactly 51 public tools. The maintained
+The registry currently exposes exactly 53 public tools. The maintained
 [public tool inventory](public-tool-inventory.md) records their exact names and
 order without duplicating registration definitions in architecture prose.
 

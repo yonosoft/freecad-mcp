@@ -56,11 +56,13 @@ from freecad_mcp.commands import (
 )
 from freecad_mcp.commands.body import CreateBodyHandler
 from freecad_mcp.commands.sketch import CreateSketchHandler
+from freecad_mcp.commands.sketch_chamfer import ChamferSketchGeometryHandler
 from freecad_mcp.commands.sketch_constraint_state import (
     SetSketchConstraintActiveHandler,
     SetSketchConstraintDrivingHandler,
     SetSketchConstraintVirtualSpaceHandler,
 )
+from freecad_mcp.commands.sketch_fillet import FilletSketchGeometryHandler
 from freecad_mcp.core.logging import get_logger
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter
 from freecad_mcp.freecad.qt_dispatcher import create_qt_main_thread_dispatcher
@@ -252,6 +254,14 @@ def _build_runtime() -> Runtime:
             dispatcher=dispatcher,
         ),
         set_sketch_constraint_virtual_space=SetSketchConstraintVirtualSpaceHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        chamfer_sketch_geometry=ChamferSketchGeometryHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        fillet_sketch_geometry=FilletSketchGeometryHandler(
             adapter=adapter,
             dispatcher=dispatcher,
         ),

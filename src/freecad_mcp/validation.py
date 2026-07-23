@@ -1802,6 +1802,76 @@ def validate_sketch_topology_point_request(
     return index, parsed
 
 
+def validate_fillet_sketch_geometry_request(
+    document_name: object,
+    sketch_name: object,
+    first_geometry_index: object,
+    radius: object,
+) -> tuple[int, float] | CommandResult:
+    """Validate one strict line-line fillet request."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(first_geometry_index, field="first_geometry_index")
+    if isinstance(index, CommandResult):
+        return index
+    if isinstance(radius, bool) or not isinstance(radius, (int, float)):
+        return CommandResult.failure(
+            code="validation_error",
+            message="radius must be a finite positive number.",
+            data={
+                "field": "radius",
+                "actual_type": type(radius).__name__,
+            },
+        )
+    value = float(radius)
+    if not math.isfinite(value) or value <= 0:
+        return CommandResult.failure(
+            code="validation_error",
+            message="radius must be a finite positive number.",
+            data={
+                "field": "radius",
+                "reason": "non_positive_or_non_finite",
+            },
+        )
+    return index, value
+
+
+def validate_chamfer_sketch_geometry_request(
+    document_name: object,
+    sketch_name: object,
+    first_geometry_index: object,
+    distance: object,
+) -> tuple[int, float] | CommandResult:
+    """Validate one strict line-line chamfer request."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    index = _validate_strict_mutation_index(first_geometry_index, field="first_geometry_index")
+    if isinstance(index, CommandResult):
+        return index
+    if isinstance(distance, bool) or not isinstance(distance, (int, float)):
+        return CommandResult.failure(
+            code="validation_error",
+            message="distance must be a finite positive number.",
+            data={
+                "field": "distance",
+                "actual_type": type(distance).__name__,
+            },
+        )
+    value = float(distance)
+    if not math.isfinite(value) or value <= 0:
+        return CommandResult.failure(
+            code="validation_error",
+            message="distance must be a finite positive number.",
+            data={
+                "field": "distance",
+                "reason": "non_positive_or_non_finite",
+            },
+        )
+    return index, value
+
+
 def validate_extend_sketch_geometry_request(
     document_name: object,
     sketch_name: object,
@@ -2300,6 +2370,7 @@ __all__ = [
     "validate_add_sketch_geometry_request",
     "validate_add_sketch_reference_constraints_request",
     "validate_analyze_sketch_request",
+    "validate_chamfer_sketch_geometry_request",
     "validate_create_body_request",
     "validate_create_document_request",
     "validate_create_sketch_centered_rectangle_request",
@@ -2313,6 +2384,7 @@ __all__ = [
     "validate_document_reference",
     "validate_extend_sketch_geometry_request",
     "validate_external_geometry_reference_request",
+    "validate_fillet_sketch_geometry_request",
     "validate_mirror_sketch_geometry_request",
     "validate_object_reference",
     "validate_polar_array_sketch_geometry_request",

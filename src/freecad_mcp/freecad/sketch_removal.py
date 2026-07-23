@@ -52,18 +52,20 @@ from freecad_mcp.transaction_names import (
 )
 
 _Operation = Literal[
+    "chamfer_geometry",
+    "extend_geometry",
+    "fillet_geometry",
     "remove_constraints",
     "remove_geometry",
-    "set_construction",
-    "update_geometry",
     "replace_constraint",
-    "update_constraint_value",
-    "trim_geometry",
-    "split_geometry",
-    "extend_geometry",
-    "set_constraint_driving",
+    "set_construction",
     "set_constraint_active",
+    "set_constraint_driving",
     "set_constraint_virtual_space",
+    "split_geometry",
+    "trim_geometry",
+    "update_constraint_value",
+    "update_geometry",
 ]
 
 _ROLLBACK_COORDINATE_TOLERANCE = 1.0e-15

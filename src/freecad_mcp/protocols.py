@@ -337,7 +337,7 @@ class SketchEditingAdapter(Protocol):
 
 
 class SketchTopologyEditingAdapter(Protocol):
-    """Evidence-bounded trim, split, and extend operations."""
+    """Evidence-bounded trim, split, extend, and fillet operations."""
 
     def trim_sketch_geometry(
         self,
@@ -366,6 +366,24 @@ class SketchTopologyEditingAdapter(Protocol):
         target_point: SketchPoint2DInput,
     ) -> SketchTopologyEditResult:
         """Extend one internal line endpoint to an explicit collinear point."""
+
+    def chamfer_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        first_geometry_index: int,
+        distance: float,
+    ) -> SketchTopologyEditResult:
+        """Chamfer two intersecting normal line segments with an equal-distance line."""
+
+    def fillet_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        first_geometry_index: int,
+        radius: float,
+    ) -> SketchTopologyEditResult:
+        """Fillet two intersecting normal line segments with a tangent arc."""
 
 
 class SketchGeometryTransformAdapter(Protocol):

@@ -119,6 +119,16 @@ def test_mcp_server_composes_explicit_registration_groups(
     )
     monkeypatch.setattr(
         mcp_server_module,
+        "register_sketch_fillet_tool",
+        recorder("sketch_fillet_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_chamfer_tool",
+        recorder("sketch_chamfer_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
         "register_sketch_geometry_transform_tools",
         recorder("sketch_geometry_transform_tools"),
     )
@@ -160,6 +170,8 @@ def test_mcp_server_composes_explicit_registration_groups(
         "sketch_reference_constraint_tool",
         "sketch_constraint_expression_tools",
         "sketch_topology_editing_tools",
+        "sketch_chamfer_tool",
+        "sketch_fillet_tool",
         "sketch_geometry_transform_tools",
         "sketch_constraint_state_tools",
     ]

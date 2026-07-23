@@ -11,6 +11,7 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     AddSketchReferenceConstraintsHandler,
     AnalyzeSketchHandler,
+    ChamferSketchGeometryHandler,
     ClearSketchConstraintExpressionHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
@@ -22,6 +23,7 @@ from freecad_mcp.commands import (
     CreateSketchSlotHandler,
     DocumentHandlers,
     ExtendSketchGeometryHandler,
+    FilletSketchGeometryHandler,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
     GetObjectHandler,
@@ -544,6 +546,38 @@ class AdapterStub:
     ) -> Any:
         return self._transform("mirror", geometry_indices, reference)
 
+    def fillet_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        first_geometry_index: int,
+        radius: float,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "operation": "fillet",
+                "original_geometry_index": first_geometry_index,
+                "changed": True,
+                "no_change": False,
+            }
+        )
+
+    def chamfer_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        first_geometry_index: int,
+        distance: float,
+    ) -> Any:
+        return _SemanticResult(
+            {
+                "operation": "chamfer",
+                "original_geometry_index": first_geometry_index,
+                "changed": True,
+                "no_change": False,
+            }
+        )
+
     def translate_sketch_geometry(
         self,
         document_name: str,
@@ -926,6 +960,8 @@ def make_application() -> Application:
             adapter,
             dispatcher,
         ),
+        fillet_sketch_geometry=FilletSketchGeometryHandler(adapter, dispatcher),
+        chamfer_sketch_geometry=ChamferSketchGeometryHandler(adapter, dispatcher),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)

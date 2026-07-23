@@ -12,6 +12,7 @@ from freecad_mcp.commands import (
     AddSketchGeometryHandler,
     AddSketchReferenceConstraintsHandler,
     AnalyzeSketchHandler,
+    ChamferSketchGeometryHandler,
     ClearSketchConstraintExpressionHandler,
     CreateBodyHandler,
     CreateDocumentHandler,
@@ -23,6 +24,7 @@ from freecad_mcp.commands import (
     CreateSketchSlotHandler,
     DocumentHandlers,
     ExtendSketchGeometryHandler,
+    FilletSketchGeometryHandler,
     GetDocumentHandler,
     GetDocumentHistoryHandler,
     GetObjectHandler,
@@ -659,6 +661,44 @@ class AdapterStub:
             }
         )
 
+    def fillet_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        first_geometry_index: int,
+        radius: float,
+    ) -> Any:
+        self.sketch_geometry_transform_calls.append(
+            ("fillet", (document_name, sketch_name, first_geometry_index, radius))
+        )
+        return _SemanticResultStub(
+            {
+                "operation": "fillet",
+                "original_geometry_index": first_geometry_index,
+                "changed": True,
+                "no_change": False,
+            }
+        )
+
+    def chamfer_sketch_geometry(
+        self,
+        document_name: str,
+        sketch_name: str,
+        first_geometry_index: int,
+        distance: float,
+    ) -> Any:
+        self.sketch_geometry_transform_calls.append(
+            ("chamfer", (document_name, sketch_name, first_geometry_index, distance))
+        )
+        return _SemanticResultStub(
+            {
+                "operation": "chamfer",
+                "original_geometry_index": first_geometry_index,
+                "changed": True,
+                "no_change": False,
+            }
+        )
+
     def mirror_sketch_geometry(
         self,
         document_name: str,
@@ -1157,6 +1197,14 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
                 dispatcher,
             ),
             set_sketch_constraint_virtual_space=SetSketchConstraintVirtualSpaceHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            fillet_sketch_geometry=FilletSketchGeometryHandler(
+                actual_adapter,
+                dispatcher,
+            ),
+            chamfer_sketch_geometry=ChamferSketchGeometryHandler(
                 actual_adapter,
                 dispatcher,
             ),

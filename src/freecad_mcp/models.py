@@ -530,6 +530,30 @@ class LowerLeftRectanglePlacementInput(_SketchGeometryInputModel):
     y: float = Field(strict=True, allow_inf_nan=False)
 
 
+class FilletSketchGeometryRequestInput(_SketchGeometryInputModel):
+    """Strict request for a line-line fillet operation.
+
+    ``first_geometry_index`` is the zero-based index of one of the two
+    intersecting line segments. ``radius`` is the fillet arc radius
+    measured in millimetres.
+    """
+
+    first_geometry_index: int = Field(strict=True, ge=0)
+    radius: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
+class ChamferSketchGeometryRequestInput(_SketchGeometryInputModel):
+    """Strict request for a line-line chamfer operation.
+
+    ``first_geometry_index`` is the zero-based index of one of the two
+    intersecting line segments. ``distance`` is the chamfer distance
+    along each line measured in millimetres.
+    """
+
+    first_geometry_index: int = Field(strict=True, ge=0)
+    distance: float = Field(strict=True, allow_inf_nan=False, gt=0.0)
+
+
 class SketchRectangleRequestInput(_SketchGeometryInputModel):
     """Complete strict semantic request for one axis-aligned rectangle."""
 
@@ -2484,6 +2508,108 @@ class SketchTopologyCreatedConstraint:
 
 
 @dataclass(frozen=True, slots=True)
+class SketchFilletResult:
+    """Verified result for one atomic fillet operation."""
+
+    first_geometry_index: int
+    second_geometry_index: int
+    created_arc_index: int
+    removed_coincident_index: int
+    created_tangent_indices: tuple[int, int]
+    geometry_mappings: tuple[SketchTopologyGeometryMapping, ...]
+    constraint_mappings: tuple[SketchTopologyConstraintMapping, ...]
+    created_geometry: tuple[SketchTopologyCreatedGeometry, ...]
+    removed_geometry: tuple[SketchGeometry, ...]
+    created_constraints: tuple[SketchTopologyCreatedConstraint, ...]
+    removed_constraints: tuple[SketchConstraint, ...]
+    modified_geometry_indices: tuple[int, ...]
+    modified_constraint_indices: tuple[int, ...]
+    transaction_name: str
+    transaction_committed: bool
+    tangency_details: dict[str, object]
+    solver: SketchSolverData
+    dependency_summary: dict[str, object]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "first_geometry_index": self.first_geometry_index,
+            "second_geometry_index": self.second_geometry_index,
+            "created_arc_index": self.created_arc_index,
+            "removed_coincident_index": self.removed_coincident_index,
+            "created_tangent_indices": list(self.created_tangent_indices),
+            "geometry_mappings": [item.to_dict() for item in self.geometry_mappings],
+            "constraint_mappings": [item.to_dict() for item in self.constraint_mappings],
+            "created_geometry": [item.to_dict() for item in self.created_geometry],
+            "removed_geometry": [item.to_dict() for item in self.removed_geometry],
+            "created_constraints": [item.to_dict() for item in self.created_constraints],
+            "removed_constraints": [item.to_dict() for item in self.removed_constraints],
+            "modified_geometry_indices": list(self.modified_geometry_indices),
+            "modified_constraint_indices": list(self.modified_constraint_indices),
+            "transaction_name": self.transaction_name,
+            "transaction_committed": self.transaction_committed,
+            "tangency_details": dict(self.tangency_details),
+            "solver": self.solver.to_dict(),
+            "dependency_summary": dict(self.dependency_summary),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchChamferResult:
+    """Verified result for one atomic chamfer operation."""
+
+    first_geometry_index: int
+    second_geometry_index: int
+    created_construction_arc_index: int
+    created_chamfer_line_index: int
+    removed_coincident_index: int
+    created_tangent_indices: tuple[int, ...]
+    geometry_mappings: tuple[SketchTopologyGeometryMapping, ...]
+    constraint_mappings: tuple[SketchTopologyConstraintMapping, ...]
+    created_geometry: tuple[SketchTopologyCreatedGeometry, ...]
+    removed_geometry: tuple[SketchGeometry, ...]
+    created_constraints: tuple[SketchTopologyCreatedConstraint, ...]
+    removed_constraints: tuple[SketchConstraint, ...]
+    modified_geometry_indices: tuple[int, ...]
+    modified_constraint_indices: tuple[int, ...]
+    transaction_name: str
+    transaction_committed: bool
+    tangency_details: dict[str, object]
+    solver: SketchSolverData
+    dependency_summary: dict[str, object]
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "first_geometry_index": self.first_geometry_index,
+            "second_geometry_index": self.second_geometry_index,
+            "created_construction_arc_index": self.created_construction_arc_index,
+            "created_chamfer_line_index": self.created_chamfer_line_index,
+            "removed_coincident_index": self.removed_coincident_index,
+            "created_tangent_indices": list(self.created_tangent_indices),
+            "geometry_mappings": [item.to_dict() for item in self.geometry_mappings],
+            "constraint_mappings": [item.to_dict() for item in self.constraint_mappings],
+            "created_geometry": [item.to_dict() for item in self.created_geometry],
+            "removed_geometry": [item.to_dict() for item in self.removed_geometry],
+            "created_constraints": [item.to_dict() for item in self.created_constraints],
+            "removed_constraints": [item.to_dict() for item in self.removed_constraints],
+            "modified_geometry_indices": list(self.modified_geometry_indices),
+            "modified_constraint_indices": list(self.modified_constraint_indices),
+            "transaction_name": self.transaction_name,
+            "transaction_committed": self.transaction_committed,
+            "tangency_details": dict(self.tangency_details),
+            "solver": self.solver.to_dict(),
+            "dependency_summary": dict(self.dependency_summary),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SketchTopologyEditResult:
     """Verified strict topology edit with complete ordered public mappings."""
 
@@ -2934,6 +3060,7 @@ __all__ = [
     "ArcOfCircleGeometryUpdateInput",
     "AttachmentInfo",
     "CenterRoundedRectanglePlacementInput",
+    "ChamferSketchGeometryRequestInput",
     "CircleGeometryInput",
     "CircleGeometryUpdateInput",
     "Circumradius",
@@ -2962,6 +3089,7 @@ __all__ = [
     "ExternalGeometrySourceInput",
     "ExternalReferenceNumber",
     "ExternalSketchGeometryReferenceInput",
+    "FilletSketchGeometryRequestInput",
     "HorizontalConstraintInput",
     "HorizontalPointsConstraintInput",
     "InternalSketchGeometryReferenceInput",
@@ -3024,6 +3152,7 @@ __all__ = [
     "SketchCenteredRectangleCreationResult",
     "SketchCenteredRectangleProfile",
     "SketchCenteredRectangleRequestInput",
+    "SketchChamferResult",
     "SketchCircleGeometry",
     "SketchCoincidentReferenceInput",
     "SketchConstraint",
@@ -3046,6 +3175,7 @@ __all__ = [
     "SketchCurvedProfileJoin",
     "SketchDependencyInspectionResult",
     "SketchEquilateralTriangleRequestInput",
+    "SketchFilletResult",
     "SketchGeometry",
     "SketchGeometryAdditionResult",
     "SketchGeometryBatch",

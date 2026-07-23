@@ -18,6 +18,7 @@ from freecad_mcp.mcp.sketch_analysis_tools import register_sketch_analysis_tools
 from freecad_mcp.mcp.sketch_centered_rectangle_tools import (
     register_create_sketch_centered_rectangle_tool,
 )
+from freecad_mcp.mcp.sketch_chamfer_tool import register_sketch_chamfer_tool
 from freecad_mcp.mcp.sketch_constraint_expression_tools import (
     register_sketch_constraint_expression_tools,
 )
@@ -30,6 +31,7 @@ from freecad_mcp.mcp.sketch_editing_tools import register_sketch_editing_tools
 from freecad_mcp.mcp.sketch_external_geometry_tools import (
     register_sketch_external_geometry_tools,
 )
+from freecad_mcp.mcp.sketch_fillet_tool import register_sketch_fillet_tool
 from freecad_mcp.mcp.sketch_geometry_tools import register_add_sketch_geometry_tool
 from freecad_mcp.mcp.sketch_geometry_transform_tools import (
     register_sketch_geometry_transform_tools,
@@ -132,6 +134,8 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_reference_constraint_tool(server, handlers)
     register_sketch_constraint_expression_tools(server, handlers)
     register_sketch_topology_editing_tools(server, handlers)
+    register_sketch_chamfer_tool(server, handlers)
+    register_sketch_fillet_tool(server, handlers)
     register_sketch_geometry_transform_tools(server, handlers)
     register_sketch_constraint_state_tools(server, handlers)
 

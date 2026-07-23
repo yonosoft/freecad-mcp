@@ -72,6 +72,8 @@ def test_controlled_transaction_names_are_stable_agent_readable_labels() -> None
         "Scale sketch geometry",
         "Rectangular array sketch geometry",
         "Polar array sketch geometry",
+        "Fillet sketch geometry",
+        "Chamfer sketch geometry",
     )
 
 

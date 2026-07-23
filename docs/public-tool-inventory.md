@@ -1,6 +1,6 @@
 # Public MCP Tool Inventory
 
-The authoritative registry contains exactly 51 public tools. The names and
+The authoritative registry contains exactly 53 public tools. The names and
 order below mirror `src/freecad_mcp/tool_registry.py`; repository consistency
 tests prevent the registry, runtime registration, and this inventory from
 drifting apart.
@@ -47,12 +47,22 @@ drifting apart.
 40. `trim_sketch_geometry`
 41. `split_sketch_geometry`
 42. `extend_sketch_geometry`
-43. `mirror_sketch_geometry`
-44. `translate_sketch_geometry`
-45. `rotate_sketch_geometry`
-46. `scale_sketch_geometry`
-47. `rectangular_array_sketch_geometry`
-48. `polar_array_sketch_geometry`
-49. `set_sketch_constraint_driving`
-50. `set_sketch_constraint_active`
-51. `set_sketch_constraint_virtual_space`
+43. `chamfer_sketch_geometry`
+44. `fillet_sketch_geometry`
+45. `mirror_sketch_geometry`
+46. `translate_sketch_geometry`
+47. `rotate_sketch_geometry`
+48. `scale_sketch_geometry`
+49. `rectangular_array_sketch_geometry`
+50. `polar_array_sketch_geometry`
+51. `set_sketch_constraint_driving`
+52. `set_sketch_constraint_active`
+53. `set_sketch_constraint_virtual_space`
+
+## Deferred
+
+`offset_sketch_geometry` is not exposed. FreeCAD 1.1 does not provide a
+headless Sketcher offset API; the GUI command uses OpenCASCADE internally and
+has no supported Python binding. Implementing offset would require a separate
+research and contract milestone built on Part/OCC offset operations — it is
+not a thin native adapter.

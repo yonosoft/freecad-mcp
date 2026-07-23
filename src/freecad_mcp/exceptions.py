@@ -397,6 +397,72 @@ class SketchControlledMutationRollbackError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchFilletUnsafeError(RuntimeError):
+    """Raised before a controlled fillet operation when the frozen contract
+    cannot prove the operation is safe."""
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        code: str,
+        reason: str,
+        first_geometry_index: int,
+        partner_index: int = -1,
+        source_construction: bool = False,
+        partner_construction: bool = False,
+        found_candidates: int = 0,
+        conflicting_constraint_index: int = -1,
+        conflicting_constraint_type: str = "",
+        details: dict[str, object] | None = None,
+    ) -> None:
+        self.operation = operation
+        self.code = code
+        self.reason = reason
+        self.first_geometry_index = first_geometry_index
+        self.partner_index = partner_index
+        self.source_construction = source_construction
+        self.partner_construction = partner_construction
+        self.found_candidates = found_candidates
+        self.conflicting_constraint_index = conflicting_constraint_index
+        self.conflicting_constraint_type = conflicting_constraint_type
+        self.details = {} if details is None else details
+        super().__init__(reason)
+
+
+class SketchChamferUnsafeError(RuntimeError):
+    """Raised before a controlled chamfer operation when the frozen contract
+    cannot prove the operation is safe."""
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        code: str,
+        reason: str,
+        first_geometry_index: int,
+        partner_index: int = -1,
+        source_construction: bool = False,
+        partner_construction: bool = False,
+        found_candidates: int = 0,
+        conflicting_constraint_index: int = -1,
+        conflicting_constraint_type: str = "",
+        details: dict[str, object] | None = None,
+    ) -> None:
+        self.operation = operation
+        self.code = code
+        self.reason = reason
+        self.first_geometry_index = first_geometry_index
+        self.partner_index = partner_index
+        self.source_construction = source_construction
+        self.partner_construction = partner_construction
+        self.found_candidates = found_candidates
+        self.conflicting_constraint_index = conflicting_constraint_index
+        self.conflicting_constraint_type = conflicting_constraint_type
+        self.details = {} if details is None else details
+        super().__init__(reason)
+
+
 class SketchTopologyEditUnsafeError(RuntimeError):
     """Raised before topology mutation when the frozen contract cannot prove safety."""
 
@@ -580,6 +646,30 @@ class SketchPolygonRollbackError(RuntimeError):
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
+
+
+class SketchFilletCreationError(RuntimeError):
+    """Raised when one controlled fillet phase cannot be completed."""
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        phase: str,
+        reason: str,
+    ) -> None:
+        self.operation = operation
+        self.phase = phase
+        self.reason = reason
+        super().__init__(reason)
+
+    def details(self) -> dict[str, object]:
+        """Return controlled diagnostic context for a public failure."""
+        return {
+            "operation": self.operation,
+            "phase": self.phase,
+            "reason": self.reason,
+        }
 
 
 class SketchSlotCreationError(RuntimeError):
@@ -796,6 +886,7 @@ __all__ = [
     "SketchCenteredRectangleCreationError",
     "SketchCenteredRectangleRollbackError",
     "SketchCenteredRectangleVerificationError",
+    "SketchChamferUnsafeError",
     "SketchConstraintCreationError",
     "SketchConstraintMalformedError",
     "SketchConstraintReplacementUnsafeError",
@@ -810,6 +901,8 @@ __all__ = [
     "SketchExternalGeometryRemovalUnsafeError",
     "SketchExternalGeometryRollbackError",
     "SketchExternalGeometrySourceError",
+    "SketchFilletCreationError",
+    "SketchFilletUnsafeError",
     "SketchGeometryCreationError",
     "SketchGeometryMalformedError",
     "SketchGeometryRollbackError",

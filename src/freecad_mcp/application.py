@@ -707,6 +707,36 @@ class Application:
             sketch_name=sketch_name,
         )
 
+    def chamfer_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        first_geometry_index: object,
+        distance: object,
+    ) -> CommandResult:
+        """Chamfer two intersecting line segments in a sketch through the shared handler."""
+        return self.documents.chamfer_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            first_geometry_index=first_geometry_index,
+            distance=distance,
+        )
+
+    def fillet_sketch_geometry(
+        self,
+        document_name: object,
+        sketch_name: object,
+        first_geometry_index: object,
+        radius: object,
+    ) -> CommandResult:
+        """Fillet two intersecting line segments in a sketch through the shared handler."""
+        return self.documents.fillet_sketch_geometry.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            first_geometry_index=first_geometry_index,
+            radius=radius,
+        )
+
     def can_start_server(self) -> bool:
         """Return whether the Start Server GUI command should be active."""
         return self.lifecycle.can_start()

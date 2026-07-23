@@ -43,3 +43,4 @@ Thumbs.db
 .aider-desk/rules/*
 !.aider-desk/rules/SEARCH.md
 /.uv-cache/
+/workdir/
