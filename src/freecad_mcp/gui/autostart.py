@@ -14,12 +14,12 @@ def is_start_on_startup_enabled() -> bool:
     param_get = getattr(App, "ParamGet", None)
     if param_get is None:
         return False
-    return param_get(_PREFERENCES_PATH).GetBool(_START_ON_STARTUP_KEY, False)
+    return bool(param_get(_PREFERENCES_PATH).GetBool(_START_ON_STARTUP_KEY, False))
 
 
 def set_start_on_startup_enabled(enabled: bool) -> None:
     """Persist whether the MCP server should start with FreeCAD."""
-    import FreeCAD as App  # type: ignore[import-not-found]
+    import FreeCAD as App
 
     App.ParamGet(_PREFERENCES_PATH).SetBool(_START_ON_STARTUP_KEY, enabled)
 

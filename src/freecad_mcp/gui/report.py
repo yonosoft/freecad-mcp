@@ -30,7 +30,7 @@ def write_stopping_status(result: CommandResult) -> None:
 
 
 def _write_transition_status(label: str, result: CommandResult) -> None:
-    import FreeCAD as App  # type: ignore[import-not-found]
+    import FreeCAD as App
 
     url = result.data.get("url")
     endpoint = url if isinstance(url, str) else ""
@@ -46,11 +46,7 @@ def _format_status(result: CommandResult, start_on_launch: bool) -> str:
 
     if state == "running":
         tools = data.get("tools")
-        tool_count = (
-            len(tools)
-            if isinstance(tools, Sequence) and not isinstance(tools, str)
-            else 0
-        )
+        tool_count = len(tools) if isinstance(tools, Sequence) and not isinstance(tools, str) else 0
         return f"Running — {endpoint} — {tool_count} tools — Start on launch: {launch}"
     if state == "stopped":
         return f"Stopped — Start on launch: {launch}"

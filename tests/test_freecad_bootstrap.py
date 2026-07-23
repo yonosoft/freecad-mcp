@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import runpy
 import sys
 from pathlib import Path
@@ -36,7 +35,7 @@ class ConsoleStub:
         self.logs.append(message)
 
 
-def test_initgui_registers_workbench_and_status_command_once(monkeypatch: Any) -> None:
+def test_initgui_registers_workbench_commands_once(monkeypatch: Any) -> None:
     repository_root = Path(__file__).resolve().parents[1]
     addon_root = repository_root / "src"
 
@@ -70,45 +69,27 @@ def test_initgui_registers_workbench_and_status_command_once(monkeypatch: Any) -
     workbench = workbenches["MCPWorkbench"]
     workbench.Initialize()  # type: ignore[attr-defined]
 
-    expected_commands = [
+    toolbar_commands = [
         "MCP_StartServer",
         "MCP_StopServer",
-        "MCP_ReportStatus",
     ]
-    assert workbench.toolbars == [("MCP", expected_commands)]
-    assert workbench.menus == [("MCP", expected_commands)]
-    assert list(commands) == expected_commands
+    menu_entries = [
+        *toolbar_commands,
+        "Separator",
+        "MCP_StartServerOnStartup",
+    ]
+    assert workbench.toolbars == [("MCP", toolbar_commands)]
+    assert workbench.menus == [("MCP", menu_entries)]
+    assert list(commands) == [*toolbar_commands, "MCP_StartServerOnStartup"]
     assert "MCP_CreateDocument" not in commands
 
-    from freecad_mcp.core.result import CommandResult
-    from freecad_mcp.gui import commands as gui_commands
-
-    class ApplicationStub:
-        def report_status(self) -> CommandResult:
-            return CommandResult.success(
-                "server_status",
-                "MCP server status reported.",
-                {"state": "stopped", "url": "http://127.0.0.1:8765/mcp"},
-            )
-
-    monkeypatch.setattr(gui_commands, "get_application", ApplicationStub)
-
-    command = commands["MCP_ReportStatus"]
-    command.Activated()  # type: ignore[attr-defined]
-
-    assert console.errors == []
-    assert len(console.messages) == 1
-    payload = json.loads(console.messages[0].removeprefix("[MCP] "))
-    assert payload == {
-        "ok": True,
-        "state": "stopped",
-        "url": "http://127.0.0.1:8765/mcp",
-        "message": "MCP server status reported.",
-    }
-
-    for registered_command in commands.values():
-        resources = registered_command.GetResources()  # type: ignore[attr-defined]
+    for command_id in toolbar_commands:
+        resources = commands[command_id].GetResources()  # type: ignore[attr-defined]
         assert Path(resources["Pixmap"]).is_file()
+
+    startup_resources = commands["MCP_StartServerOnStartup"].GetResources()  # type: ignore[attr-defined]
+    assert startup_resources["MenuText"] == "Start on launch"
+    assert startup_resources["Checkable"] is False
 
 
 def test_initgui_loads_without_dunder_file(monkeypatch: Any) -> None:
