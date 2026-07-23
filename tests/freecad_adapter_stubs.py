@@ -33,7 +33,9 @@ class AppDocumentStub:
         self.Name = name
         self.Label = label or name
         self.FileName = file_path
-        self.Objects = objects if objects is not None else [object() for _ in range(object_count)]
+        self.Objects = (
+            objects if objects is not None else [DocumentObjectStub() for _ in range(object_count)]
+        )
         for obj in self.Objects:
             if hasattr(obj, "Document"):
                 obj.Document = self
@@ -75,7 +77,7 @@ class AppDocumentStub:
         """Look up an object by exact internal name, matching FreeCAD's getObject."""
         for obj in self.Objects:
             if getattr(obj, "Name", None) == name:
-                return obj  # type: ignore[return-value]
+                return obj
         return None
 
     def openTransaction(self, name: str) -> None:

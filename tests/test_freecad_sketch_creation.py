@@ -415,7 +415,7 @@ def test_create_sketch_failure_does_not_leave_orphan_sketch(
         FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", "Base Sketch")
 
     # After abort, the document should not contain the orphan sketch
-    obj_names = [obj.Name for obj in doc_stub.Objects]  # type: ignore[attr-defined]
+    obj_names = [obj.Name for obj in doc_stub.Objects]
     assert "BaseSketch" not in obj_names
 
     # After abort, the body's Group should not contain the orphan sketch
@@ -439,7 +439,7 @@ def test_create_sketch_rollback_restores_body_membership(
         FreeCADDocumentAdapter().create_sketch("TestDoc", "Body", "BaseSketch", None)
 
     # After abort, document should not contain the orphan sketch
-    obj_names = [obj.Name for obj in doc_stub.Objects]  # type: ignore[attr-defined]
+    obj_names = [obj.Name for obj in doc_stub.Objects]
     assert "BaseSketch" not in obj_names
 
     # After abort, body's Group should not contain the orphan sketch
