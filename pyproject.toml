@@ -42,6 +42,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
+disable_error_code = ["unused-ignore"]
 mypy_path = "src"
 files = ["src/freecad_mcp", "tests"]
 exclude = ["src/Init.py", "src/InitGui.py"]
