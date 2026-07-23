@@ -98,14 +98,11 @@ def fillet_sketch_geometry(
         _verify_dependency_health(document, sketch, operation)
         summary = _final_document_summary(document, operation)
 
-        tangent_indices = cast(
-            tuple[int, int],
-            _discover_new_tangents(
-                snapshot,
-                first_geometry_index,
-                preflight.position,
-                removed_coincident_index,
-            ),
+        tangent_indices = _discover_new_tangents(
+            snapshot,
+            first_geometry_index,
+            preflight.position,
+            removed_coincident_index,
         )
 
         result = _build_result(
@@ -427,7 +424,7 @@ def _discover_new_tangents(
     first_index: int,
     endpoint: int,
     removed_coincident_index: int,
-) -> tuple[int, ...]:
+) -> tuple[int, int]:
     """Return indices of the two new tangent constraints (last two, post-removal)."""
     count = snapshot.sketch.constraint_count
     return (count - 1, count)
@@ -438,7 +435,7 @@ def _build_result(
     second_index: int,
     created_arc_index: int,
     removed_coincident_index: int,
-    tangent_indices: tuple[int, ...],
+    tangent_indices: tuple[int, int],
     snapshot: Any,
     inspected: Any,
     summary: Any,
