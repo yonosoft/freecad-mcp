@@ -1487,6 +1487,7 @@ output:
 
 ```python
 import sys
+
 print(sys.version)
 print(App.getUserAppDataDir())
 ```

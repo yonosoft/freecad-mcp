@@ -34,7 +34,9 @@ class AppDocumentStub:
         self.Label = label or name
         self.FileName = file_path
         self.Objects = (
-            objects if objects is not None else [DocumentObjectStub() for _ in range(object_count)]
+            objects
+            if objects is not None
+            else [DocumentObjectStub(str(i)) for i in range(object_count)]
         )
         for obj in self.Objects:
             if hasattr(obj, "Document"):
