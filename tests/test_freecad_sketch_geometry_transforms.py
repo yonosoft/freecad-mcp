@@ -1076,6 +1076,72 @@ def test_production_functions_restored_after_monkeypatched_test() -> None:
 # ==========================================================================
 
 
+# ==========================================================================
+# Invariant overlap regression (point/line on mirror axis refused)
+# ==========================================================================
+
+
+def test_point_at_origin_is_invariant_under_origin_mirror() -> None:
+    pt = SketchPointGeometry(0, False, SketchPoint2D(0, 0))
+    origin_tf = transforms._affine(1, -1, 0, 0, -1, 0, 0, False, {})
+    t = transforms._transform_geometry(pt, origin_tf, 0)
+    assert transforms._geometry_overlap_equal(pt, t)
+
+
+def test_point_on_horizontal_axis_is_invariant_under_horizontal_mirror() -> None:
+    pt = SketchPointGeometry(1, False, SketchPoint2D(42, 0))
+    h_tf = transforms._affine(1, 1, 0, 0, -1, 0, 0, True, {})
+    t = transforms._transform_geometry(pt, h_tf, 1)
+    assert transforms._geometry_overlap_equal(pt, t)
+
+
+def test_point_on_vertical_axis_is_invariant_under_vertical_mirror() -> None:
+    pt = SketchPointGeometry(2, True, SketchPoint2D(0, 17))
+    v_tf = transforms._affine(1, -1, 0, 0, 1, 0, 0, True, {})
+    t = transforms._transform_geometry(pt, v_tf, 2)
+    assert transforms._geometry_overlap_equal(pt, t)
+
+
+def test_line_on_horizontal_axis_is_invariant_under_horizontal_mirror() -> None:
+    ln = SketchLineGeometry(0, False, SketchPoint2D(10, 0), SketchPoint2D(60, 0))
+    h_tf = transforms._affine(1, 1, 0, 0, -1, 0, 0, True, {})
+    t = transforms._transform_geometry(ln, h_tf, 0)
+    assert transforms._geometry_overlap_equal(ln, t)
+
+
+def test_line_on_vertical_axis_is_invariant_under_vertical_mirror() -> None:
+    ln = SketchLineGeometry(1, True, SketchPoint2D(0, 10), SketchPoint2D(0, 50))
+    v_tf = transforms._affine(1, -1, 0, 0, 1, 0, 0, True, {})
+    t = transforms._transform_geometry(ln, v_tf, 1)
+    assert transforms._geometry_overlap_equal(ln, t)
+
+
+def test_circle_center_at_origin_is_invariant_under_origin_mirror() -> None:
+    c = SketchCircleGeometry(0, False, SketchPoint2D(0, 0), 5)
+    origin_tf = transforms._affine(1, -1, 0, 0, -1, 0, 0, False, {})
+    t = transforms._transform_geometry(c, origin_tf, 0)
+    assert transforms._geometry_overlap_equal(c, t)
+
+
+def test_nearby_point_not_on_axis_mirrors_successfully() -> None:
+    pt = SketchPointGeometry(0, False, SketchPoint2D(-30, 10))
+    origin_tf = transforms._affine(1, -1, 0, 0, -1, 0, 0, False, {})
+    t = transforms._transform_geometry(pt, origin_tf, 0)
+    assert not transforms._geometry_overlap_equal(pt, t)
+
+
+def test_nearby_line_not_on_axis_mirrors_successfully() -> None:
+    ln = SketchLineGeometry(0, False, SketchPoint2D(10, 10), SketchPoint2D(60, 10))
+    h_tf = transforms._affine(1, 1, 0, 0, -1, 0, 0, True, {})
+    t = transforms._transform_geometry(ln, h_tf, 0)
+    assert not transforms._geometry_overlap_equal(ln, t)
+
+
+# ==========================================================================
+# Helpers for transaction management in monkeypatched tests
+# ==========================================================================
+
+
 def _open_tx(doc: _Doc, name: str) -> bool:
     if not doc.HasPendingTransaction:
         doc.openTransaction(name)
