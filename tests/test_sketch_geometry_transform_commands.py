@@ -393,12 +393,10 @@ class _ErrorRaisingAdapter:
         return _dummy_result()
 
     # Needed to satisfy the protocol stubs (unused in these tests)
-    mirror_sketch_geometry = translate_sketch_geometry = (  # type: ignore[assignment]
-        rotate_sketch_geometry  # type: ignore[assignment]
-    ) = scale_sketch_geometry = lambda self, *a, **kw: None  # type: ignore[assignment]
-    rectangular_array_sketch_geometry = (  # type: ignore[assignment]
-        polar_array_sketch_geometry  # type: ignore[assignment]
-    ) = lambda self, *a, **kw: None  # type: ignore[assignment]
+    mirror_sketch_geometry = translate_sketch_geometry = rotate_sketch_geometry = (
+        scale_sketch_geometry
+    ) = lambda self, *a: None
+    rectangular_array_sketch_geometry = polar_array_sketch_geometry = lambda self, *a: None
 
 
 def _dummy_result() -> object:
@@ -527,12 +525,10 @@ class _TransactionCommittedAdapter:
         return _TransactionCommittedResult(self._committed)
 
     # Protocol stubs
-    mirror_sketch_geometry = translate_sketch_geometry = (  # type: ignore[assignment]
-        rotate_sketch_geometry  # type: ignore[assignment]
-    ) = scale_sketch_geometry = lambda self, *a, **kw: None  # type: ignore[assignment]
-    rectangular_array_sketch_geometry = (  # type: ignore[assignment]
-        polar_array_sketch_geometry  # type: ignore[assignment]
-    ) = lambda self, *a, **kw: None  # type: ignore[assignment]
+    mirror_sketch_geometry = translate_sketch_geometry = rotate_sketch_geometry = (
+        scale_sketch_geometry
+    ) = lambda self, *a: None
+    rectangular_array_sketch_geometry = polar_array_sketch_geometry = lambda self, *a: None
 
 
 def test_transaction_committed_true_preserved() -> None:

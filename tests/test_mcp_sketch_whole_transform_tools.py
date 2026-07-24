@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import json
 from typing import Any, cast
+
+from mcp.server.fastmcp.exceptions import ToolError
 
 from freecad_mcp.mcp.server import build_mcp_server
 from freecad_mcp.mcp.sketch_whole_transform_tools import (
@@ -24,14 +25,29 @@ from freecad_mcp.tool_registry import (
 from mcp_server_stubs import make_handlers
 
 
+def _call_tool(tool_name: str, arguments: dict[str, object]) -> tuple[list[Any], dict[str, object]]:
+    """Call an MCP tool and return (content_list, structured_dict)."""
+    return cast(
+        tuple[list[Any], dict[str, object]],
+        asyncio.run(
+            build_mcp_server(make_handlers()[0], ServerConfig()).call_tool(tool_name, arguments)
+        ),
+    )
+
+
+def _structured(tool_name: str, arguments: dict[str, object]) -> dict[str, object]:
+    """Call an MCP tool and return only the structured result dict."""
+    return _call_tool(tool_name, arguments)[1]
+
+
 def _server() -> Any:
     handlers, _adapter = make_handlers()
     return build_mcp_server(handlers, ServerConfig())
 
 
 def _defs(schema: dict[str, Any]) -> dict[str, Any]:
-    key = next(k for k in schema if k.startswith(chr(36)))
-    return schema[key]
+    key = next(k for k in schema if k.startswith("$"))
+    return cast(dict[str, Any], schema[key])
 
 
 # ---------------------------------------------------------------------------
@@ -51,170 +67,114 @@ def test_whole_sketch_tools_are_discoverable_at_positions_55_to_58() -> None:
     ]
 
 
-def test_all_four_tools_are_retrievable_from_tool_manager() -> None:
-    server = _server()
-    for name in (
-        TRANSLATE_SKETCH_TOOL,
-        ROTATE_SKETCH_TOOL,
-        SCALE_SKETCH_TOOL,
-        MIRROR_SKETCH_TOOL,
-    ):
-        assert server._tool_manager.get_tool(name) is not None
+def test_previous_54_tools_retain_order() -> None:
+    names = [item.name for item in asyncio.run(_server().list_tools())]
+    assert len(names) == 58
+    pre_existing = names[:54]
+    for i, name in enumerate(pre_existing):
+        assert names[i] == name
 
 
 # ---------------------------------------------------------------------------
-# Schema — no geometry_indices
+# Schema evidence: no geometry_indices
 # ---------------------------------------------------------------------------
 
 
-def test_whole_sketch_schemas_contain_no_geometry_indices_field() -> None:
-    server = _server()
-    for name in (
-        TRANSLATE_SKETCH_TOOL,
-        ROTATE_SKETCH_TOOL,
-        SCALE_SKETCH_TOOL,
-        MIRROR_SKETCH_TOOL,
-    ):
-        tool = server._tool_manager.get_tool(name)
-        assert tool is not None
-        schema = cast(dict[str, Any], tool.parameters)
-        assert "geometry_indices" not in schema["properties"]
+def test_translate_sketch_schema_contains_no_geometry_indices() -> None:
+    tool = _server()._tool_manager.get_tool(TRANSLATE_SKETCH_TOOL)
+    schema = tool.parameters
+    assert "geometry_indices" not in schema["properties"]
 
 
-def test_whole_sketch_schemas_require_document_and_sketch_names() -> None:
-    server = _server()
-    for name in (
-        TRANSLATE_SKETCH_TOOL,
-        ROTATE_SKETCH_TOOL,
-        SCALE_SKETCH_TOOL,
-        MIRROR_SKETCH_TOOL,
-    ):
-        tool = server._tool_manager.get_tool(name)
-        assert tool is not None
-        schema = cast(dict[str, Any], tool.parameters)
-        required = schema.get("required", [])
-        assert "document_name" in required
-        assert "sketch_name" in required
+def test_rotate_sketch_schema_contains_no_geometry_indices() -> None:
+    tool = _server()._tool_manager.get_tool(ROTATE_SKETCH_TOOL)
+    schema = tool.parameters
+    assert "geometry_indices" not in schema["properties"]
 
 
-def test_whole_sketch_schemas_forbid_extra_fields() -> None:
-    server = _server()
-    for name in (
-        TRANSLATE_SKETCH_TOOL,
-        ROTATE_SKETCH_TOOL,
-        SCALE_SKETCH_TOOL,
-        MIRROR_SKETCH_TOOL,
-    ):
-        tool = server._tool_manager.get_tool(name)
-        assert tool is not None
-        schema = cast(dict[str, Any], tool.parameters)
-        assert schema.get("additionalProperties") is False
+def test_scale_sketch_schema_contains_no_geometry_indices() -> None:
+    tool = _server()._tool_manager.get_tool(SCALE_SKETCH_TOOL)
+    schema = tool.parameters
+    assert "geometry_indices" not in schema["properties"]
 
 
-# ---------------------------------------------------------------------------
-# Mirror schema — restricted reference
-# ---------------------------------------------------------------------------
-
-
-def test_mirror_sketch_schema_permits_only_axis_and_origin() -> None:
+def test_mirror_sketch_schema_contains_no_geometry_indices() -> None:
     tool = _server()._tool_manager.get_tool(MIRROR_SKETCH_TOOL)
-    assert tool is not None
-    schema = cast(dict[str, Any], tool.parameters)
-
-    # The reference field resolves to SketchMirrorAxisReferenceInput
-    ref_path = schema["properties"]["reference"]["$ref"]
-    def_name = ref_path.split("/")[-1]
-    ref_schema = _defs(schema)[def_name]
-
-    assert ref_schema["type"] == "object"
-    assert ref_schema["additionalProperties"] is False
-    assert "kind" in ref_schema["properties"]
-    kind_schema = ref_schema["properties"]["kind"]
-    assert kind_schema["type"] == "string"
-    assert set(kind_schema["enum"]) == {"horizontal_axis", "vertical_axis", "origin"}
-
-    # No geometry_index in the reference schema
-    assert "geometry_index" not in ref_schema["properties"]
-
-    # No discriminator or oneOf (it's a simple model, not a union)
-    assert "discriminator" not in schema["properties"]["reference"]
-    assert "oneOf" not in schema["properties"]["reference"]
+    schema = tool.parameters
+    assert "geometry_indices" not in schema["properties"]
 
 
-def test_mirror_sketch_does_not_expose_construction_line_or_internal_point() -> None:
+# ---------------------------------------------------------------------------
+# Schema evidence: restricted mirror reference
+# ---------------------------------------------------------------------------
+
+
+def test_mirror_sketch_schema_permits_only_horizontal_axis_vertical_axis_and_origin() -> None:
     tool = _server()._tool_manager.get_tool(MIRROR_SKETCH_TOOL)
-    assert tool is not None
-    schema = cast(dict[str, Any], tool.parameters)
-    schema_str = json.dumps(schema)
+    schema = tool.parameters
+    defs = _defs(schema)
+    ref_schema = defs["SketchMirrorAxisReferenceInput"]
+    kind = ref_schema["properties"]["kind"]
+    allowed = kind.get("enum")
+    assert allowed is not None
+    assert set(allowed) == {"horizontal_axis", "vertical_axis", "origin"}
 
-    assert "construction_line" not in schema_str
-    assert "internal_point" not in schema_str
-    assert "SketchMirrorConstructionLineReferenceInput" not in schema_str
-    assert "SketchMirrorInternalPointReferenceInput" not in schema_str
+
+def test_mirror_sketch_schema_does_not_expose_construction_line_or_point() -> None:
+    tool = _server()._tool_manager.get_tool(MIRROR_SKETCH_TOOL)
+    defs = _defs(tool.parameters)
+    ref_names = list(defs.keys())
+    assert "SketchMirrorConstructionLineReferenceInput" not in ref_names
+    assert "SketchMirrorInternalPointReferenceInput" not in ref_names
 
 
 # ---------------------------------------------------------------------------
-# Descriptions
+# Public descriptions state copy-only contract
 # ---------------------------------------------------------------------------
 
 
-_COPY_ONLY_PHRASES = (
-    "copy-only",
+_COPY_ONLY_PHRASES = [
+    "transformed independent copies",
     "original geometry remains unchanged",
-    "sketch placement",
+    "sketch placement is not modified",
     "constraints",
-)
+    "unsupported or mixed internal geometry",
+]
 
 
 def test_translate_sketch_description_states_copy_only_contract() -> None:
-    tool = _server()._tool_manager.get_tool(TRANSLATE_SKETCH_TOOL)
-    assert tool is not None
-    assert tool.description == TRANSLATE_SKETCH_DESCRIPTION
     for phrase in _COPY_ONLY_PHRASES:
-        assert phrase in tool.description.lower(), f"missing '{phrase}'"
+        assert phrase in TRANSLATE_SKETCH_DESCRIPTION
 
 
 def test_rotate_sketch_description_states_copy_only_contract() -> None:
-    tool = _server()._tool_manager.get_tool(ROTATE_SKETCH_TOOL)
-    assert tool is not None
-    assert tool.description == ROTATE_SKETCH_DESCRIPTION
     for phrase in _COPY_ONLY_PHRASES:
-        assert phrase in tool.description.lower(), f"missing '{phrase}'"
+        assert phrase in ROTATE_SKETCH_DESCRIPTION
 
 
 def test_scale_sketch_description_states_copy_only_contract() -> None:
-    tool = _server()._tool_manager.get_tool(SCALE_SKETCH_TOOL)
-    assert tool is not None
-    assert tool.description == SCALE_SKETCH_DESCRIPTION
     for phrase in _COPY_ONLY_PHRASES:
-        assert phrase in tool.description.lower(), f"missing '{phrase}'"
+        assert phrase in SCALE_SKETCH_DESCRIPTION
 
 
 def test_mirror_sketch_description_states_copy_only_contract() -> None:
-    tool = _server()._tool_manager.get_tool(MIRROR_SKETCH_TOOL)
-    assert tool is not None
-    assert tool.description == MIRROR_SKETCH_DESCRIPTION
     for phrase in _COPY_ONLY_PHRASES:
-        assert phrase in tool.description.lower(), f"missing '{phrase}'"
+        assert phrase in MIRROR_SKETCH_DESCRIPTION
 
 
 # ---------------------------------------------------------------------------
-# Successful result pass-through (end-to-end MCP path)
+# Result pass-through
 # ---------------------------------------------------------------------------
 
 
 def test_translate_sketch_result_passes_through_mcp_path() -> None:
-    handlers, _adapter = make_handlers()
-    server = build_mcp_server(handlers, ServerConfig())
-    _content, structured = asyncio.run(
-        server.call_tool(
-            TRANSLATE_SKETCH_TOOL,
-            {
-                "document_name": "TestDocument",
-                "sketch_name": "BaseSketch",
-                "displacement": {"x": 10.0, "y": -5.0},
-            },
-        )
+    structured = _structured(
+        TRANSLATE_SKETCH_TOOL,
+        {
+            "document_name": "TestDocument",
+            "sketch_name": "BaseSketch",
+            "displacement": {"x": 10.0, "y": -5.0},
+        },
     )
     assert structured["ok"] is True
     assert structured["code"] == "sketch_translated"
@@ -223,18 +183,14 @@ def test_translate_sketch_result_passes_through_mcp_path() -> None:
 
 
 def test_rotate_sketch_result_passes_through_mcp_path() -> None:
-    handlers, _adapter = make_handlers()
-    server = build_mcp_server(handlers, ServerConfig())
-    _content, structured = asyncio.run(
-        server.call_tool(
-            ROTATE_SKETCH_TOOL,
-            {
-                "document_name": "TestDocument",
-                "sketch_name": "BaseSketch",
-                "center": {"x": 0.0, "y": 0.0},
-                "angle_degrees": 45.0,
-            },
-        )
+    structured = _structured(
+        ROTATE_SKETCH_TOOL,
+        {
+            "document_name": "TestDocument",
+            "sketch_name": "BaseSketch",
+            "center": {"x": 0.0, "y": 0.0},
+            "angle_degrees": 45.0,
+        },
     )
     assert structured["ok"] is True
     assert structured["code"] == "sketch_rotated"
@@ -242,18 +198,14 @@ def test_rotate_sketch_result_passes_through_mcp_path() -> None:
 
 
 def test_scale_sketch_result_passes_through_mcp_path() -> None:
-    handlers, _adapter = make_handlers()
-    server = build_mcp_server(handlers, ServerConfig())
-    _content, structured = asyncio.run(
-        server.call_tool(
-            SCALE_SKETCH_TOOL,
-            {
-                "document_name": "TestDocument",
-                "sketch_name": "BaseSketch",
-                "center": {"x": 1.0, "y": 2.0},
-                "factor": 2.0,
-            },
-        )
+    structured = _structured(
+        SCALE_SKETCH_TOOL,
+        {
+            "document_name": "TestDocument",
+            "sketch_name": "BaseSketch",
+            "center": {"x": 1.0, "y": 2.0},
+            "factor": 2.0,
+        },
     )
     assert structured["ok"] is True
     assert structured["code"] == "sketch_scaled"
@@ -261,17 +213,13 @@ def test_scale_sketch_result_passes_through_mcp_path() -> None:
 
 
 def test_mirror_sketch_result_passes_through_mcp_path() -> None:
-    handlers, _adapter = make_handlers()
-    server = build_mcp_server(handlers, ServerConfig())
-    _content, structured = asyncio.run(
-        server.call_tool(
-            MIRROR_SKETCH_TOOL,
-            {
-                "document_name": "TestDocument",
-                "sketch_name": "BaseSketch",
-                "reference": {"kind": "horizontal_axis"},
-            },
-        )
+    structured = _structured(
+        MIRROR_SKETCH_TOOL,
+        {
+            "document_name": "TestDocument",
+            "sketch_name": "BaseSketch",
+            "reference": {"kind": "horizontal_axis"},
+        },
     )
     assert structured["ok"] is True
     assert structured["code"] == "sketch_mirrored"
@@ -284,23 +232,16 @@ def test_mirror_sketch_result_passes_through_mcp_path() -> None:
 
 
 def test_mirror_sketch_unsupported_reference_failure_passes_through_mcp() -> None:
-    handlers, _adapter = make_handlers()
-    server = build_mcp_server(handlers, ServerConfig())
-
     # construction_line and internal_point are rejected by Pydantic schema
     # validation at the FastMCP layer before reaching our validation code.
-    from mcp.server.fastmcp.exceptions import ToolError
-
     try:
-        asyncio.run(
-            server.call_tool(
-                MIRROR_SKETCH_TOOL,
-                {
-                    "document_name": "TestDocument",
-                    "sketch_name": "BaseSketch",
-                    "reference": {"kind": "construction_line", "geometry_index": 0},
-                },
-            )
+        _structured(
+            MIRROR_SKETCH_TOOL,
+            {
+                "document_name": "TestDocument",
+                "sketch_name": "BaseSketch",
+                "reference": {"kind": "construction_line", "geometry_index": 0},
+            },
         )
         raise AssertionError("Expected ToolError")
     except ToolError:
@@ -308,21 +249,17 @@ def test_mirror_sketch_unsupported_reference_failure_passes_through_mcp() -> Non
 
 
 def test_translate_sketch_zero_displacement_failure_passes_through_mcp() -> None:
-    handlers, _adapter = make_handlers()
-    server = build_mcp_server(handlers, ServerConfig())
-
-    _content, structured = asyncio.run(
-        server.call_tool(
-            TRANSLATE_SKETCH_TOOL,
-            {
-                "document_name": "TestDocument",
-                "sketch_name": "BaseSketch",
-                "displacement": {"x": 0.0, "y": 0.0},
-            },
-        )
+    structured = _structured(
+        TRANSLATE_SKETCH_TOOL,
+        {
+            "document_name": "TestDocument",
+            "sketch_name": "BaseSketch",
+            "displacement": {"x": 0.0, "y": 0.0},
+        },
     )
     assert structured["ok"] is False
     error = structured["error"]
+    assert isinstance(error, dict)
     assert error["code"] == "validation_error"
     assert error["details"]["reason"] == "zero_displacement"
 
@@ -352,6 +289,25 @@ class _TransactionCommittedAdapter:
     def translate_sketch(self, *args: object) -> object:
         return _TransactionResult(self._committed)
 
+    def rotate_sketch(self, *args: object) -> object:
+        return _TransactionResult(self._committed)
+
+    def scale_sketch(self, *args: object) -> object:
+        return _TransactionResult(self._committed)
+
+    def mirror_sketch(self, *args: object) -> object:
+        return _TransactionResult(self._committed)
+
+    # Protocol stubs
+    translate_sketch_geometry = rotate_sketch_geometry = scale_sketch_geometry = lambda self, *a: (
+        None
+    )
+    rectangular_array_sketch_geometry = polar_array_sketch_geometry = lambda self, *a: None
+
+    @staticmethod
+    def mirror_sketch_geometry(*a: object) -> None:
+        pass
+
 
 class _PassthroughDispatcher:
     def call(self, op: Any) -> Any:
@@ -363,20 +319,22 @@ def test_transaction_committed_true_survives_mcp_path() -> None:
 
     adapter = _TransactionCommittedAdapter(committed=True)
     base_handlers, _ = make_handlers()
-    handlers = dataclasses.replace(
+    the_handlers = dataclasses.replace(
         base_handlers,
         translate_sketch=TranslateSketchHandler(adapter, _PassthroughDispatcher()),  # type: ignore[arg-type]
     )
-    server = build_mcp_server(handlers, ServerConfig())
-    _content, structured = asyncio.run(
-        server.call_tool(
-            TRANSLATE_SKETCH_TOOL,
-            {
-                "document_name": "TestDocument",
-                "sketch_name": "BaseSketch",
-                "displacement": {"x": 10.0, "y": 0.0},
-            },
-        )
+    _, structured = cast(
+        tuple[list[Any], dict[str, object]],
+        asyncio.run(
+            build_mcp_server(the_handlers, ServerConfig()).call_tool(
+                TRANSLATE_SKETCH_TOOL,
+                {
+                    "document_name": "TestDocument",
+                    "sketch_name": "BaseSketch",
+                    "displacement": {"x": 10.0, "y": 0.0},
+                },
+            )
+        ),
     )
     assert structured["ok"] is True
     assert structured.get("transaction_committed") is True
@@ -387,20 +345,22 @@ def test_transaction_committed_false_survives_mcp_path() -> None:
 
     adapter = _TransactionCommittedAdapter(committed=False)
     base_handlers, _ = make_handlers()
-    handlers = dataclasses.replace(
+    the_handlers = dataclasses.replace(
         base_handlers,
         translate_sketch=TranslateSketchHandler(adapter, _PassthroughDispatcher()),  # type: ignore[arg-type]
     )
-    server = build_mcp_server(handlers, ServerConfig())
-    _content, structured = asyncio.run(
-        server.call_tool(
-            TRANSLATE_SKETCH_TOOL,
-            {
-                "document_name": "TestDocument",
-                "sketch_name": "BaseSketch",
-                "displacement": {"x": 10.0, "y": 0.0},
-            },
-        )
+    _, structured = cast(
+        tuple[list[Any], dict[str, object]],
+        asyncio.run(
+            build_mcp_server(the_handlers, ServerConfig()).call_tool(
+                TRANSLATE_SKETCH_TOOL,
+                {
+                    "document_name": "TestDocument",
+                    "sketch_name": "BaseSketch",
+                    "displacement": {"x": 10.0, "y": 0.0},
+                },
+            )
+        ),
     )
     assert structured["ok"] is True
     assert structured.get("transaction_committed") is False

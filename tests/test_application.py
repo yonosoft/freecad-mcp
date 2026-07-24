@@ -988,19 +988,19 @@ def make_application() -> Application:
         trim_sketch_geometry=TrimSketchGeometryHandler(adapter, dispatcher),
         split_sketch_geometry=SplitSketchGeometryHandler(adapter, dispatcher),
         extend_sketch_geometry=ExtendSketchGeometryHandler(adapter, dispatcher),
-        mirror_sketch_geometry=MirrorSketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
-        translate_sketch_geometry=TranslateSketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
-        rotate_sketch_geometry=RotateSketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
-        scale_sketch_geometry=ScaleSketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
+        mirror_sketch_geometry=MirrorSketchGeometryHandler(adapter, dispatcher),
+        translate_sketch_geometry=TranslateSketchGeometryHandler(adapter, dispatcher),
+        rotate_sketch_geometry=RotateSketchGeometryHandler(adapter, dispatcher),
+        scale_sketch_geometry=ScaleSketchGeometryHandler(adapter, dispatcher),
         rectangular_array_sketch_geometry=RectangularArraySketchGeometryHandler(
-            adapter,  # type: ignore[arg-type]
+            adapter,
             dispatcher,
         ),
-        polar_array_sketch_geometry=PolarArraySketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
-        translate_sketch=TranslateSketchHandler(adapter, dispatcher),  # type: ignore[arg-type]
-        rotate_sketch=RotateSketchHandler(adapter, dispatcher),  # type: ignore[arg-type]
-        scale_sketch=ScaleSketchHandler(adapter, dispatcher),  # type: ignore[arg-type]
-        mirror_sketch=MirrorSketchHandler(adapter, dispatcher),  # type: ignore[arg-type]
+        polar_array_sketch_geometry=PolarArraySketchGeometryHandler(adapter, dispatcher),
+        translate_sketch=TranslateSketchHandler(adapter, dispatcher),
+        rotate_sketch=RotateSketchHandler(adapter, dispatcher),
+        scale_sketch=ScaleSketchHandler(adapter, dispatcher),
+        mirror_sketch=MirrorSketchHandler(adapter, dispatcher),
         add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
             adapter,
             dispatcher,

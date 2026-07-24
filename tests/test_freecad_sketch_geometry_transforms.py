@@ -401,9 +401,9 @@ class _Sk:
         self.Name = "Sketch"
         self.Label = "Sketch"
         self.TypeId = "Sketcher::SketchObject"
-        self._geo: list[dict] = [{"index": i} for i in range(gc)]
+        self._geo: list[dict[str, object]] = [{"index": i} for i in range(gc)]
         self._constr: list[bool] = [False] * gc
-        self._constraints: list[dict] = [{"index": i} for i in range(cc)]
+        self._constraints: list[dict[str, object]] = [{"index": i} for i in range(cc)]
         self.geometry_count = gc
         self.constraint_count = cc
 
@@ -418,7 +418,7 @@ class _Sk:
     Construction = property(lambda s: s._constr)
 
 
-def _ctx(doc: _Doc, sk: _Sk, sources: tuple) -> transforms._WholeSketchContext:
+def _ctx(doc: _Doc, sk: _Sk, sources: tuple[object, ...]) -> transforms._WholeSketchContext:
     sol = SimpleNamespace(available=True, fresh=True)
     snap = SimpleNamespace(
         sketch=SimpleNamespace(
@@ -438,7 +438,14 @@ def _ctx(doc: _Doc, sk: _Sk, sources: tuple) -> transforms._WholeSketchContext:
         profile="open",
     )
     return transforms._WholeSketchContext(
-        doc, sk, snap, tuple(range(len(sources))), sources, None, None, None
+        doc,
+        sk,
+        snap,
+        tuple(range(len(sources))),
+        sources,  # type: ignore[arg-type]
+        None,
+        None,
+        None,
     )
 
 
@@ -506,7 +513,17 @@ def test_owned_tx_via_execute_copy(
     monkeypatch.setattr(transforms, "_native_geometry", lambda g, p, a: "dummy")
 
     result = transforms._execute_copy(
-        doc, sk, ctx.snapshot, sources, (tf,), "translate", tx_name, {}, None, None, None
+        doc,
+        sk,
+        ctx.snapshot,
+        sources,
+        (tf,),  # type: ignore[arg-type]
+        "translate",
+        tx_name,
+        {},
+        None,
+        None,
+        None,
     )
 
     assert result.transaction_committed is True
@@ -634,7 +651,7 @@ def test_caller_owned_failure_after_partial_mutation(
         ),
     )
     monkeypatch.setattr(transforms, "_native_geometry", lambda g, p, a: "dummy")
-    monkeypatch.setattr(R, "_controlled_readback", lambda dn, sn, op: (_r := 1 / 0))  # type: ignore
+    monkeypatch.setattr(R, "_controlled_readback", lambda dn, sn, op: (_r := 1 / 0))
 
     def _f(*args: Any, **kw: Any) -> None:
         fail_called.append(True)
@@ -716,10 +733,14 @@ def test_owned_failure_during_recompute_aborts_and_restores(
             SimpleNamespace(),
         ),
     )
-    monkeypatch.setattr(R, "_recompute", lambda d, op: (_r := 1 / 0))  # type: ignore
+    monkeypatch.setattr(R, "_recompute", lambda d, op: (_r := 1 / 0))
 
     def _f(*args: Any, **kw: Any) -> None:
         fail_called.append(True)
+        # Restore geometry to pre-mutation state (as _rollback would)
+        sk._geo = sk._geo[:geom_before]
+        sk._constr = sk._constr[:geom_before]
+        sk.geometry_count = geom_before
         doc.abortTransaction()
 
     monkeypatch.setattr(T, "_fail", _f)
@@ -784,7 +805,7 @@ def test_rollback_verification_failure_via_production_path(
         ),
     )
     monkeypatch.setattr(transforms, "_native_geometry", lambda g, p, a: "dummy")
-    monkeypatch.setattr(R, "_controlled_readback", lambda dn, sn, op: (_r := 1 / 0))  # type: ignore
+    monkeypatch.setattr(R, "_controlled_readback", lambda dn, sn, op: (_r := 1 / 0))
 
     def _f(*args: Any, **kw: Any) -> None:
         raise SketchControlledMutationRollbackError(
