@@ -615,6 +615,46 @@ class FreeCADDocumentAdapter:
             step_angle_degrees,
         )
 
+    # ------------------------------------------------------------------
+    # Milestone 28 — whole-sketch transforms
+    # ------------------------------------------------------------------
+
+    def translate_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        displacement: SketchPoint2DInput,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.translate_sketch(document_name, sketch_name, displacement)
+
+    def rotate_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        center: SketchPoint2DInput,
+        angle_degrees: float,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.rotate_sketch(
+            document_name, sketch_name, center, angle_degrees
+        )
+
+    def scale_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        center: SketchPoint2DInput,
+        factor: float,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.scale_sketch(document_name, sketch_name, center, factor)
+
+    def mirror_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        reference: SketchMirrorReferenceInput,
+    ) -> SketchGeometryTransformResult:
+        return sketch_geometry_transforms.mirror_sketch(document_name, sketch_name, reference)
+
     def set_sketch_constraint_name(
         self,
         document_name: str,

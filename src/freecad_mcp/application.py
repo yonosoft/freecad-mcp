@@ -683,6 +683,62 @@ class Application:
             step_angle_degrees=step_angle_degrees,
         )
 
+    def translate_sketch(
+        self,
+        document_name: object,
+        sketch_name: object,
+        displacement: object,
+    ) -> CommandResult:
+        """Append translated copies of every internal geometry item."""
+        return self.documents.translate_sketch.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            displacement=displacement,
+        )
+
+    def rotate_sketch(
+        self,
+        document_name: object,
+        sketch_name: object,
+        center: object,
+        angle_degrees: object,
+    ) -> CommandResult:
+        """Append rotated copies of every internal geometry item."""
+        return self.documents.rotate_sketch.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            center=center,
+            angle_degrees=angle_degrees,
+        )
+
+    def scale_sketch(
+        self,
+        document_name: object,
+        sketch_name: object,
+        center: object,
+        factor: object,
+    ) -> CommandResult:
+        """Append uniformly scaled copies of every internal geometry item."""
+        return self.documents.scale_sketch.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            center=center,
+            factor=factor,
+        )
+
+    def mirror_sketch(
+        self,
+        document_name: object,
+        sketch_name: object,
+        reference: object,
+    ) -> CommandResult:
+        """Append mirrored copies of every internal geometry item."""
+        return self.documents.mirror_sketch.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            reference=reference,
+        )
+
     def set_sketch_constraint_expression(
         self,
         document_name: object,

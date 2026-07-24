@@ -37,15 +37,25 @@ from freecad_mcp.models import (
     SketchTransformCreatedGeometry,
     SketchTransformGeometryMapping,
     SketchTransformInstance,
-    UnsupportedSketchGeometry,
 )
 from freecad_mcp.transaction_names import (
     MIRROR_SKETCH_GEOMETRY_TRANSACTION_NAME,
+    MIRROR_SKETCH_TRANSACTION_NAME,
     POLAR_ARRAY_SKETCH_GEOMETRY_TRANSACTION_NAME,
     RECTANGULAR_ARRAY_SKETCH_GEOMETRY_TRANSACTION_NAME,
     ROTATE_SKETCH_GEOMETRY_TRANSACTION_NAME,
+    ROTATE_SKETCH_TRANSACTION_NAME,
     SCALE_SKETCH_GEOMETRY_TRANSACTION_NAME,
+    SCALE_SKETCH_TRANSACTION_NAME,
     TRANSLATE_SKETCH_GEOMETRY_TRANSACTION_NAME,
+    TRANSLATE_SKETCH_TRANSACTION_NAME,
+)
+
+_SUPPORTED_TRANSFORM_GEOMETRY: tuple[type, type, type, type] = (
+    SketchLineGeometry,
+    SketchPointGeometry,
+    SketchCircleGeometry,
+    SketchArcGeometry,
 )
 
 _PublicOperation = Literal[
@@ -386,6 +396,223 @@ def polar_array_sketch_geometry(
     )
 
 
+# ---------------------------------------------------------------------------
+# Milestone 28 — whole-sketch transforms: resolve all eligible sources,
+# delegate into the proven shared copy-transform implementation.
+# ---------------------------------------------------------------------------
+
+
+def _resolve_whole_sketch_source_indices(
+    document: Any,
+    sketch: Any,
+    snapshot: Any,
+    operation: _PublicOperation,
+) -> tuple[int, ...]:
+    """Return every internal geometry index in deterministic order.
+
+    The call is refused before mutation when the sketch is empty or when
+    any internal geometry item is not in the supported transform whitelist.
+    External geometry is excluded from enumeration and does not cause
+    refusal by itself.
+    """
+    geometry_count: int = snapshot.sketch.geometry_count
+    if geometry_count == 0:
+        raise _unsafe(operation, "sketch_empty", 0)
+    indices: list[int] = []
+    for index in range(geometry_count):
+        source = snapshot.sketch.geometry[index]
+        if not isinstance(source, _SUPPORTED_TRANSFORM_GEOMETRY):
+            raise _unsafe(
+                operation,
+                "unsupported_geometry_type",
+                index,
+                geometry_type=_transform_geometry_type(source),
+                supported_geometry_types=["line_segment", "point", "circle", "arc_of_circle"],
+            )
+        indices.append(index)
+    return tuple(indices)
+
+
+@dataclass(frozen=True, slots=True)
+class _WholeSketchContext:
+    """Captured pre-mutation state shared by all whole-sketch transform functions."""
+
+    document: Any
+    sketch: Any
+    snapshot: Any
+    indices: tuple[int, ...]
+    sources: tuple[SketchGeometry, ...]
+    app: Any
+    gui: Any
+    part: Any
+
+
+def _prepare_whole_sketch_transform(
+    document_name: str,
+    sketch_name: str,
+    operation: _PublicOperation,
+) -> _WholeSketchContext:
+    """Resolve runtime modules, document context, snapshot, and eligible sources."""
+    App, Gui, Part = _runtime_modules()
+    document, sketch = sketch_removal._context(App, document_name, sketch_name)
+    snapshot = sketch_removal._snapshot(document, sketch, Part, App, Gui, cast(Any, operation))
+    indices = _resolve_whole_sketch_source_indices(document, sketch, snapshot, operation)
+    sources = _preflight_selection(document, sketch, snapshot, indices, operation)
+    return _WholeSketchContext(
+        document=document,
+        sketch=sketch,
+        snapshot=snapshot,
+        indices=indices,
+        sources=sources,
+        app=App,
+        gui=Gui,
+        part=Part,
+    )
+
+
+def translate_sketch(
+    document_name: str,
+    sketch_name: str,
+    displacement: SketchPoint2DInput,
+) -> SketchGeometryTransformResult:
+    """Append translated copies of every eligible internal geometry item."""
+    ctx = _prepare_whole_sketch_transform(document_name, sketch_name, "translate")
+    if math.hypot(displacement.x, displacement.y) <= TOPOLOGY_TOLERANCE:
+        raise _unsafe("translate", "ambiguous_overlapping_copy", ctx.indices[0])
+    transform = _translation(1, displacement.x, displacement.y)
+    return _execute_copy(
+        ctx.document,
+        ctx.sketch,
+        ctx.snapshot,
+        ctx.sources,
+        (transform,),
+        "translate",
+        TRANSLATE_SKETCH_TRANSACTION_NAME,
+        {"displacement": {"x": displacement.x, "y": displacement.y}},
+        ctx.part,
+        ctx.app,
+        ctx.gui,
+    )
+
+
+def rotate_sketch(
+    document_name: str,
+    sketch_name: str,
+    center: SketchPoint2DInput,
+    angle_degrees: float,
+) -> SketchGeometryTransformResult:
+    """Append rotated copies of every eligible internal geometry item."""
+    ctx = _prepare_whole_sketch_transform(document_name, sketch_name, "rotate")
+    normalized = _normalized_signed_degrees(angle_degrees)
+    if abs(normalized) <= math.degrees(TOPOLOGY_TOLERANCE):
+        raise _unsafe("rotate", "ambiguous_overlapping_copy", ctx.indices[0])
+    transform = _rotation(1, center.x, center.y, normalized)
+    invariant = _invariant_geometry_indices(ctx.sources, transform)
+    if invariant:
+        raise _unsafe(
+            "rotate",
+            "ambiguous_overlapping_copy",
+            ctx.indices[0],
+            invariant_geometry_indices=invariant,
+        )
+    return _execute_copy(
+        ctx.document,
+        ctx.sketch,
+        ctx.snapshot,
+        ctx.sources,
+        (transform,),
+        "rotate",
+        ROTATE_SKETCH_TRANSACTION_NAME,
+        {
+            "center": {"x": center.x, "y": center.y},
+            "angle_degrees": angle_degrees,
+            "normalized_angle_degrees": normalized,
+        },
+        ctx.part,
+        ctx.app,
+        ctx.gui,
+    )
+
+
+def scale_sketch(
+    document_name: str,
+    sketch_name: str,
+    center: SketchPoint2DInput,
+    factor: float,
+) -> SketchGeometryTransformResult:
+    """Append uniformly scaled copies of every eligible internal geometry item."""
+    ctx = _prepare_whole_sketch_transform(document_name, sketch_name, "scale")
+    if abs(factor - 1.0) <= TOPOLOGY_TOLERANCE:
+        raise _unsafe("scale", "ambiguous_overlapping_copy", ctx.indices[0])
+    transform = _scaling(1, center.x, center.y, factor)
+    invariant = [
+        source.index
+        for source in ctx.sources
+        if _geometry_overlap_equal(
+            source,
+            _transform_geometry(source, transform, source.index),
+        )
+    ]
+    if invariant:
+        raise _unsafe(
+            "scale",
+            "ambiguous_overlapping_copy",
+            ctx.indices[0],
+            invariant_geometry_indices=invariant,
+        )
+    return _execute_copy(
+        ctx.document,
+        ctx.sketch,
+        ctx.snapshot,
+        ctx.sources,
+        (transform,),
+        "scale",
+        SCALE_SKETCH_TRANSACTION_NAME,
+        {"center": {"x": center.x, "y": center.y}, "factor": factor},
+        ctx.part,
+        ctx.app,
+        ctx.gui,
+    )
+
+
+def mirror_sketch(
+    document_name: str,
+    sketch_name: str,
+    reference: SketchMirrorReferenceInput,
+) -> SketchGeometryTransformResult:
+    """Append mirror copies of every eligible internal geometry item."""
+    ctx = _prepare_whole_sketch_transform(document_name, sketch_name, "mirror")
+    transform, reference_details = _mirror_transform(ctx.snapshot, ctx.indices, reference)
+    invariant = [
+        source.index
+        for source in ctx.sources
+        if _geometry_overlap_equal(
+            source,
+            _transform_geometry(source, transform, source.index),
+        )
+    ]
+    if invariant:
+        raise _unsafe(
+            "mirror",
+            "ambiguous_overlapping_copy",
+            ctx.indices[0],
+            invariant_geometry_indices=invariant,
+        )
+    return _execute_copy(
+        ctx.document,
+        ctx.sketch,
+        ctx.snapshot,
+        ctx.sources,
+        (transform,),
+        "mirror",
+        MIRROR_SKETCH_TRANSACTION_NAME,
+        {"mirror_reference": reference_details},
+        ctx.part,
+        ctx.app,
+        ctx.gui,
+    )
+
+
 def _runtime_modules() -> tuple[Any, Any, Any]:
     import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
@@ -408,15 +635,15 @@ def _preflight_selection(
         if index >= snapshot.sketch.geometry_count:
             raise SketchMutationIndexNotFoundError(selection="geometry", index=index)
         source = snapshot.sketch.geometry[index]
-        if isinstance(source, UnsupportedSketchGeometry):
+        if not isinstance(source, _SUPPORTED_TRANSFORM_GEOMETRY):
             raise _unsafe(
                 operation,
                 "unsupported_geometry_type",
                 index,
-                geometry_type=source.freecad_type,
+                geometry_type=_transform_geometry_type(source),
                 supported_geometry_types=["line_segment", "point", "circle", "arc_of_circle"],
             )
-        sources.append(source)
+        sources.append(cast(SketchGeometry, source))
     sketch_topology_editing._require_healthy_solver_data(
         snapshot.sketch.solver,
         cast(Any, operation),
@@ -1028,15 +1255,38 @@ def _unsafe(
     )
 
 
+def _transform_geometry_type(source: Any) -> str:
+    """Return a human-readable geometry type for unsupported transform preflight reporting."""
+    try:
+        raw = getattr(source, "freecad_type", None)
+        if isinstance(raw, str):
+            return raw
+    except Exception:
+        pass
+    try:
+        result = source.to_dict()
+        if isinstance(result, dict):
+            type_value = result.get("type")
+            if isinstance(type_value, str):
+                return type_value
+    except Exception:
+        pass
+    return type(source).__name__
+
+
 def _error(operation: _PublicOperation, phase: str, reason: str) -> SketchControlledMutationError:
     return SketchControlledMutationError(operation=operation, phase=phase, reason=reason)
 
 
 __all__ = [
+    "mirror_sketch",
     "mirror_sketch_geometry",
     "polar_array_sketch_geometry",
     "rectangular_array_sketch_geometry",
+    "rotate_sketch",
     "rotate_sketch_geometry",
+    "scale_sketch",
     "scale_sketch_geometry",
+    "translate_sketch",
     "translate_sketch_geometry",
 ]

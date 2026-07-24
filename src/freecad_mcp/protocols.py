@@ -458,6 +458,40 @@ class SketchGeometryTransformAdapter(Protocol):
     ) -> SketchGeometryTransformResult:
         """Append bounded source-inclusive polar-array copies."""
 
+    def translate_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        displacement: SketchPoint2DInput,
+    ) -> SketchGeometryTransformResult:
+        """Append transformed copies of every eligible internal geometry item."""
+
+    def rotate_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        center: SketchPoint2DInput,
+        angle_degrees: float,
+    ) -> SketchGeometryTransformResult:
+        """Append transformed copies of every eligible internal geometry item."""
+
+    def scale_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        center: SketchPoint2DInput,
+        factor: float,
+    ) -> SketchGeometryTransformResult:
+        """Append transformed copies of every eligible internal geometry item."""
+
+    def mirror_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        reference: SketchMirrorReferenceInput,
+    ) -> SketchGeometryTransformResult:
+        """Append transformed copies of every eligible internal geometry item."""
+
 
 class SketchConstraintExpressionAdapter(Protocol):
     """Controlled constraint-name and finite expression operations."""

@@ -35,6 +35,7 @@ from freecad_mcp.commands import (
     ListSketchConstraintExpressionsHandler,
     ListSketchOpenVerticesHandler,
     MirrorSketchGeometryHandler,
+    MirrorSketchHandler,
     PolarArraySketchGeometryHandler,
     RecomputeDocumentHandler,
     RectangularArraySketchGeometryHandler,
@@ -44,13 +45,16 @@ from freecad_mcp.commands import (
     RemoveSketchGeometryHandler,
     ReplaceSketchConstraintHandler,
     RotateSketchGeometryHandler,
+    RotateSketchHandler,
     SaveDocumentHandler,
     ScaleSketchGeometryHandler,
+    ScaleSketchHandler,
     SetSketchConstraintExpressionHandler,
     SetSketchConstraintNameHandler,
     SetSketchGeometryConstructionHandler,
     SplitSketchGeometryHandler,
     TranslateSketchGeometryHandler,
+    TranslateSketchHandler,
     TrimSketchGeometryHandler,
     UndoDocumentHandler,
     UpdateSketchConstraintValueHandler,
@@ -660,6 +664,40 @@ class AdapterStub:
             }
         )
 
+    def translate_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        displacement: SketchPoint2DInput,
+    ) -> Any:
+        return self._transform("translate_sketch", displacement)
+
+    def rotate_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        center: SketchPoint2DInput,
+        angle_degrees: float,
+    ) -> Any:
+        return self._transform("rotate_sketch", center, angle_degrees)
+
+    def scale_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        center: SketchPoint2DInput,
+        factor: float,
+    ) -> Any:
+        return self._transform("scale_sketch", center, factor)
+
+    def mirror_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        reference: Any,
+    ) -> Any:
+        return self._transform("mirror_sketch", reference)
+
     def set_sketch_constraint_name(
         self,
         document_name: str,
@@ -950,14 +988,19 @@ def make_application() -> Application:
         trim_sketch_geometry=TrimSketchGeometryHandler(adapter, dispatcher),
         split_sketch_geometry=SplitSketchGeometryHandler(adapter, dispatcher),
         extend_sketch_geometry=ExtendSketchGeometryHandler(adapter, dispatcher),
-        mirror_sketch_geometry=MirrorSketchGeometryHandler(adapter, dispatcher),
-        translate_sketch_geometry=TranslateSketchGeometryHandler(adapter, dispatcher),
-        rotate_sketch_geometry=RotateSketchGeometryHandler(adapter, dispatcher),
-        scale_sketch_geometry=ScaleSketchGeometryHandler(adapter, dispatcher),
+        mirror_sketch_geometry=MirrorSketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
+        translate_sketch_geometry=TranslateSketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
+        rotate_sketch_geometry=RotateSketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
+        scale_sketch_geometry=ScaleSketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
         rectangular_array_sketch_geometry=RectangularArraySketchGeometryHandler(
-            adapter, dispatcher
+            adapter,  # type: ignore[arg-type]
+            dispatcher,
         ),
-        polar_array_sketch_geometry=PolarArraySketchGeometryHandler(adapter, dispatcher),
+        polar_array_sketch_geometry=PolarArraySketchGeometryHandler(adapter, dispatcher),  # type: ignore[arg-type]
+        translate_sketch=TranslateSketchHandler(adapter, dispatcher),  # type: ignore[arg-type]
+        rotate_sketch=RotateSketchHandler(adapter, dispatcher),  # type: ignore[arg-type]
+        scale_sketch=ScaleSketchHandler(adapter, dispatcher),  # type: ignore[arg-type]
+        mirror_sketch=MirrorSketchHandler(adapter, dispatcher),  # type: ignore[arg-type]
         add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
             adapter,
             dispatcher,
@@ -1224,6 +1267,50 @@ def test_application_dispatches_all_six_geometry_transform_commands() -> None:
         "rectangular_array",
         "polar_array",
     ]
+
+
+def test_application_dispatches_all_four_whole_sketch_transform_commands() -> None:
+    application = make_application()
+
+    results = [
+        application.translate_sketch("TestDocument", "BaseSketch", {"x": 10.0, "y": 0.0}),
+        application.rotate_sketch("TestDocument", "BaseSketch", {"x": 0.0, "y": 0.0}, 45.0),
+        application.scale_sketch("TestDocument", "BaseSketch", {"x": 1.0, "y": 2.0}, 2.0),
+        application.mirror_sketch("TestDocument", "BaseSketch", {"kind": "horizontal_axis"}),
+    ]
+
+    assert [result.code for result in results] == [
+        "sketch_translated",
+        "sketch_rotated",
+        "sketch_scaled",
+        "sketch_mirrored",
+    ]
+    assert all(result.ok for result in results)
+
+
+def test_application_whole_sketch_handlers_are_constructed() -> None:
+    application = make_application()
+    assert hasattr(application.documents, "translate_sketch")
+    assert hasattr(application.documents, "rotate_sketch")
+    assert hasattr(application.documents, "scale_sketch")
+    assert hasattr(application.documents, "mirror_sketch")
+
+
+def test_application_whole_sketch_exact_adapter_args_forwarded() -> None:
+    application = make_application()
+    result = application.translate_sketch("TestDocument", "BaseSketch", {"x": 5.0, "y": 3.0})
+    assert result.ok
+    assert result.code == "sketch_translated"
+    assert result.data["operation"] == "translate_sketch"
+
+
+def test_application_existing_selected_geometry_commands_unchanged() -> None:
+    application = make_application()
+    result = application.translate_sketch_geometry(
+        "TestDocument", "BaseSketch", [0], {"x": 5.0, "y": 3.0}
+    )
+    assert result.ok
+    assert result.code == "sketch_geometry_translated"
 
 
 def test_application_dispatches_equilateral_triangle_with_dedicated_semantics() -> None:

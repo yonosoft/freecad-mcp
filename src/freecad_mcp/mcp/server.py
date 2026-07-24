@@ -46,6 +46,9 @@ from freecad_mcp.mcp.sketch_removal_tools import register_sketch_removal_tools
 from freecad_mcp.mcp.sketch_topology_editing_tools import (
     register_sketch_topology_editing_tools,
 )
+from freecad_mcp.mcp.sketch_whole_transform_tools import (
+    register_sketch_whole_transform_tools,
+)
 from freecad_mcp.server.config import ServerConfig
 
 
@@ -140,5 +143,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_fillet_tool(server, handlers)
     register_sketch_geometry_transform_tools(server, handlers)
     register_sketch_constraint_state_tools(server, handlers)
+    register_sketch_whole_transform_tools(server, handlers)
 
     return server

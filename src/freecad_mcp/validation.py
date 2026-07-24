@@ -70,6 +70,11 @@ from freecad_mcp.models import (
     SketchSlotRequestInput,
     SketchTopologyEndpoint,
     SketchVerticalAxisReferenceInput,
+    SketchWholeMirrorReferenceInput,
+    SketchWholeMirrorRequestInput,
+    SketchWholeRotateRequestInput,
+    SketchWholeScaleRequestInput,
+    SketchWholeTranslateRequestInput,
     SymmetricConstraintInput,
     TangentConstraintInput,
     VerticalPointsConstraintInput,
@@ -145,6 +150,21 @@ _EXTERNAL_GEOMETRY_SOURCE_ADAPTER: TypeAdapter[ExternalGeometrySourceInput] = Ty
 _SKETCH_POINT_2D_INPUT_ADAPTER: TypeAdapter[SketchPoint2DInput] = TypeAdapter(SketchPoint2DInput)
 _SKETCH_MIRROR_REFERENCE_ADAPTER: TypeAdapter[SketchMirrorReferenceInput] = TypeAdapter(
     SketchMirrorReferenceInput
+)
+_SKETCH_WHOLE_MIRROR_REFERENCE_ADAPTER: TypeAdapter[SketchWholeMirrorReferenceInput] = TypeAdapter(
+    SketchWholeMirrorReferenceInput
+)
+_SKETCH_WHOLE_TRANSLATE_REQUEST_ADAPTER: TypeAdapter[SketchWholeTranslateRequestInput] = (
+    TypeAdapter(SketchWholeTranslateRequestInput)
+)
+_SKETCH_WHOLE_ROTATE_REQUEST_ADAPTER: TypeAdapter[SketchWholeRotateRequestInput] = TypeAdapter(
+    SketchWholeRotateRequestInput
+)
+_SKETCH_WHOLE_SCALE_REQUEST_ADAPTER: TypeAdapter[SketchWholeScaleRequestInput] = TypeAdapter(
+    SketchWholeScaleRequestInput
+)
+_SKETCH_WHOLE_MIRROR_REQUEST_ADAPTER: TypeAdapter[SketchWholeMirrorRequestInput] = TypeAdapter(
+    SketchWholeMirrorRequestInput
 )
 
 
@@ -2395,6 +2415,179 @@ def validate_polar_array_sketch_geometry_request(
     if isinstance(angle, CommandResult):
         return angle
     return selection, parsed_center, parsed_count, angle
+
+
+# ---------------------------------------------------------------------------
+# Milestone 28 — whole-sketch transform request validation
+# ---------------------------------------------------------------------------
+
+
+def validate_translate_sketch_request(
+    document_name: object,
+    sketch_name: object,
+    displacement: object,
+) -> SketchWholeTranslateRequestInput | CommandResult:
+    """Validate a whole-sketch translate request without geometry_indices."""
+    doc_error = validate_document_reference(document_name)
+    if doc_error is not None:
+        return doc_error
+    sketch_error = _validate_object_name(sketch_name, field="sketch_name", subject="Sketch")
+    if sketch_error is not None:
+        return sketch_error
+    parsed_displacement = _validate_transform_point(displacement, field="displacement")
+    if isinstance(parsed_displacement, CommandResult):
+        return parsed_displacement
+    if math.hypot(parsed_displacement.x, parsed_displacement.y) <= 0.0:
+        return CommandResult.failure(
+            code="validation_error",
+            message="displacement must be a non-zero vector.",
+            data={"field": "displacement", "reason": "zero_displacement"},
+        )
+    try:
+        return _SKETCH_WHOLE_TRANSLATE_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "displacement": parsed_displacement,
+            }
+        )
+    except ValidationError as exc:
+        return _transform_model_validation_error("displacement", exc)
+
+
+def validate_rotate_sketch_request(
+    document_name: object,
+    sketch_name: object,
+    center: object,
+    angle_degrees: object,
+) -> SketchWholeRotateRequestInput | CommandResult:
+    """Validate a whole-sketch rotate request without geometry_indices."""
+    doc_error = validate_document_reference(document_name)
+    if doc_error is not None:
+        return doc_error
+    sketch_error = _validate_object_name(sketch_name, field="sketch_name", subject="Sketch")
+    if sketch_error is not None:
+        return sketch_error
+    parsed_center = _validate_transform_point(center, field="center")
+    if isinstance(parsed_center, CommandResult):
+        return parsed_center
+    parsed_angle = _validate_transform_number(angle_degrees, field="angle_degrees")
+    if isinstance(parsed_angle, CommandResult):
+        return parsed_angle
+    if math.fmod(abs(parsed_angle), 360.0) <= 1e-9:
+        return CommandResult.failure(
+            code="validation_error",
+            message="Rotation angle must not be zero or a full-turn multiple.",
+            data={"field": "angle_degrees", "reason": "zero_or_full_turn_rotation"},
+        )
+    try:
+        return _SKETCH_WHOLE_ROTATE_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "center": parsed_center,
+                "angle_degrees": parsed_angle,
+            }
+        )
+    except ValidationError as exc:
+        return _transform_model_validation_error("angle_degrees", exc)
+
+
+def validate_scale_sketch_request(
+    document_name: object,
+    sketch_name: object,
+    center: object,
+    factor: object,
+) -> SketchWholeScaleRequestInput | CommandResult:
+    """Validate a whole-sketch scale request without geometry_indices."""
+    doc_error = validate_document_reference(document_name)
+    if doc_error is not None:
+        return doc_error
+    sketch_error = _validate_object_name(sketch_name, field="sketch_name", subject="Sketch")
+    if sketch_error is not None:
+        return sketch_error
+    parsed_center = _validate_transform_point(center, field="center")
+    if isinstance(parsed_center, CommandResult):
+        return parsed_center
+    parsed_factor = _validate_transform_number(factor, field="factor")
+    if isinstance(parsed_factor, CommandResult):
+        return parsed_factor
+    if parsed_factor < MIN_SKETCH_SCALE_FACTOR:
+        return CommandResult.failure(
+            code="validation_error",
+            message="factor must be at least the controlled positive minimum.",
+            data={
+                "field": "factor",
+                "minimum": MIN_SKETCH_SCALE_FACTOR,
+                "actual": parsed_factor,
+                "reason": "unsupported_scale_factor",
+            },
+        )
+    if abs(parsed_factor - 1.0) <= 1e-9:
+        return CommandResult.failure(
+            code="validation_error",
+            message="Scale factor 1.0 would produce overlapping copies and is refused.",
+            data={"field": "factor", "reason": "identity_scale"},
+        )
+    try:
+        return _SKETCH_WHOLE_SCALE_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "center": parsed_center,
+                "factor": parsed_factor,
+            }
+        )
+    except ValidationError as exc:
+        return _transform_model_validation_error("factor", exc)
+
+
+def validate_mirror_sketch_request(
+    document_name: object,
+    sketch_name: object,
+    reference: object,
+) -> SketchWholeMirrorRequestInput | CommandResult:
+    """Validate a whole-sketch mirror request, restricting to axis/origin only."""
+    doc_error = validate_document_reference(document_name)
+    if doc_error is not None:
+        return doc_error
+    sketch_error = _validate_object_name(sketch_name, field="sketch_name", subject="Sketch")
+    if sketch_error is not None:
+        return sketch_error
+
+    # Detect construction_line / internal_point before Pydantic validation
+    # so we can return a custom unsupported_mirror_reference error.
+    if isinstance(reference, dict) and reference.get("kind") in {
+        "construction_line",
+        "internal_point",
+    }:
+        return CommandResult.failure(
+            code="validation_error",
+            message=(
+                "Whole-sketch mirror only accepts horizontal_axis, vertical_axis, "
+                "or origin references."
+            ),
+            data={
+                "field": "reference",
+                "reason": "unsupported_mirror_reference",
+                "discriminator_value": reference["kind"],
+            },
+        )
+
+    try:
+        parsed_reference = _SKETCH_WHOLE_MIRROR_REFERENCE_ADAPTER.validate_python(reference)
+    except ValidationError as exc:
+        return _transform_model_validation_error("reference", exc)
+    try:
+        return _SKETCH_WHOLE_MIRROR_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "reference": parsed_reference,
+            }
+        )
+    except ValidationError as exc:
+        return _transform_model_validation_error("reference", exc)
 
 
 def _validate_transform_selection(

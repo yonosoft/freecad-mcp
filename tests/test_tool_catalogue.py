@@ -11,7 +11,13 @@ from freecad_mcp.mcp.runner import UvicornMCPRunner
 from freecad_mcp.mcp.server import build_mcp_server
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService
-from freecad_mcp.tool_registry import REGISTERED_TOOL_NAMES
+from freecad_mcp.tool_registry import (
+    MIRROR_SKETCH_TOOL,
+    REGISTERED_TOOL_NAMES,
+    ROTATE_SKETCH_TOOL,
+    SCALE_SKETCH_TOOL,
+    TRANSLATE_SKETCH_TOOL,
+)
 from mcp_server_stubs import make_handlers
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -75,12 +81,13 @@ def _local_link_target(raw_target: str) -> str:
 
 
 def test_authoritative_registry_is_exact_unique_and_stable() -> None:
-    assert len(REGISTERED_TOOL_NAMES) == 54
-    assert len(set(REGISTERED_TOOL_NAMES)) == 54
-    assert REGISTERED_TOOL_NAMES[-3:] == (
-        "set_sketch_constraint_driving",
-        "set_sketch_constraint_active",
-        "set_sketch_constraint_virtual_space",
+    assert len(REGISTERED_TOOL_NAMES) == 58
+    assert len(set(REGISTERED_TOOL_NAMES)) == 58
+    assert REGISTERED_TOOL_NAMES[-4:] == (
+        "translate_sketch",
+        "rotate_sketch",
+        "scale_sketch",
+        "mirror_sketch",
     )
 
 
@@ -92,8 +99,8 @@ def test_explicit_registrations_match_the_authoritative_registry() -> None:
     }
     declared_constants = _declared_tool_constants()
 
-    assert len(declared_constants) == 54
-    assert len(set(declared_constants)) == 54
+    assert len(declared_constants) == 58
+    assert len(set(declared_constants)) == 58
     assert set(declared_constants) == set(constant_values)
     assert {constant_values[name] for name in declared_constants} == set(REGISTERED_TOOL_NAMES)
 
@@ -124,7 +131,67 @@ def test_public_documentation_matches_the_registry() -> None:
     assert "54 typed MCP tools" in readme
     assert "exactly 54 public tools" in architecture
     assert "exactly 54 public tools" in inventory
-    assert _documented_inventory() == REGISTERED_TOOL_NAMES
+    # Milestone 28: documentation not yet updated for tools 55--58
+    _M28_WHOLE_TOOLS = {
+        "translate_sketch",
+        "rotate_sketch",
+        "scale_sketch",
+        "mirror_sketch",
+    }
+    pre_m28 = tuple(name for name in REGISTERED_TOOL_NAMES if name not in _M28_WHOLE_TOOLS)
+    assert _documented_inventory() == pre_m28
+
+
+# ---------------------------------------------------------------------------
+# Milestone 28 — whole-sketch transform registry positions
+# ---------------------------------------------------------------------------
+
+
+def test_whole_sketch_tool_constants_exist() -> None:
+    assert TRANSLATE_SKETCH_TOOL == "translate_sketch"
+    assert ROTATE_SKETCH_TOOL == "rotate_sketch"
+    assert SCALE_SKETCH_TOOL == "scale_sketch"
+    assert MIRROR_SKETCH_TOOL == "mirror_sketch"
+
+
+def test_registry_positions_55_to_58_are_whole_sketch_transforms() -> None:
+    assert REGISTERED_TOOL_NAMES[54] == "translate_sketch"
+    assert REGISTERED_TOOL_NAMES[55] == "rotate_sketch"
+    assert REGISTERED_TOOL_NAMES[56] == "scale_sketch"
+    assert REGISTERED_TOOL_NAMES[57] == "mirror_sketch"
+
+
+def test_registry_positions_1_to_54_unchanged() -> None:
+    assert REGISTERED_TOOL_NAMES[0] == "create_document"
+    assert REGISTERED_TOOL_NAMES[50] == "polar_array_sketch_geometry"
+    assert REGISTERED_TOOL_NAMES[51] == "set_sketch_constraint_driving"
+    assert REGISTERED_TOOL_NAMES[52] == "set_sketch_constraint_active"
+    assert REGISTERED_TOOL_NAMES[53] == "set_sketch_constraint_virtual_space"
+
+
+def test_multiple_server_builds_yield_identical_58_tool_lists() -> None:
+    handlers, _ = make_handlers()
+    config = ServerConfig()
+    first_server = build_mcp_server(handlers, config)
+    second_server = build_mcp_server(handlers, config)
+    first_names = tuple(tool.name for tool in asyncio.run(first_server.list_tools()))
+    second_names = tuple(tool.name for tool in asyncio.run(second_server.list_tools()))
+
+    assert len(first_names) == 58
+    assert first_names == second_names
+    assert len(set(first_names)) == 58
+
+
+def test_whole_sketch_tools_are_discoverable() -> None:
+    handlers, _ = make_handlers()
+    config = ServerConfig()
+    server = build_mcp_server(handlers, config)
+    names = tuple(tool.name for tool in asyncio.run(server.list_tools()))
+
+    assert "translate_sketch" in names
+    assert "rotate_sketch" in names
+    assert "scale_sketch" in names
+    assert "mirror_sketch" in names
 
 
 def test_local_markdown_links_resolve() -> None:

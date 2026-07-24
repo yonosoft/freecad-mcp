@@ -36,6 +36,7 @@ from freecad_mcp.commands import (
     ListSketchConstraintExpressionsHandler,
     ListSketchOpenVerticesHandler,
     MirrorSketchGeometryHandler,
+    MirrorSketchHandler,
     PolarArraySketchGeometryHandler,
     RecomputeDocumentHandler,
     RectangularArraySketchGeometryHandler,
@@ -45,13 +46,16 @@ from freecad_mcp.commands import (
     RemoveSketchGeometryHandler,
     ReplaceSketchConstraintHandler,
     RotateSketchGeometryHandler,
+    RotateSketchHandler,
     SaveDocumentHandler,
     ScaleSketchGeometryHandler,
+    ScaleSketchHandler,
     SetSketchConstraintExpressionHandler,
     SetSketchConstraintNameHandler,
     SetSketchGeometryConstructionHandler,
     SplitSketchGeometryHandler,
     TranslateSketchGeometryHandler,
+    TranslateSketchHandler,
     TrimSketchGeometryHandler,
     UndoDocumentHandler,
     UpdateSketchConstraintValueHandler,
@@ -788,6 +792,40 @@ class AdapterStub:
             step_angle_degrees,
         )
 
+    def translate_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        displacement: SketchPoint2DInput,
+    ) -> Any:
+        return self._transform("translate_sketch", document_name, sketch_name, displacement)
+
+    def rotate_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        center: SketchPoint2DInput,
+        angle_degrees: float,
+    ) -> Any:
+        return self._transform("rotate_sketch", document_name, sketch_name, center, angle_degrees)
+
+    def scale_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        center: SketchPoint2DInput,
+        factor: float,
+    ) -> Any:
+        return self._transform("scale_sketch", document_name, sketch_name, center, factor)
+
+    def mirror_sketch(
+        self,
+        document_name: str,
+        sketch_name: str,
+        reference: SketchMirrorReferenceInput,
+    ) -> Any:
+        return self._transform("mirror_sketch", document_name, sketch_name, reference)
+
     def _transform(self, operation: str, *arguments: object) -> Any:
         self.sketch_geometry_transform_calls.append((operation, arguments))
         return _SemanticResultStub(
@@ -1195,6 +1233,10 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
                 actual_adapter, dispatcher
             ),
             polar_array_sketch_geometry=PolarArraySketchGeometryHandler(actual_adapter, dispatcher),
+            translate_sketch=TranslateSketchHandler(actual_adapter, dispatcher),
+            rotate_sketch=RotateSketchHandler(actual_adapter, dispatcher),
+            scale_sketch=ScaleSketchHandler(actual_adapter, dispatcher),
+            mirror_sketch=MirrorSketchHandler(actual_adapter, dispatcher),
             add_sketch_reference_constraints=AddSketchReferenceConstraintsHandler(
                 actual_adapter,
                 dispatcher,

@@ -20,11 +20,15 @@ from freecad_mcp.exceptions import (
 from freecad_mcp.protocols import Dispatcher, SketchGeometryTransformAdapter
 from freecad_mcp.validation import (
     validate_mirror_sketch_geometry_request,
+    validate_mirror_sketch_request,
     validate_polar_array_sketch_geometry_request,
     validate_rectangular_array_sketch_geometry_request,
     validate_rotate_sketch_geometry_request,
+    validate_rotate_sketch_request,
     validate_scale_sketch_geometry_request,
+    validate_scale_sketch_request,
     validate_translate_sketch_geometry_request,
+    validate_translate_sketch_request,
 )
 
 
@@ -235,6 +239,121 @@ class PolarArraySketchGeometryHandler:
         )
 
 
+# ---------------------------------------------------------------------------
+# Milestone 28 — whole-sketch transform command handlers
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class TranslateSketchHandler:
+    """Copy-only whole-sketch translate: no geometry_indices accepted."""
+
+    adapter: SketchGeometryTransformAdapter
+    dispatcher: Dispatcher
+
+    def execute(
+        self,
+        document_name: object,
+        sketch_name: object,
+        displacement: object,
+    ) -> CommandResult:
+        parsed = validate_translate_sketch_request(document_name, sketch_name, displacement)
+        if isinstance(parsed, CommandResult):
+            return parsed
+        return _dispatch(
+            self.dispatcher,
+            lambda: self.adapter.translate_sketch(
+                str(document_name), str(sketch_name), parsed.displacement
+            ),
+            document_name,
+            sketch_name,
+            "translate_sketch",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RotateSketchHandler:
+    """Copy-only whole-sketch rotate: no geometry_indices accepted."""
+
+    adapter: SketchGeometryTransformAdapter
+    dispatcher: Dispatcher
+
+    def execute(
+        self,
+        document_name: object,
+        sketch_name: object,
+        center: object,
+        angle_degrees: object,
+    ) -> CommandResult:
+        parsed = validate_rotate_sketch_request(document_name, sketch_name, center, angle_degrees)
+        if isinstance(parsed, CommandResult):
+            return parsed
+        return _dispatch(
+            self.dispatcher,
+            lambda: self.adapter.rotate_sketch(
+                str(document_name), str(sketch_name), parsed.center, parsed.angle_degrees
+            ),
+            document_name,
+            sketch_name,
+            "rotate_sketch",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ScaleSketchHandler:
+    """Copy-only whole-sketch scale: no geometry_indices accepted."""
+
+    adapter: SketchGeometryTransformAdapter
+    dispatcher: Dispatcher
+
+    def execute(
+        self,
+        document_name: object,
+        sketch_name: object,
+        center: object,
+        factor: object,
+    ) -> CommandResult:
+        parsed = validate_scale_sketch_request(document_name, sketch_name, center, factor)
+        if isinstance(parsed, CommandResult):
+            return parsed
+        return _dispatch(
+            self.dispatcher,
+            lambda: self.adapter.scale_sketch(
+                str(document_name), str(sketch_name), parsed.center, parsed.factor
+            ),
+            document_name,
+            sketch_name,
+            "scale_sketch",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MirrorSketchHandler:
+    """Copy-only whole-sketch mirror: no geometry_indices accepted."""
+
+    adapter: SketchGeometryTransformAdapter
+    dispatcher: Dispatcher
+
+    def execute(
+        self,
+        document_name: object,
+        sketch_name: object,
+        reference: object,
+    ) -> CommandResult:
+        parsed = validate_mirror_sketch_request(document_name, sketch_name, reference)
+        if isinstance(parsed, CommandResult):
+            return parsed
+        return _dispatch(
+            self.dispatcher,
+            lambda: self.adapter.mirror_sketch(
+                str(document_name), str(sketch_name), parsed.reference
+            ),
+            document_name,
+            sketch_name,
+            "mirror_sketch",
+        )
+
+
 def _dispatch(
     dispatcher: Dispatcher,
     operation_call: Callable[[], object],
@@ -256,6 +375,11 @@ def _dispatch(
         "scale": "sketch_geometry_scaled",
         "rectangular_array": "sketch_geometry_rectangular_array_copied",
         "polar_array": "sketch_geometry_polar_array_copied",
+        # Milestone 28 — whole-sketch transforms
+        "translate_sketch": "sketch_translated",
+        "rotate_sketch": "sketch_rotated",
+        "scale_sketch": "sketch_scaled",
+        "mirror_sketch": "sketch_mirrored",
     }
     code = changed_codes[operation] if changed else f"sketch_geometry_{operation}_unchanged"
     return CommandResult.success(
@@ -348,9 +472,13 @@ def _failure(
 
 __all__ = [
     "MirrorSketchGeometryHandler",
+    "MirrorSketchHandler",
     "PolarArraySketchGeometryHandler",
     "RectangularArraySketchGeometryHandler",
     "RotateSketchGeometryHandler",
+    "RotateSketchHandler",
     "ScaleSketchGeometryHandler",
+    "ScaleSketchHandler",
     "TranslateSketchGeometryHandler",
+    "TranslateSketchHandler",
 ]

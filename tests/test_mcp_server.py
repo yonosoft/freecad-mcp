@@ -147,6 +147,11 @@ def test_mcp_server_composes_explicit_registration_groups(
         "register_sketch_constraint_state_tools",
         recorder("sketch_constraint_state_tools"),
     )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_whole_transform_tools",
+        recorder("sketch_whole_transform_tools"),
+    )
 
     server = mcp_server_module.build_mcp_server(handlers, ServerConfig())
 
@@ -174,6 +179,7 @@ def test_mcp_server_composes_explicit_registration_groups(
         "sketch_fillet_tool",
         "sketch_geometry_transform_tools",
         "sketch_constraint_state_tools",
+        "sketch_whole_transform_tools",
     ]
     assert [tool.name for tool in asyncio.run(server.list_tools())] == ["create_sketch_polyline"]
 

@@ -524,6 +524,76 @@ SketchMirrorReferenceInput = Annotated[
     Field(discriminator="kind"),
 ]
 
+# ---------------------------------------------------------------------------
+# Milestone 28 — whole-sketch transform request models
+# ---------------------------------------------------------------------------
+
+SketchWholeMirrorReferenceInput = SketchMirrorAxisReferenceInput
+"""Restricted mirror reference for whole-sketch mirror: axis or origin only."""
+
+
+class SketchWholeTranslateRequestInput(_SketchGeometryInputModel):
+    """Translate every internal geometry item in one sketch.
+
+    This is a copy-only operation: originals remain unchanged, one
+    transformed independent copy is appended per source geometry,
+    the sketch placement is not changed, and constraints are not
+    copied.
+    """
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    displacement: SketchPoint2DInput
+
+
+class SketchWholeRotateRequestInput(_SketchGeometryInputModel):
+    """Rotate every internal geometry item in one sketch.
+
+    This is a copy-only operation: originals remain unchanged, one
+    transformed independent copy is appended per source geometry,
+    the sketch placement is not changed, and constraints are not
+    copied.
+    """
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    center: SketchPoint2DInput
+    angle_degrees: SketchTransformAngleDegrees
+
+
+class SketchWholeScaleRequestInput(_SketchGeometryInputModel):
+    """Uniformly scale every internal geometry item in one sketch.
+
+    This is a copy-only operation: originals remain unchanged, one
+    transformed independent copy is appended per source geometry,
+    the sketch placement is not changed, and constraints are not
+    copied.
+    """
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    center: SketchPoint2DInput
+    factor: SketchTransformScaleFactor
+
+
+class SketchWholeMirrorRequestInput(_SketchGeometryInputModel):
+    """Mirror every internal geometry item in one sketch.
+
+    This is a copy-only operation: originals remain unchanged, one
+    transformed independent copy is appended per source geometry,
+    the sketch placement is not changed, and constraints are not
+    copied.
+
+    Only built-in sketch axes and the origin are accepted as mirror
+    references.  Internal construction-line and point references are
+    refused for whole-sketch mirror because they would belong to the
+    source selection.
+    """
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    reference: SketchWholeMirrorReferenceInput
+
 
 class SketchTopologyEndpoint(StrEnum):
     """Supported open-geometry endpoint selector for topology extension."""
@@ -3518,6 +3588,11 @@ __all__ = [
     "SketchTopologyEndpoint",
     "SketchTopologyGeometryMapping",
     "SketchVerticalAxisReferenceInput",
+    "SketchWholeMirrorReferenceInput",
+    "SketchWholeMirrorRequestInput",
+    "SketchWholeRotateRequestInput",
+    "SketchWholeScaleRequestInput",
+    "SketchWholeTranslateRequestInput",
     "UnsupportedSketchConstraint",
     "UnsupportedSketchGeometry",
     "VerticalConstraintInput",
