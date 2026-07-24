@@ -539,6 +539,62 @@ class SketchRectangleRollbackError(RuntimeError):
         super().__init__(reason)
 
 
+class SketchPolylineCreationError(RuntimeError):
+    """Raised when one semantic polyline phase cannot be completed."""
+
+    def __init__(
+        self,
+        *,
+        phase: str,
+        reason: str,
+        expected_count: int | None = None,
+        actual_count: int | None = None,
+    ) -> None:
+        self.phase = phase
+        self.reason = reason
+        self.expected_count = expected_count
+        self.actual_count = actual_count
+        super().__init__(reason)
+
+    def details(self) -> dict[str, object]:
+        """Return controlled diagnostic context for a public failure."""
+        details: dict[str, object] = {
+            "phase": self.phase,
+            "reason": self.reason,
+        }
+        if self.expected_count is not None:
+            details["expected_count"] = self.expected_count
+        if self.actual_count is not None:
+            details["actual_count"] = self.actual_count
+        return details
+
+
+class SketchPolylineVerificationError(SketchPolylineCreationError):
+    """Raised when native creation cannot satisfy the semantic polyline contract."""
+
+    def __init__(
+        self,
+        reason: str,
+        *,
+        expected_count: int | None = None,
+        actual_count: int | None = None,
+    ) -> None:
+        super().__init__(
+            phase="verification",
+            reason=reason,
+            expected_count=expected_count,
+            actual_count=actual_count,
+        )
+
+
+class SketchPolylineRollbackError(RuntimeError):
+    """Raised when a failed semantic polyline cannot restore the exact sketch."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SketchCenteredRectangleCreationError(RuntimeError):
     """Raised when one semantic centred-rectangle phase cannot be completed."""
 
@@ -911,6 +967,9 @@ __all__ = [
     "SketchPolygonCreationError",
     "SketchPolygonRollbackError",
     "SketchPolygonVerificationError",
+    "SketchPolylineCreationError",
+    "SketchPolylineRollbackError",
+    "SketchPolylineVerificationError",
     "SketchRectangleCreationError",
     "SketchRectangleRollbackError",
     "SketchRectangleVerificationError",

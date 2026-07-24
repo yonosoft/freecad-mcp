@@ -75,8 +75,8 @@ def _local_link_target(raw_target: str) -> str:
 
 
 def test_authoritative_registry_is_exact_unique_and_stable() -> None:
-    assert len(REGISTERED_TOOL_NAMES) == 53
-    assert len(set(REGISTERED_TOOL_NAMES)) == 53
+    assert len(REGISTERED_TOOL_NAMES) == 54
+    assert len(set(REGISTERED_TOOL_NAMES)) == 54
     assert REGISTERED_TOOL_NAMES[-3:] == (
         "set_sketch_constraint_driving",
         "set_sketch_constraint_active",
@@ -92,8 +92,8 @@ def test_explicit_registrations_match_the_authoritative_registry() -> None:
     }
     declared_constants = _declared_tool_constants()
 
-    assert len(declared_constants) == 53
-    assert len(set(declared_constants)) == 53
+    assert len(declared_constants) == 54
+    assert len(set(declared_constants)) == 54
     assert set(declared_constants) == set(constant_values)
     assert {constant_values[name] for name in declared_constants} == set(REGISTERED_TOOL_NAMES)
 
@@ -121,9 +121,9 @@ def test_public_documentation_matches_the_registry() -> None:
     architecture = (REPOSITORY_ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
     inventory = INVENTORY_PATH.read_text(encoding="utf-8")
 
-    assert "53 typed MCP tools" in readme
-    assert "exactly 53 public tools" in architecture
-    assert "exactly 53 public tools" in inventory
+    assert "54 typed MCP tools" in readme
+    assert "exactly 54 public tools" in architecture
+    assert "exactly 54 public tools" in inventory
     assert _documented_inventory() == REGISTERED_TOOL_NAMES
 
 

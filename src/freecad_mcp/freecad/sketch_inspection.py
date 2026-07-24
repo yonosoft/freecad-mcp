@@ -27,12 +27,17 @@ from freecad_mcp.freecad.object_inspection import (
 from freecad_mcp.models import (
     OriginPlane,
     SketchArcGeometry,
+    SketchArcOfEllipseGeometry,
+    SketchArcOfHyperbolaGeometry,
+    SketchArcOfParabolaGeometry,
     SketchAttachmentData,
+    SketchBSplineGeometry,
     SketchCircleGeometry,
     SketchConstraint,
     SketchConstraintData,
     SketchConstraintReference,
     SketchConstraintValue,
+    SketchEllipseGeometry,
     SketchGeometry,
     SketchInspectionResult,
     SketchLineGeometry,
@@ -229,6 +234,162 @@ def _inspect_geometry_item(
                 y=_geometry_number(item.Y, index),
             ),
         )
+    if _part_instance(item, part, "ArcOfEllipse"):
+        try:
+            return SketchArcOfEllipseGeometry(
+                index=index,
+                construction=construction,
+                center=SketchPoint2D(
+                    x=_geometry_number(item.Center.x, index),
+                    y=_geometry_number(item.Center.y, index),
+                ),
+                major_radius=_radius(item.MajorRadius, index),
+                minor_radius=_radius(item.MinorRadius, index),
+                angle_xu_degrees=math.degrees(_geometry_number(item.AngleXU, index)) % 180.0,
+                start=SketchPoint2D(
+                    x=_geometry_number(item.StartPoint.x, index),
+                    y=_geometry_number(item.StartPoint.y, index),
+                ),
+                end=SketchPoint2D(
+                    x=_geometry_number(item.EndPoint.x, index),
+                    y=_geometry_number(item.EndPoint.y, index),
+                ),
+                start_parameter_degrees=math.degrees(_geometry_number(item.FirstParameter, index)),
+                end_parameter_degrees=math.degrees(_geometry_number(item.LastParameter, index)),
+            )
+        except Exception as exc:
+            raise SketchGeometryMalformedError(
+                index=index, reason="arc_of_ellipse_attributes_unreadable"
+            ) from exc
+    if _part_instance(item, part, "Ellipse"):
+        try:
+            return SketchEllipseGeometry(
+                index=index,
+                construction=construction,
+                center=SketchPoint2D(
+                    x=_geometry_number(item.Center.x, index),
+                    y=_geometry_number(item.Center.y, index),
+                ),
+                major_radius=_radius(item.MajorRadius, index),
+                minor_radius=_radius(item.MinorRadius, index),
+                angle_xu_degrees=math.degrees(_geometry_number(item.AngleXU, index)) % 180.0,
+            )
+        except Exception as exc:
+            raise SketchGeometryMalformedError(
+                index=index, reason="ellipse_attributes_unreadable"
+            ) from exc
+    if _part_instance(item, part, "ArcOfHyperbola"):
+        try:
+            angle_xu_rad = _geometry_number(item.AngleXU, index)
+            major_axis_angle_degrees = math.degrees(angle_xu_rad) % 360.0
+            if hasattr(item.Hyperbola, "Focus"):
+                focus_vec = item.Hyperbola.Focus
+                focus = SketchPoint2D(
+                    x=_geometry_number(focus_vec.x, index),
+                    y=_geometry_number(focus_vec.y, index),
+                )
+            else:
+                major_radius = _geometry_number(item.MajorRadius, index)
+                minor_radius = _geometry_number(item.MinorRadius, index)
+                focal_dist = math.sqrt(major_radius**2 + minor_radius**2)
+                focus = SketchPoint2D(
+                    x=_geometry_number(item.Center.x, index)
+                    + _geometry_number(item.XAxis.x, index) * focal_dist,
+                    y=_geometry_number(item.Center.y, index)
+                    + _geometry_number(item.XAxis.y, index) * focal_dist,
+                )
+            return SketchArcOfHyperbolaGeometry(
+                index=index,
+                construction=construction,
+                center=SketchPoint2D(
+                    x=_geometry_number(item.Center.x, index),
+                    y=_geometry_number(item.Center.y, index),
+                ),
+                major_radius=_radius(item.MajorRadius, index),
+                minor_radius=_radius(item.MinorRadius, index),
+                major_axis_angle_degrees=major_axis_angle_degrees,
+                focus=focus,
+                start=SketchPoint2D(
+                    x=_geometry_number(item.StartPoint.x, index),
+                    y=_geometry_number(item.StartPoint.y, index),
+                ),
+                end=SketchPoint2D(
+                    x=_geometry_number(item.EndPoint.x, index),
+                    y=_geometry_number(item.EndPoint.y, index),
+                ),
+                start_parameter=_geometry_number(item.FirstParameter, index),
+                end_parameter=_geometry_number(item.LastParameter, index),
+            )
+        except Exception as exc:
+            raise SketchGeometryMalformedError(
+                index=index, reason="arc_of_hyperbola_attributes_unreadable"
+            ) from exc
+    if _part_instance(item, part, "ArcOfParabola"):
+        try:
+            center_x = _geometry_number(item.Center.x, index)
+            center_y = _geometry_number(item.Center.y, index)
+            focal = _geometry_number(item.Focal, index)
+            axis_x = _geometry_number(item.XAxis.x, index)
+            axis_y = _geometry_number(item.XAxis.y, index)
+            focus = SketchPoint2D(
+                x=center_x + axis_x * focal,
+                y=center_y + axis_y * focal,
+            )
+            return SketchArcOfParabolaGeometry(
+                index=index,
+                construction=construction,
+                vertex=SketchPoint2D(x=center_x, y=center_y),
+                focus=focus,
+                start=SketchPoint2D(
+                    x=_geometry_number(item.StartPoint.x, index),
+                    y=_geometry_number(item.StartPoint.y, index),
+                ),
+                end=SketchPoint2D(
+                    x=_geometry_number(item.EndPoint.x, index),
+                    y=_geometry_number(item.EndPoint.y, index),
+                ),
+                start_parameter=_geometry_number(item.FirstParameter, index),
+                end_parameter=_geometry_number(item.LastParameter, index),
+            )
+        except Exception as exc:
+            raise SketchGeometryMalformedError(
+                index=index, reason="arc_of_parabola_attributes_unreadable"
+            ) from exc
+    if _part_instance(item, part, "BSplineCurve"):
+        try:
+            poles = tuple(
+                SketchPoint2D(
+                    x=_geometry_number(vector.x, index),
+                    y=_geometry_number(vector.y, index),
+                )
+                for vector in item.getPoles()
+            )
+            raw_weights = list(item.getWeights())
+            all_unit = all(abs(w - 1.0) < 1e-9 for w in raw_weights) if raw_weights else True
+            weights = None if (all_unit or not item.isRational()) else tuple(raw_weights)
+            return SketchBSplineGeometry(
+                index=index,
+                construction=construction,
+                poles=poles,
+                weights=weights,
+                degree=int(item.Degree),
+                periodic=bool(item.isPeriodic()),
+                rational=bool(item.isRational()),
+                closed=bool(item.isClosed()),
+                knot_sequence=tuple(float(k) for k in item.KnotSequence),
+                start=SketchPoint2D(
+                    x=_geometry_number(item.StartPoint.x, index),
+                    y=_geometry_number(item.StartPoint.y, index),
+                ),
+                end=SketchPoint2D(
+                    x=_geometry_number(item.EndPoint.x, index),
+                    y=_geometry_number(item.EndPoint.y, index),
+                ),
+            )
+        except Exception as exc:
+            raise SketchGeometryMalformedError(
+                index=index, reason="b_spline_attributes_unreadable"
+            ) from exc
     return UnsupportedSketchGeometry(
         index=index,
         construction=construction,
@@ -1112,6 +1273,7 @@ def _part_instance(value: Any, part: Any, type_name: str) -> bool:
 
 
 def _controlled_type_name(value: str) -> str:
+    # Keep existing function unchanged
     normalized = re.sub(r"[^A-Za-z0-9_:]", "_", value)[:80]
     return normalized or "Unknown"
 

@@ -175,7 +175,7 @@ def test_mcp_server_composes_explicit_registration_groups(
         "sketch_geometry_transform_tools",
         "sketch_constraint_state_tools",
     ]
-    assert asyncio.run(server.list_tools()) == []
+    assert [tool.name for tool in asyncio.run(server.list_tools())] == ["create_sketch_polyline"]
 
 
 def test_registered_tools_match_lifecycle_status() -> None:

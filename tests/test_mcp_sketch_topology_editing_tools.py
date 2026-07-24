@@ -27,10 +27,10 @@ def _server() -> Any:
     return build_mcp_server(handlers, ServerConfig())
 
 
-def test_milestone_23_appends_exact_tools_forty_through_forty_two() -> None:
+def test_milestone_23_appends_exact_tools_forty_one_through_forty_three() -> None:
     names = [item.name for item in asyncio.run(_server().list_tools())]
 
-    assert names[39:42] == [
+    assert names[40:43] == [
         TRIM_SKETCH_GEOMETRY_TOOL,
         SPLIT_SKETCH_GEOMETRY_TOOL,
         EXTEND_SKETCH_GEOMETRY_TOOL,

@@ -28,11 +28,11 @@ def _server() -> Any:
     return build_mcp_server(handlers, ServerConfig())
 
 
-def test_external_geometry_tools_are_exactly_twenty_five_through_twenty_eight() -> None:
+def test_external_geometry_tools_are_exactly_twenty_six_through_twenty_nine() -> None:
     tools = asyncio.run(_server().list_tools())
     names = [item.name for item in tools]
 
-    assert names[24:28] == [
+    assert names[25:29] == [
         "add_external_geometry",
         "list_external_geometry",
         "remove_external_geometry",

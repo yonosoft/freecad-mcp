@@ -19,7 +19,8 @@ def register_add_sketch_geometry_tool(server: FastMCP[Any], handlers: DocumentHa
         description=(
             "Atomically append 1 to 100 controlled geometry items to a sketch by exact "
             "internal document and sketch name. Supports line_segment, circle, "
-            "arc_of_circle and point in request order, with an explicit construction flag "
+            "arc_of_circle, point, ellipse, arc_of_ellipse, arc_of_parabola, "
+            "arc_of_hyperbola and b_spline in request order, with an explicit construction flag "
             "on every item. Arc angles are degrees and define a normalized counter-clockwise "
             "span shorter than 360 degrees. The tool does not solve, recompute or save. "
             "Returned indices describe only the immediate sketch state and may be renumbered "

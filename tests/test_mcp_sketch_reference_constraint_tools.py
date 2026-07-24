@@ -19,10 +19,10 @@ def _server() -> Any:
     return build_mcp_server(handlers, ServerConfig())
 
 
-def test_reference_constraint_tool_is_exactly_tool_thirty_five() -> None:
+def test_reference_constraint_tool_is_exactly_tool_thirty_six() -> None:
     names = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert names[34] == ADD_SKETCH_REFERENCE_CONSTRAINTS_TOOL
+    assert names[35] == ADD_SKETCH_REFERENCE_CONSTRAINTS_TOOL
 
 
 def test_reference_constraint_schema_is_strict_and_has_all_variants_modes() -> None:

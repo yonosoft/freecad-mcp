@@ -26,11 +26,11 @@ def _server() -> Any:
     return build_mcp_server(handlers, ServerConfig())
 
 
-def test_analysis_tools_are_exactly_twenty_two_through_twenty_four() -> None:
+def test_analysis_tools_are_exactly_twenty_three_through_twenty_five() -> None:
     tools = asyncio.run(_server().list_tools())
     names = [item.name for item in tools]
 
-    assert names[21:24] == [
+    assert names[22:25] == [
         "analyze_sketch",
         "validate_sketch_profile",
         "list_sketch_open_vertices",

@@ -15,6 +15,7 @@ from freecad_mcp.commands import (
     CreateDocumentHandler,
     CreateSketchCenteredRectangleHandler,
     CreateSketchEquilateralTriangleHandler,
+    CreateSketchPolylineHandler,
     CreateSketchRectangleHandler,
     CreateSketchRegularPolygonHandler,
     CreateSketchRoundedRectangleHandler,
@@ -146,6 +147,10 @@ def _build_runtime() -> Runtime:
             dispatcher=dispatcher,
         ),
         create_sketch_rounded_rectangle=CreateSketchRoundedRectangleHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
+        create_sketch_polyline=CreateSketchPolylineHandler(
             adapter=adapter,
             dispatcher=dispatcher,
         ),

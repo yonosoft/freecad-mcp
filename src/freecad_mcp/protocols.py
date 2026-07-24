@@ -44,6 +44,8 @@ from freecad_mcp.models import (
     SketchOpenVerticesResult,
     SketchPoint2DInput,
     SketchPolygonCreationResult,
+    SketchPolylineCreationResult,
+    SketchPolylineRequestInput,
     SketchProfileAnalysisRequestInput,
     SketchProfileValidationResult,
     SketchRectangleCreationResult,
@@ -157,6 +159,12 @@ class DocumentAdapter(Protocol):
         request: SketchCenteredRectangleRequestInput,
     ) -> SketchCenteredRectangleCreationResult:
         """Create and verify one semantic centre-defined rectangle atomically."""
+
+    def create_sketch_polyline(
+        self,
+        request: SketchPolylineRequestInput,
+    ) -> SketchPolylineCreationResult:
+        """Create and verify one connected semantic polyline atomically."""
 
 
 class Dispatcher(Protocol):

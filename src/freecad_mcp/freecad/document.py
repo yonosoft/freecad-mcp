@@ -24,6 +24,7 @@ from freecad_mcp.freecad import (
     sketch_geometry_transforms,
     sketch_inspection,
     sketch_polygon_creation,
+    sketch_polyline_creation,
     sketch_rectangle_creation,
     sketch_reference_constraints,
     sketch_removal,
@@ -101,6 +102,8 @@ from freecad_mcp.models import (
     SketchOpenVerticesResult,
     SketchPoint2DInput,
     SketchPolygonCreationResult,
+    SketchPolylineCreationResult,
+    SketchPolylineRequestInput,
     SketchProfileAnalysisRequestInput,
     SketchProfileValidationResult,
     SketchRectangleCreationResult,
@@ -282,6 +285,13 @@ class FreeCADDocumentAdapter:
     ) -> SketchRoundedRectangleCreationResult:
         """Create one verified rounded rectangle without GUI commands or saving."""
         return sketch_rounded_rectangle_creation.create_sketch_rounded_rectangle(request)
+
+    def create_sketch_polyline(
+        self,
+        request: SketchPolylineRequestInput,
+    ) -> SketchPolylineCreationResult:
+        """Create one verified connected polyline without GUI commands or saving."""
+        return sketch_polyline_creation.create_sketch_polyline(request)
 
     def add_external_geometry(
         self,

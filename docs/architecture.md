@@ -211,6 +211,8 @@ registers controlled history inspection, undo, and redo.
 explicitly register the two semantic rectangle profiles.
 `mcp.sketch_polygon_tools` explicitly appends the semantic equilateral triangle
 and regular polygon profiles.
+`mcp.sketch_polyline_tools` explicitly appends the semantic connected polyline
+profile.
 `mcp.sketch_curved_profile_tools` explicitly appends the semantic slot and
 rounded-rectangle profiles.
 `mcp.sketch_analysis_tools` explicitly appends read-only sketch analysis,
@@ -252,7 +254,7 @@ A dependency-free tool registry is the authoritative source for tool names and
 ordering. FastMCP registration and lifecycle status both consume that registry,
 so reported capabilities cannot drift from the registered set.
 
-The registry currently exposes exactly 53 public tools. The maintained
+The registry currently exposes exactly 54 public tools. The maintained
 [public tool inventory](public-tool-inventory.md) records their exact names and
 order without duplicating registration definitions in architecture prose.
 

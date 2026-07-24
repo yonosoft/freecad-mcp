@@ -329,6 +329,64 @@ class ArcOfCircleGeometryInput(_SketchGeometryInputModel):
     construction: bool = Field(strict=True)
 
 
+class EllipseGeometryInput(_SketchGeometryInputModel):
+    """Controlled ellipse creation input."""
+
+    type: Literal["ellipse"]
+    center: SketchPoint2DInput
+    major_radius: float = Field(strict=True, allow_inf_nan=False)
+    minor_radius: float = Field(strict=True, allow_inf_nan=False)
+    angle_xu_degrees: float = Field(default=0.0, strict=True, allow_inf_nan=False)
+    construction: bool = Field(strict=True)
+
+
+class ArcOfEllipseGeometryInput(_SketchGeometryInputModel):
+    """Controlled arc-of-ellipse creation input."""
+
+    type: Literal["arc_of_ellipse"]
+    center: SketchPoint2DInput
+    major_radius: float = Field(strict=True, allow_inf_nan=False)
+    minor_radius: float = Field(strict=True, allow_inf_nan=False)
+    angle_xu_degrees: float = Field(default=0.0, strict=True, allow_inf_nan=False)
+    start_parameter_degrees: float = Field(strict=True, allow_inf_nan=False)
+    end_parameter_degrees: float = Field(strict=True, allow_inf_nan=False)
+    construction: bool = Field(strict=True)
+
+
+class ArcOfParabolaGeometryInput(_SketchGeometryInputModel):
+    """Controlled arc-of-parabola creation input."""
+
+    type: Literal["arc_of_parabola"]
+    focus: SketchPoint2DInput
+    vertex: SketchPoint2DInput
+    start_parameter: float = Field(strict=True, allow_inf_nan=False)
+    end_parameter: float = Field(strict=True, allow_inf_nan=False)
+    construction: bool = Field(strict=True)
+
+
+class ArcOfHyperbolaGeometryInput(_SketchGeometryInputModel):
+    """Controlled arc-of-hyperbola creation input."""
+
+    type: Literal["arc_of_hyperbola"]
+    center: SketchPoint2DInput
+    major_radius: float = Field(strict=True, allow_inf_nan=False)
+    minor_radius: float = Field(strict=True, allow_inf_nan=False)
+    major_axis_angle_degrees: float = Field(default=0.0, strict=True, allow_inf_nan=False)
+    start_parameter: float = Field(strict=True, allow_inf_nan=False)
+    end_parameter: float = Field(strict=True, allow_inf_nan=False)
+    construction: bool = Field(strict=True)
+
+
+class BSplineGeometryInput(_SketchGeometryInputModel):
+    """Controlled B-spline creation input."""
+
+    type: Literal["b_spline"]
+    poles: list[SketchPoint2DInput]
+    degree: int = Field(strict=True)
+    weights: list[float] | None = None
+    construction: bool = Field(strict=True)
+
+
 class PointGeometryInput(_SketchGeometryInputModel):
     """Controlled point-geometry creation input."""
 
@@ -338,7 +396,15 @@ class PointGeometryInput(_SketchGeometryInputModel):
 
 
 SketchGeometryInput = Annotated[
-    LineSegmentGeometryInput | CircleGeometryInput | ArcOfCircleGeometryInput | PointGeometryInput,
+    LineSegmentGeometryInput
+    | CircleGeometryInput
+    | ArcOfCircleGeometryInput
+    | EllipseGeometryInput
+    | ArcOfEllipseGeometryInput
+    | ArcOfParabolaGeometryInput
+    | ArcOfHyperbolaGeometryInput
+    | BSplineGeometryInput
+    | PointGeometryInput,
     Field(discriminator="type"),
 ]
 SketchGeometryBatch = Annotated[
@@ -625,6 +691,22 @@ class SketchRoundedRectangleRequestInput(_SketchGeometryInputModel):
     height: ProfileDimension
     corner_radius: ProfileDimension
     placement: RoundedRectanglePlacementInput
+
+
+class SketchPolylinePointInput(_SketchGeometryInputModel):
+    """One finite vertex for a semantic sketch polyline."""
+
+    x: float = Field(strict=True, allow_inf_nan=False)
+    y: float = Field(strict=True, allow_inf_nan=False)
+
+
+class SketchPolylineRequestInput(_SketchGeometryInputModel):
+    """Complete strict semantic request for one sketch polyline."""
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+    points: list[SketchPolylinePointInput]
+    closed: bool = Field(default=False, strict=True)
 
 
 Circumradius = Annotated[
@@ -1823,6 +1905,153 @@ class SketchPointGeometry:
 
 
 @dataclass(frozen=True, slots=True)
+class SketchEllipseGeometry:
+    """Controlled ellipse geometry."""
+
+    index: int
+    construction: bool
+    center: SketchPoint2D
+    major_radius: float
+    minor_radius: float
+    angle_xu_degrees: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "ellipse",
+            "construction": self.construction,
+            "center": self.center.to_dict(),
+            "major_radius": self.major_radius,
+            "minor_radius": self.minor_radius,
+            "angle_xu_degrees": self.angle_xu_degrees,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchArcOfEllipseGeometry:
+    """Controlled arc-of-ellipse geometry."""
+
+    index: int
+    construction: bool
+    center: SketchPoint2D
+    major_radius: float
+    minor_radius: float
+    angle_xu_degrees: float
+    start: SketchPoint2D
+    end: SketchPoint2D
+    start_parameter_degrees: float
+    end_parameter_degrees: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "arc_of_ellipse",
+            "construction": self.construction,
+            "center": self.center.to_dict(),
+            "major_radius": self.major_radius,
+            "minor_radius": self.minor_radius,
+            "angle_xu_degrees": self.angle_xu_degrees,
+            "start": self.start.to_dict(),
+            "end": self.end.to_dict(),
+            "start_parameter_degrees": self.start_parameter_degrees,
+            "end_parameter_degrees": self.end_parameter_degrees,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchArcOfParabolaGeometry:
+    """Controlled arc-of-parabola geometry."""
+
+    index: int
+    construction: bool
+    vertex: SketchPoint2D
+    focus: SketchPoint2D
+    start: SketchPoint2D
+    end: SketchPoint2D
+    start_parameter: float
+    end_parameter: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "arc_of_parabola",
+            "construction": self.construction,
+            "vertex": self.vertex.to_dict(),
+            "focus": self.focus.to_dict(),
+            "start": self.start.to_dict(),
+            "end": self.end.to_dict(),
+            "start_parameter": self.start_parameter,
+            "end_parameter": self.end_parameter,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchArcOfHyperbolaGeometry:
+    """Controlled arc-of-hyperbola geometry."""
+
+    index: int
+    construction: bool
+    center: SketchPoint2D
+    major_radius: float
+    minor_radius: float
+    major_axis_angle_degrees: float
+    focus: SketchPoint2D
+    start: SketchPoint2D
+    end: SketchPoint2D
+    start_parameter: float
+    end_parameter: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "arc_of_hyperbola",
+            "construction": self.construction,
+            "center": self.center.to_dict(),
+            "major_radius": self.major_radius,
+            "minor_radius": self.minor_radius,
+            "major_axis_angle_degrees": self.major_axis_angle_degrees,
+            "focus": self.focus.to_dict(),
+            "start": self.start.to_dict(),
+            "end": self.end.to_dict(),
+            "start_parameter": self.start_parameter,
+            "end_parameter": self.end_parameter,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchBSplineGeometry:
+    """Controlled B-spline geometry."""
+
+    index: int
+    construction: bool
+    poles: tuple[SketchPoint2D, ...]
+    weights: tuple[float, ...] | None
+    degree: int
+    periodic: bool
+    rational: bool
+    closed: bool
+    knot_sequence: tuple[float, ...]
+    start: SketchPoint2D
+    end: SketchPoint2D
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "index": self.index,
+            "type": "b_spline",
+            "construction": self.construction,
+            "poles": [pole.to_dict() for pole in self.poles],
+            "weights": None if self.weights is None else list(self.weights),
+            "degree": self.degree,
+            "periodic": self.periodic,
+            "rational": self.rational,
+            "closed": self.closed,
+            "knot_sequence": list(self.knot_sequence),
+            "start": self.start.to_dict(),
+            "end": self.end.to_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class UnsupportedSketchGeometry:
     """A valid FreeCAD geometry item outside the v1 public schema."""
 
@@ -1843,6 +2072,11 @@ SketchGeometry = (
     SketchLineGeometry
     | SketchCircleGeometry
     | SketchArcGeometry
+    | SketchEllipseGeometry
+    | SketchArcOfEllipseGeometry
+    | SketchArcOfParabolaGeometry
+    | SketchArcOfHyperbolaGeometry
+    | SketchBSplineGeometry
     | SketchPointGeometry
     | UnsupportedSketchGeometry
 )
@@ -3049,6 +3283,41 @@ class SketchRoundedRectangleCreationResult:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class SketchPolylineProfile:
+    """Verified semantic mapping for one connected sketch polyline."""
+
+    geometry_indices: tuple[int, ...]
+    constraint_indices: tuple[int, ...]
+    point_count: int
+    closed: bool = False
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "type": "polyline",
+            "geometry_indices": list(self.geometry_indices),
+            "constraint_indices": list(self.constraint_indices),
+            "point_count": self.point_count,
+            "closed": self.closed,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchPolylineCreationResult:
+    """Verified polyline with current sketch and document readback."""
+
+    profile: SketchPolylineProfile
+    sketch: SketchInspectionResult
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "profile": self.profile.to_dict(),
+            "sketch": self.sketch.to_dict(),
+            "document": self.document.to_dict(),
+        }
+
+
 __all__ = [
     "MAX_REGULAR_POLYGON_SIDE_COUNT",
     "MAX_SKETCH_CONSTRAINT_BATCH_SIZE",
@@ -3058,7 +3327,11 @@ __all__ = [
     "AngleLineConstraintInput",
     "ArcOfCircleGeometryInput",
     "ArcOfCircleGeometryUpdateInput",
+    "ArcOfEllipseGeometryInput",
+    "ArcOfHyperbolaGeometryInput",
+    "ArcOfParabolaGeometryInput",
     "AttachmentInfo",
+    "BSplineGeometryInput",
     "CenterRoundedRectanglePlacementInput",
     "ChamferSketchGeometryRequestInput",
     "CircleGeometryInput",
@@ -3082,6 +3355,7 @@ __all__ = [
     "DocumentHistorySnapshot",
     "DocumentHistoryTransaction",
     "DocumentSummary",
+    "EllipseGeometryInput",
     "EqualConstraintInput",
     "ExternalGeometryListResult",
     "ExternalGeometryMutationResult",
@@ -3145,8 +3419,12 @@ __all__ = [
     "SketchAnalysisRequestInput",
     "SketchAnalysisResult",
     "SketchArcGeometry",
+    "SketchArcOfEllipseGeometry",
+    "SketchArcOfHyperbolaGeometry",
+    "SketchArcOfParabolaGeometry",
     "SketchAttachmentData",
     "SketchAxisReferenceInput",
+    "SketchBSplineGeometry",
     "SketchBoundedArcProfile",
     "SketchCenterPointInput",
     "SketchCenteredRectangleCreationResult",
@@ -3174,6 +3452,7 @@ __all__ = [
     "SketchCreationResult",
     "SketchCurvedProfileJoin",
     "SketchDependencyInspectionResult",
+    "SketchEllipseGeometry",
     "SketchEquilateralTriangleRequestInput",
     "SketchFilletResult",
     "SketchGeometry",
@@ -3200,6 +3479,10 @@ __all__ = [
     "SketchPolygonProfile",
     "SketchPolygonVertex",
     "SketchPolygonVertexReference",
+    "SketchPolylineCreationResult",
+    "SketchPolylinePointInput",
+    "SketchPolylineProfile",
+    "SketchPolylineRequestInput",
     "SketchProfileAnalysisRequestInput",
     "SketchProfileBounds",
     "SketchProfileCenter",

@@ -17,7 +17,12 @@ from freecad_mcp.exceptions import (
 from freecad_mcp.freecad.history_guard import history_activity
 from freecad_mcp.models import (
     ArcOfCircleGeometryInput,
+    ArcOfEllipseGeometryInput,
+    ArcOfHyperbolaGeometryInput,
+    ArcOfParabolaGeometryInput,
+    BSplineGeometryInput,
     CircleGeometryInput,
+    EllipseGeometryInput,
     LineSegmentGeometryInput,
     PointGeometryInput,
     SketchGeometryAdditionResult,
@@ -200,6 +205,49 @@ def _build_geometry(item: SketchGeometryInput, part: Any, app: Any, index: int) 
             )
         if isinstance(item, PointGeometryInput):
             return part.Point(app.Vector(item.position.x, item.position.y, 0.0))
+        if isinstance(item, EllipseGeometryInput):
+            center_3d = app.Vector(item.center.x, item.center.y, 0.0)
+            angle_rad = math.radians(item.angle_xu_degrees % 180.0)
+            maj_dir = app.Vector(math.cos(angle_rad), math.sin(angle_rad), 0.0)
+            min_dir = app.Vector(-math.sin(angle_rad), math.cos(angle_rad), 0.0)
+            s1 = center_3d + maj_dir * item.major_radius
+            s2 = center_3d + min_dir * item.minor_radius
+            return part.Ellipse(s1, s2, center_3d)
+        if isinstance(item, ArcOfEllipseGeometryInput):
+            center_3d = app.Vector(item.center.x, item.center.y, 0.0)
+            angle_rad = math.radians(item.angle_xu_degrees % 180.0)
+            maj_dir = app.Vector(math.cos(angle_rad), math.sin(angle_rad), 0.0)
+            min_dir = app.Vector(-math.sin(angle_rad), math.cos(angle_rad), 0.0)
+            s1 = center_3d + maj_dir * item.major_radius
+            s2 = center_3d + min_dir * item.minor_radius
+            ellipse = part.Ellipse(s1, s2, center_3d)
+            start_rad = math.radians(item.start_parameter_degrees)
+            end_rad = math.radians(item.end_parameter_degrees)
+            return part.ArcOfEllipse(ellipse, start_rad, end_rad)
+        if isinstance(item, ArcOfParabolaGeometryInput):
+            focus_3d = app.Vector(item.focus.x, item.focus.y, 0.0)
+            vertex_3d = app.Vector(item.vertex.x, item.vertex.y, 0.0)
+            par = part.Parabola(focus_3d, vertex_3d, app.Vector(0.0, 0.0, 1.0))
+            return part.ArcOfParabola(par, item.start_parameter, item.end_parameter)
+        if isinstance(item, ArcOfHyperbolaGeometryInput):
+            center_3d = app.Vector(item.center.x, item.center.y, 0.0)
+            angle_rad = math.radians(item.major_axis_angle_degrees)
+            maj_dir = app.Vector(math.cos(angle_rad), math.sin(angle_rad), 0.0)
+            min_dir = app.Vector(-math.sin(angle_rad), math.cos(angle_rad), 0.0)
+            maj_pt = center_3d + maj_dir * item.major_radius
+            min_pt = center_3d + min_dir * item.minor_radius
+            hyp = part.Hyperbola(maj_pt, min_pt, center_3d)
+            return part.ArcOfHyperbola(hyp, item.start_parameter, item.end_parameter)
+        if isinstance(item, BSplineGeometryInput):
+            poles_3d = [app.Vector(p.x, p.y, 0.0) for p in item.poles]
+            bsp = part.BSplineCurve()
+            bsp.buildFromPoles(poles_3d, False, item.degree, False)
+            if item.weights is not None:
+                weights = list(item.weights)
+                if not all(abs(w - 1.0) < 1e-9 for w in weights):
+                    for i, w in enumerate(weights):
+                        bsp.setWeight(i + 1, w)
+            return bsp
     except Exception as exc:
         raise SketchGeometryCreationError(
             index=index,

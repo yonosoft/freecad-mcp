@@ -323,6 +323,21 @@ class Application:
             placement=placement,
         )
 
+    def create_sketch_polyline(
+        self,
+        document_name: object,
+        sketch_name: object,
+        points: object,
+        closed: object = False,
+    ) -> CommandResult:
+        """Create one verified semantic polyline through the shared handler."""
+        return self.documents.create_sketch_polyline.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            points=points,
+            closed=closed,
+        )
+
     def add_external_geometry(
         self,
         document_name: object,

@@ -65,6 +65,7 @@ from freecad_mcp.commands.sketch_polygon import (
     CreateSketchEquilateralTriangleHandler,
     CreateSketchRegularPolygonHandler,
 )
+from freecad_mcp.commands.sketch_polyline import CreateSketchPolylineHandler
 from freecad_mcp.commands.sketch_query import GetSketchHandler
 from freecad_mcp.commands.sketch_rectangle import CreateSketchRectangleHandler
 from freecad_mcp.commands.sketch_reference_constraints import (
@@ -110,6 +111,7 @@ class DocumentHandlers:
     create_sketch_regular_polygon: CreateSketchRegularPolygonHandler
     create_sketch_slot: CreateSketchSlotHandler
     create_sketch_rounded_rectangle: CreateSketchRoundedRectangleHandler
+    create_sketch_polyline: CreateSketchPolylineHandler
     add_external_geometry: AddExternalGeometryHandler
     list_external_geometry: ListExternalGeometryHandler
     remove_external_geometry: RemoveExternalGeometryHandler
@@ -155,6 +157,7 @@ __all__ = [
     "CreateSketchCenteredRectangleHandler",
     "CreateSketchEquilateralTriangleHandler",
     "CreateSketchHandler",
+    "CreateSketchPolylineHandler",
     "CreateSketchRectangleHandler",
     "CreateSketchRegularPolygonHandler",
     "CreateSketchRoundedRectangleHandler",

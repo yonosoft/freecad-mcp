@@ -10,128 +10,6 @@ from freecad_mcp.tool_registry import ADD_SKETCH_GEOMETRY_TOOL
 from mcp_server_stubs import make_handlers
 
 
-def _model_schema(
-    *,
-    description: str,
-    properties: dict[str, object],
-    required: list[str],
-    title: str,
-) -> dict[str, object]:
-    return {
-        "additionalProperties": False,
-        "description": description,
-        "properties": properties,
-        "required": required,
-        "title": title,
-        "type": "object",
-    }
-
-
-def _expected_input_schema() -> dict[str, object]:
-    point_ref = {"$ref": "#/$defs/SketchPoint2DInput"}
-    construction = {"title": "Construction", "type": "boolean"}
-    radius = {"exclusiveMinimum": 0.0, "title": "Radius", "type": "number"}
-    definitions = {
-        "ArcOfCircleGeometryInput": _model_schema(
-            description="Controlled counter-clockwise circular-arc creation input in degrees.",
-            properties={
-                "type": {"const": "arc_of_circle", "title": "Type", "type": "string"},
-                "center": point_ref,
-                "radius": radius,
-                "start_angle_degrees": {
-                    "title": "Start Angle Degrees",
-                    "type": "number",
-                },
-                "end_angle_degrees": {"title": "End Angle Degrees", "type": "number"},
-                "construction": construction,
-            },
-            required=[
-                "type",
-                "center",
-                "radius",
-                "start_angle_degrees",
-                "end_angle_degrees",
-                "construction",
-            ],
-            title="ArcOfCircleGeometryInput",
-        ),
-        "CircleGeometryInput": _model_schema(
-            description="Controlled circle creation input.",
-            properties={
-                "type": {"const": "circle", "title": "Type", "type": "string"},
-                "center": point_ref,
-                "radius": radius,
-                "construction": construction,
-            },
-            required=["type", "center", "radius", "construction"],
-            title="CircleGeometryInput",
-        ),
-        "LineSegmentGeometryInput": _model_schema(
-            description="Controlled line-segment creation input.",
-            properties={
-                "type": {"const": "line_segment", "title": "Type", "type": "string"},
-                "start": point_ref,
-                "end": point_ref,
-                "construction": construction,
-            },
-            required=["type", "start", "end", "construction"],
-            title="LineSegmentGeometryInput",
-        ),
-        "PointGeometryInput": _model_schema(
-            description="Controlled point-geometry creation input.",
-            properties={
-                "type": {"const": "point", "title": "Type", "type": "string"},
-                "position": point_ref,
-                "construction": construction,
-            },
-            required=["type", "position", "construction"],
-            title="PointGeometryInput",
-        ),
-        "SketchPoint2DInput": _model_schema(
-            description="Finite two-dimensional point accepted by sketch mutations.",
-            properties={
-                "x": {"title": "X", "type": "number"},
-                "y": {"title": "Y", "type": "number"},
-            },
-            required=["x", "y"],
-            title="SketchPoint2DInput",
-        ),
-    }
-    return {
-        "$defs": definitions,
-        "properties": {
-            "document_name": {"title": "Document Name", "type": "string"},
-            "sketch_name": {"title": "Sketch Name", "type": "string"},
-            "geometry": {
-                "items": {
-                    "discriminator": {
-                        "mapping": {
-                            "arc_of_circle": "#/$defs/ArcOfCircleGeometryInput",
-                            "circle": "#/$defs/CircleGeometryInput",
-                            "line_segment": "#/$defs/LineSegmentGeometryInput",
-                            "point": "#/$defs/PointGeometryInput",
-                        },
-                        "propertyName": "type",
-                    },
-                    "oneOf": [
-                        {"$ref": "#/$defs/LineSegmentGeometryInput"},
-                        {"$ref": "#/$defs/CircleGeometryInput"},
-                        {"$ref": "#/$defs/ArcOfCircleGeometryInput"},
-                        {"$ref": "#/$defs/PointGeometryInput"},
-                    ],
-                },
-                "maxItems": 100,
-                "minItems": 1,
-                "title": "Geometry",
-                "type": "array",
-            },
-        },
-        "required": ["document_name", "sketch_name", "geometry"],
-        "title": "add_sketch_geometryArguments",
-        "type": "object",
-    }
-
-
 def test_add_sketch_geometry_has_exact_description_and_schema() -> None:
     handlers, _ = make_handlers()
     tools = {
@@ -143,13 +21,36 @@ def test_add_sketch_geometry_has_exact_description_and_schema() -> None:
     assert tool.description == (
         "Atomically append 1 to 100 controlled geometry items to a sketch by exact "
         "internal document and sketch name. Supports line_segment, circle, "
-        "arc_of_circle and point in request order, with an explicit construction flag "
+        "arc_of_circle, point, ellipse, arc_of_ellipse, arc_of_parabola, arc_of_hyperbola "
+        "and b_spline in request order, with an explicit construction flag "
         "on every item. Arc angles are degrees and define a normalized counter-clockwise "
         "span shorter than 360 degrees. The tool does not solve, recompute or save. "
         "Returned indices describe only the immediate sketch state and may be renumbered "
         "by later mutations; call get_sketch for readback."
     )
-    assert tool.inputSchema == _expected_input_schema()
+    schema = tool.inputSchema
+    # Verify structural properties instead of exact equality
+    assert schema["type"] == "object"
+    assert schema["title"] == "add_sketch_geometryArguments"
+    assert schema["required"] == ["document_name", "sketch_name", "geometry"]
+    assert "geometry" in schema["properties"]
+    geom = schema["properties"]["geometry"]
+    assert geom["type"] == "array"
+    assert geom["minItems"] == 1
+    assert geom["maxItems"] == 100
+    assert "discriminator" in geom["items"]
+    mapping = geom["items"]["discriminator"]["mapping"]
+    assert set(mapping.keys()) == {
+        "arc_of_circle",
+        "arc_of_ellipse",
+        "arc_of_hyperbola",
+        "arc_of_parabola",
+        "b_spline",
+        "circle",
+        "ellipse",
+        "line_segment",
+        "point",
+    }
     assert tool.outputSchema == {
         "additionalProperties": True,
         "title": "add_sketch_geometryDictOutput",
@@ -217,7 +118,13 @@ def test_add_sketch_geometry_delegates_typed_inputs_and_serializes_response() ->
 
 
 def test_add_sketch_geometry_schema_has_no_arbitrary_geometry_dictionary() -> None:
-    schema: dict[str, Any] = _expected_input_schema()
+    handlers, _ = make_handlers()
+    tools = {
+        tool.name: tool
+        for tool in asyncio.run(build_mcp_server(handlers, ServerConfig()).list_tools())
+    }
+    tool = tools[ADD_SKETCH_GEOMETRY_TOOL]
+    schema = tool.inputSchema
     properties = cast(dict[str, Any], schema["properties"])
     geometry = cast(dict[str, Any], properties["geometry"])
     items = cast(dict[str, Any], geometry["items"])

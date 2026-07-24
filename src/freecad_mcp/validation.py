@@ -26,12 +26,17 @@ from freecad_mcp.models import (
     AngleBetweenLinesConstraintInput,
     ArcOfCircleGeometryInput,
     ArcOfCircleGeometryUpdateInput,
+    ArcOfEllipseGeometryInput,
+    ArcOfHyperbolaGeometryInput,
+    ArcOfParabolaGeometryInput,
+    BSplineGeometryInput,
     CircleGeometryInput,
     CircleGeometryUpdateInput,
     CoincidentConstraintInput,
     DistanceBetweenPointsConstraintInput,
     DistanceXBetweenPointsConstraintInput,
     DistanceYBetweenPointsConstraintInput,
+    EllipseGeometryInput,
     EqualConstraintInput,
     ExternalGeometrySourceInput,
     HorizontalPointsConstraintInput,
@@ -56,6 +61,7 @@ from freecad_mcp.models import (
     SketchHorizontalAxisReferenceInput,
     SketchMirrorReferenceInput,
     SketchPoint2DInput,
+    SketchPolylineRequestInput,
     SketchProfileAnalysisRequestInput,
     SketchRectangleRequestInput,
     SketchReferenceConstraintInput,
@@ -74,7 +80,12 @@ _EXTERNAL_SUBELEMENT_PATTERN = re.compile(r"(?:Edge|Vertex)[1-9][0-9]*\Z")
 _INTERNAL_NAME_RULE = "ASCII letter or underscore, followed by letters, digits, or underscores"
 _SUPPORTED_SKETCH_GEOMETRY_INPUT_TYPES = {
     "arc_of_circle",
+    "arc_of_ellipse",
+    "arc_of_hyperbola",
+    "arc_of_parabola",
+    "b_spline",
     "circle",
+    "ellipse",
     "line_segment",
     "point",
 }
@@ -124,6 +135,9 @@ _SKETCH_SLOT_REQUEST_ADAPTER: TypeAdapter[SketchSlotRequestInput] = TypeAdapter(
 )
 _SKETCH_ROUNDED_RECTANGLE_REQUEST_ADAPTER: TypeAdapter[SketchRoundedRectangleRequestInput] = (
     TypeAdapter(SketchRoundedRectangleRequestInput)
+)
+_SKETCH_POLYLINE_REQUEST_ADAPTER: TypeAdapter[SketchPolylineRequestInput] = TypeAdapter(
+    SketchPolylineRequestInput
 )
 _EXTERNAL_GEOMETRY_SOURCE_ADAPTER: TypeAdapter[ExternalGeometrySourceInput] = TypeAdapter(
     ExternalGeometrySourceInput
@@ -818,6 +832,113 @@ def validate_create_sketch_slot_request(
                 "reason": "slot_coordinate_overflow",
             },
         )
+    return parsed
+
+
+def validate_create_sketch_polyline_request(
+    document_name: object,
+    sketch_name: object,
+    points: object,
+    closed: object = False,
+) -> CommandResult | SketchPolylineRequestInput:
+    """Validate and parse one complete semantic polyline request."""
+    document_error = validate_document_reference(document_name)
+    if document_error is not None:
+        return document_error
+    sketch_error = _validate_object_name(
+        sketch_name,
+        field="sketch_name",
+        subject="Sketch",
+    )
+    if sketch_error is not None:
+        return sketch_error
+
+    try:
+        parsed = _SKETCH_POLYLINE_REQUEST_ADAPTER.validate_python(
+            {
+                "document_name": document_name,
+                "sketch_name": sketch_name,
+                "points": points,
+                "closed": closed,
+            }
+        )
+    except ValidationError as exc:
+        first_error = exc.errors(include_url=False)[0]
+        location = ".".join(str(item) for item in first_error.get("loc", ()))
+        return CommandResult.failure(
+            code="invalid_polyline_parameters",
+            message=(
+                "Polyline parameters must be strict, finite, and contain only the "
+                "documented fields."
+            ),
+            data={
+                "field": location or "request",
+                "reason": str(first_error.get("type", "invalid_parameters")),
+            },
+        )
+
+    point_count = len(parsed.points)
+    if parsed.closed:
+        if point_count < 3:
+            return CommandResult.failure(
+                code="invalid_polyline_parameters",
+                message="Closed polyline must have at least 3 points.",
+                data={
+                    "field": "points",
+                    "point_count": point_count,
+                    "reason": "closed_polyline_too_few_points",
+                },
+            )
+    else:
+        if point_count < 2:
+            return CommandResult.failure(
+                code="invalid_polyline_parameters",
+                message="Open polyline must have at least 2 points.",
+                data={
+                    "field": "points",
+                    "point_count": point_count,
+                    "reason": "open_polyline_too_few_points",
+                },
+            )
+    if point_count > 50:
+        return CommandResult.failure(
+            code="invalid_polyline_parameters",
+            message="Polyline must have at most 50 points.",
+            data={
+                "field": "points",
+                "point_count": point_count,
+                "reason": "polyline_too_many_points",
+            },
+        )
+
+    for index in range(point_count - 1):
+        p0 = parsed.points[index]
+        p1 = parsed.points[index + 1]
+        distance = math.hypot(p0.x - p1.x, p0.y - p1.y)
+        if distance < 1e-9:
+            return CommandResult.failure(
+                code="invalid_polyline_parameters",
+                message="Consecutive polyline points must be distinct.",
+                data={
+                    "field": f"points[{index}]",
+                    "reason": "consecutive_duplicate_points",
+                },
+            )
+
+    if parsed.closed:
+        p0 = parsed.points[0]
+        p1 = parsed.points[-1]
+        distance = math.hypot(p0.x - p1.x, p0.y - p1.y)
+        if distance <= 1e-9:
+            return CommandResult.failure(
+                code="invalid_polyline_parameters",
+                message="Closed polyline first and last points must be distinct.",
+                data={
+                    "field": "points",
+                    "reason": "closed_polyline_first_last_coincident",
+                },
+            )
+
     return parsed
 
 
@@ -1570,6 +1691,219 @@ def _validate_geometry_semantics(
                     "reason": "arc_angles_collapse",
                 },
             )
+        return None
+
+    if isinstance(item, (EllipseGeometryInput, ArcOfEllipseGeometryInput)):
+        if item.major_radius <= 0 or item.minor_radius <= 0:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Geometry item {index} has non-positive radii.",
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "ellipse_non_positive_radius",
+                },
+            )
+        if item.major_radius <= item.minor_radius:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Geometry item {index} major radius must exceed minor radius.",
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "ellipse_major_radius_not_greater",
+                },
+            )
+        if isinstance(item, ArcOfEllipseGeometryInput):
+            raw_delta = item.end_parameter_degrees - item.start_parameter_degrees
+            if abs(raw_delta) >= 360.0 - 1e-9:
+                return CommandResult.failure(
+                    code="validation_error",
+                    message=f"Geometry item {index} is a full-turn or multi-turn arc of ellipse.",
+                    data={
+                        "field": f"geometry[{index}]",
+                        "geometry_index": index,
+                        "reason": "full_turn_or_multi_turn_arc",
+                    },
+                )
+            start_norm = item.start_parameter_degrees % 360.0
+            end_norm = item.end_parameter_degrees % 360.0
+            sweep = (end_norm - start_norm) % 360.0
+            if sweep <= 1e-9:
+                return CommandResult.failure(
+                    code="validation_error",
+                    message=f"Geometry item {index} has a zero-length arc of ellipse.",
+                    data={
+                        "field": f"geometry[{index}]",
+                        "geometry_index": index,
+                        "reason": "zero_length_arc",
+                    },
+                )
+        return None
+
+    if isinstance(item, ArcOfParabolaGeometryInput):
+        if not (-100.0 <= item.start_parameter <= 100.0):
+            return CommandResult.failure(
+                code="validation_error",
+                message=(
+                    f"Geometry item {index} start_parameter "
+                    f"{item.start_parameter} is outside [-100, 100]."
+                ),
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "parameter_out_of_range",
+                },
+            )
+        if not (-100.0 <= item.end_parameter <= 100.0):
+            return CommandResult.failure(
+                code="validation_error",
+                message=(
+                    f"Geometry item {index} end_parameter "
+                    f"{item.end_parameter} is outside [-100, 100]."
+                ),
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "parameter_out_of_range",
+                },
+            )
+        if abs(item.start_parameter - item.end_parameter) <= 1e-9:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Geometry item {index} has a zero-length arc of parabola.",
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "zero_length_arc",
+                },
+            )
+        if math.hypot(item.focus.x - item.vertex.x, item.focus.y - item.vertex.y) <= 1e-9:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Geometry item {index} focus and vertex are too close.",
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "parabola_degenerate_focus_vertex",
+                },
+            )
+        return None
+
+    if isinstance(item, ArcOfHyperbolaGeometryInput):
+        if item.major_radius <= 0 or item.minor_radius <= 0:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Geometry item {index} has non-positive radii.",
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "hyperbola_non_positive_radius",
+                },
+            )
+        if not (-5.0 <= item.start_parameter <= 5.0):
+            return CommandResult.failure(
+                code="validation_error",
+                message=(
+                    f"Geometry item {index} start_parameter "
+                    f"{item.start_parameter} is outside [-5, 5]."
+                ),
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "parameter_out_of_range",
+                },
+            )
+        if not (-5.0 <= item.end_parameter <= 5.0):
+            return CommandResult.failure(
+                code="validation_error",
+                message=(
+                    f"Geometry item {index} end_parameter {item.end_parameter} is outside [-5, 5]."
+                ),
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "parameter_out_of_range",
+                },
+            )
+        if abs(item.start_parameter - item.end_parameter) <= 1e-9:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Geometry item {index} has a zero-length arc of hyperbola.",
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "zero_length_arc",
+                },
+            )
+        return None
+
+    if isinstance(item, BSplineGeometryInput):
+        if item.degree < 1 or item.degree > 12:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Geometry item {index} degree must be between 1 and 12.",
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "b_spline_degree_out_of_range",
+                },
+            )
+        pole_count = len(item.poles)
+        if pole_count < item.degree + 1:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Geometry item {index} has too few poles for its degree.",
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "b_spline_too_few_poles",
+                },
+            )
+        if pole_count > 50:
+            return CommandResult.failure(
+                code="validation_error",
+                message=f"Geometry item {index} has too many poles.",
+                data={
+                    "field": f"geometry[{index}]",
+                    "geometry_index": index,
+                    "reason": "b_spline_too_many_poles",
+                },
+            )
+        for position in range(pole_count - 1):
+            p0 = item.poles[position]
+            p1 = item.poles[position + 1]
+            if math.hypot(p0.x - p1.x, p0.y - p1.y) <= 1e-9:
+                return CommandResult.failure(
+                    code="validation_error",
+                    message=f"Geometry item {index} has duplicate adjacent poles.",
+                    data={
+                        "field": f"geometry[{index}]",
+                        "geometry_index": index,
+                        "reason": "b_spline_adjacent_duplicate_poles",
+                    },
+                )
+        if item.weights is not None:
+            if len(item.weights) != pole_count:
+                return CommandResult.failure(
+                    code="validation_error",
+                    message=f"Geometry item {index} weights length must match poles.",
+                    data={
+                        "field": f"geometry[{index}]",
+                        "geometry_index": index,
+                        "reason": "b_spline_weights_length_mismatch",
+                    },
+                )
+            if any(weight <= 0 for weight in item.weights):
+                return CommandResult.failure(
+                    code="validation_error",
+                    message=f"Geometry item {index} weights must be positive.",
+                    data={
+                        "field": f"geometry[{index}]",
+                        "geometry_index": index,
+                        "reason": "b_spline_non_positive_weight",
+                    },
+                )
         return None
 
     if isinstance(item, (CircleGeometryInput, PointGeometryInput)):
@@ -2375,6 +2709,7 @@ __all__ = [
     "validate_create_document_request",
     "validate_create_sketch_centered_rectangle_request",
     "validate_create_sketch_equilateral_triangle_request",
+    "validate_create_sketch_polyline_request",
     "validate_create_sketch_rectangle_request",
     "validate_create_sketch_regular_polygon_request",
     "validate_create_sketch_request",

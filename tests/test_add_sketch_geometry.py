@@ -22,6 +22,7 @@ from freecad_mcp.models import (
     MAX_SKETCH_GEOMETRY_BATCH_SIZE,
     ArcOfCircleGeometryInput,
     CircleGeometryInput,
+    EllipseGeometryInput,
     LineSegmentGeometryInput,
     PointGeometryInput,
     SketchGeometryAdditionResult,
@@ -174,7 +175,7 @@ def test_geometry_batch_rejects_unsupported_discriminator() -> None:
     result = validate_add_sketch_geometry_request(
         "Bracket",
         "Sketch",
-        [{"type": "ellipse", "construction": False}],
+        [{"type": "unknown_type", "construction": False}],
     )
 
     assert isinstance(result, CommandResult)
@@ -182,9 +183,39 @@ def test_geometry_batch_rejects_unsupported_discriminator() -> None:
     assert result.data == {
         "field": "geometry[0].type",
         "geometry_index": 0,
-        "actual_value": "ellipse",
-        "allowed": ["arc_of_circle", "circle", "line_segment", "point"],
+        "actual_value": "unknown_type",
+        "allowed": [
+            "arc_of_circle",
+            "arc_of_ellipse",
+            "arc_of_hyperbola",
+            "arc_of_parabola",
+            "b_spline",
+            "circle",
+            "ellipse",
+            "line_segment",
+            "point",
+        ],
     }
+
+
+def test_geometry_batch_accepts_ellipse_discriminator() -> None:
+    result = validate_add_sketch_geometry_request(
+        "Bracket",
+        "Sketch",
+        [
+            {
+                "type": "ellipse",
+                "center": {"x": 0.0, "y": 0.0},
+                "major_radius": 15.0,
+                "minor_radius": 7.0,
+                "construction": False,
+            }
+        ],
+    )
+
+    assert isinstance(result, tuple)
+    assert len(result) == 1
+    assert isinstance(result[0], EllipseGeometryInput)
 
 
 @pytest.mark.parametrize(

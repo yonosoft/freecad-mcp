@@ -22,10 +22,10 @@ def _server() -> Any:
     return build_mcp_server(handlers, ServerConfig())
 
 
-def test_constraint_expression_tools_are_exactly_tools_thirty_six_through_thirty_nine() -> None:
+def test_constraint_expression_tools_are_exactly_tools_thirty_seven_through_forty() -> None:
     names = [tool.name for tool in asyncio.run(_server().list_tools())]
 
-    assert names[35:39] == [
+    assert names[36:40] == [
         SET_SKETCH_CONSTRAINT_NAME_TOOL,
         SET_SKETCH_CONSTRAINT_EXPRESSION_TOOL,
         CLEAR_SKETCH_CONSTRAINT_EXPRESSION_TOOL,

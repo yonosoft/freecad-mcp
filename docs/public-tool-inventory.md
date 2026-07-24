@@ -1,6 +1,6 @@
 # Public MCP Tool Inventory
 
-The authoritative registry contains exactly 53 public tools. The names and
+The authoritative registry contains exactly 54 public tools. The names and
 order below mirror `src/freecad_mcp/tool_registry.py`; repository consistency
 tests prevent the registry, runtime registration, and this inventory from
 drifting apart.
@@ -26,7 +26,8 @@ drifting apart.
 19. `create_sketch_regular_polygon`
 20. `create_sketch_slot`
 21. `create_sketch_rounded_rectangle`
-22. `analyze_sketch`
+22. `create_sketch_polyline`
+23. `analyze_sketch`
 23. `validate_sketch_profile`
 24. `list_sketch_open_vertices`
 25. `add_external_geometry`

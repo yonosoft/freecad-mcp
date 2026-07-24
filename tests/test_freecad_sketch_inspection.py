@@ -68,7 +68,33 @@ class Point:
 
 
 class BSplineCurve:
-    pass
+    def __init__(self) -> None:
+        self.Degree = 3
+        self.KnotSequence = [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+        self.StartPoint = Vector(0.0, 0.0)
+        self.EndPoint = Vector(10.0, 0.0)
+        self.FirstParameter = 0.0
+        self.LastParameter = 1.0
+
+    def getPoles(self) -> list[Vector]:
+        return [
+            Vector(0.0, 0.0),
+            Vector(3.0, 8.0),
+            Vector(7.0, 3.0),
+            Vector(10.0, 0.0),
+        ]
+
+    def getWeights(self) -> list[float]:
+        return [1.0, 1.0, 1.0, 1.0]
+
+    def isPeriodic(self) -> bool:
+        return False
+
+    def isRational(self) -> bool:
+        return False
+
+    def isClosed(self) -> bool:
+        return False
 
 
 class ConstraintStub:
@@ -231,7 +257,7 @@ def test_get_sketch_serializes_supported_and_unsupported_items(
     assert result["units"] == {"length": "millimeter", "angle": "degree"}
     assert result["geometry_count"] == 5
     assert result["external_geometry_count"] == 1
-    assert result["unsupported_geometry_count"] == 1
+    assert result["unsupported_geometry_count"] == 0
     assert result["constraint_count"] == 7
     assert result["unsupported_constraint_count"] == 1
     assert result["geometry"] == [
@@ -268,9 +294,22 @@ def test_get_sketch_serializes_supported_and_unsupported_items(
         },
         {
             "index": 4,
-            "type": "unsupported",
+            "type": "b_spline",
             "construction": False,
-            "freecad_type": "BSplineCurve",
+            "poles": [
+                {"x": 0.0, "y": 0.0},
+                {"x": 3.0, "y": 8.0},
+                {"x": 7.0, "y": 3.0},
+                {"x": 10.0, "y": 0.0},
+            ],
+            "weights": None,
+            "degree": 3,
+            "periodic": False,
+            "rational": False,
+            "closed": False,
+            "knot_sequence": [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+            "start": {"x": 0.0, "y": 0.0},
+            "end": {"x": 10.0, "y": 0.0},
         },
     ]
     serialized_constraints = result["constraints"]

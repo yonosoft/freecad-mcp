@@ -64,6 +64,7 @@ from freecad_mcp.commands.sketch_constraint_state import (
     SetSketchConstraintDrivingHandler,
     SetSketchConstraintVirtualSpaceHandler,
 )
+from freecad_mcp.commands.sketch_polyline import CreateSketchPolylineHandler
 from freecad_mcp.exceptions import SketchConstraintStateUnsafeError
 from freecad_mcp.freecad import sketch_topology
 from freecad_mcp.models import (
@@ -105,6 +106,9 @@ from freecad_mcp.models import (
     SketchPolygonProfile,
     SketchPolygonVertex,
     SketchPolygonVertexReference,
+    SketchPolylineCreationResult,
+    SketchPolylineProfile,
+    SketchPolylineRequestInput,
     SketchProfileAnalysisRequestInput,
     SketchProfileCenter,
     SketchProfilePointReference,
@@ -172,6 +176,7 @@ class AdapterStub:
         self.create_sketch_polygon_calls: list[SketchSemanticPolygonRequest] = []
         self.create_sketch_slot_calls: list[SketchSlotRequestInput] = []
         self.create_sketch_rounded_rectangle_calls: list[SketchRoundedRectangleRequestInput] = []
+        self.create_sketch_polyline_calls: list[SketchPolylineRequestInput] = []
         self.add_external_geometry_calls: list[tuple[str, str, ExternalGeometrySourceInput]] = []
         self.list_external_geometry_calls: list[tuple[str, str]] = []
         self.remove_external_geometry_calls: list[tuple[str, str, int]] = []
@@ -1029,6 +1034,27 @@ class AdapterStub:
             ),
         )
 
+    def create_sketch_polyline(
+        self,
+        request: SketchPolylineRequestInput,
+    ) -> SketchPolylineCreationResult:
+        self.create_sketch_polyline_calls.append(request)
+        point_count = len(request.points)
+        segment_count = point_count if request.closed else point_count - 1
+        junction_count = segment_count if request.closed else segment_count - 1
+        geometry_indices = tuple(range(segment_count))
+        constraint_indices = tuple(range(junction_count))
+        return SketchPolylineCreationResult(
+            profile=SketchPolylineProfile(
+                geometry_indices=geometry_indices,
+                constraint_indices=constraint_indices,
+                point_count=point_count,
+                closed=request.closed,
+            ),
+            sketch=self.get_sketch(request.document_name, request.sketch_name),
+            document=self.document,
+        )
+
     def set_sketch_constraint_driving(
         self,
         document_name: str,
@@ -1135,6 +1161,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
                 actual_adapter,
                 dispatcher,
             ),
+            create_sketch_polyline=CreateSketchPolylineHandler(actual_adapter, dispatcher),
             add_external_geometry=AddExternalGeometryHandler(actual_adapter, dispatcher),
             list_external_geometry=ListExternalGeometryHandler(actual_adapter, dispatcher),
             remove_external_geometry=RemoveExternalGeometryHandler(actual_adapter, dispatcher),

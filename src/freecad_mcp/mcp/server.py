@@ -37,6 +37,7 @@ from freecad_mcp.mcp.sketch_geometry_transform_tools import (
     register_sketch_geometry_transform_tools,
 )
 from freecad_mcp.mcp.sketch_polygon_tools import register_sketch_polygon_tools
+from freecad_mcp.mcp.sketch_polyline_tools import register_create_sketch_polyline_tool
 from freecad_mcp.mcp.sketch_rectangle_tools import register_create_sketch_rectangle_tool
 from freecad_mcp.mcp.sketch_reference_constraint_tools import (
     register_sketch_reference_constraint_tool,
@@ -127,6 +128,7 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_create_sketch_centered_rectangle_tool(server, handlers)
     register_sketch_polygon_tools(server, handlers)
     register_sketch_curved_profile_tools(server, handlers)
+    register_create_sketch_polyline_tool(server, handlers)
     register_sketch_analysis_tools(server, handlers)
     register_sketch_external_geometry_tools(server, handlers)
     register_sketch_removal_tools(server, handlers)
