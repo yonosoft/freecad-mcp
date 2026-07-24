@@ -184,34 +184,201 @@ documents.
 
 ## Development Workflow
 
-1. Read this file and relevant permanent documentation.
-2. Inspect repository state, connected tools, and affected architecture.
-3. Make the smallest coherent change.
-4. Run focused tests first.
-5. Run focused Ruff, formatting, and strict Mypy checks.
-6. Run native probes or smoke only when FreeCAD behavior is involved.
-7. Review the complete diff.
-8. Run the complete quality gate once at task or milestone completion.
-9. Run `git diff --check` and inspect `git status`.
-10. Report exact results and remaining uncertainty.
+### Repository verification
 
-Do not rerun completed historical campaigns unnecessarily.
+At the start of a milestone or replacement session:
 
-Do not weaken tests, schemas, verification, rollback, or refusal behavior to
-make an implementation pass.
+- read this file completely;
+- inspect Git status, branch, HEAD, and recent history;
+- confirm the current test baseline and public tool count;
+- inspect relevant architecture, implementation, and tests;
+- identify unexpected tracked, staged, or disposable files before editing.
 
-Keep README and permanent documentation synchronized with public or
-architectural changes.
+Do not rely solely on prior conversation summaries.
+
+### Discovery and contract
+
+Before implementation:
+
+- identify the smallest coherent scope;
+- inspect existing architecture and native FreeCAD behavior where relevant;
+- define public schemas, validation, mutation behavior, rollback, persistence, tests, risks, and deferrals;
+- freeze the contract;
+- stop for user approval before implementation.
+
+### Bounded slices
+
+Each implementation slice must define:
+
+- one bounded purpose;
+- exact files permitted;
+- exact required behavior;
+- explicit exclusions;
+- focused test requirements;
+- completion criteria;
+- a stop-and-report boundary.
+
+Do not send an entire large milestone as one unrestricted implementation request.
+
+After each slice:
+
+- make the smallest coherent change;
+- inspect the actual complete diff;
+- compare it with the approved scope;
+- reject unrelated edits;
+- reconcile the real changed-file list;
+- reconcile test-count changes;
+- run focused tests first;
+- run focused Ruff, formatting, and strict Mypy checks;
+- report files changed, tests, native evidence, Git state, and unresolved risks;
+- stop before the next slice.
+
+A completion report is not authoritative until verified against the repository and test output. Run native probes or smoke only when FreeCAD behavior is involved. Do not rerun completed historical campaigns unnecessarily. Do not weaken tests, schemas, verification, rollback, or refusal behavior to make an implementation pass.
+
+### Session continuity
+
+Continue in the same session across related slices when:
+
+- the session remains accessible;
+- context remains accurate;
+- the frozen contract is still understood;
+- the cumulative diff and baseline are known.
+
+At each slice boundary restate:
+
+- approved scope;
+- current test baseline;
+- cumulative changed files;
+- unresolved risks;
+- explicit exclusions.
+
+Start a new session when:
+
+- the current session is unavailable or corrupted;
+- context has become unreliable;
+- a new milestone begins;
+- independent review or acceptance begins.
+
+Use a concise self-contained handover containing:
+
+- verified repository baseline;
+- frozen contract;
+- completed slices;
+- cumulative changed files;
+- current test and quality state;
+- exact immediate task;
+- explicit exclusions.
+
+Do not copy an entire long conversation when a reliable handover can be produced.
+
+### Editing constraints
+
+For every bounded edit request specify:
+
+- exact files allowed;
+- exact changes required;
+- explicit exclusions;
+- required tests;
+- no Git publication actions;
+- no FreeCAD installation or restart actions;
+- disposable-file location.
+
+Prohibit:
+
+- unrelated cleanup;
+- broad refactoring;
+- formatting churn;
+- unrequested renaming;
+- staging or committing;
+- pushing or deployment;
+- package-manager or installer use;
+- modifying FreeCAD installation directories;
+- `git add -f`;
+- disposable files outside `workdir/`.
+
+All disposable probes must be placed under `workdir/`. `workdir/` must be empty before the final milestone gate.
+
+### Testing requirements
+
+Production changes require permanent regression tests.
+
+Native runtime discoveries that affect behavior require permanent regression coverage where practical.
+
+Stubs must exercise production paths rather than reimplementing the behavior being tested.
+
+Monkeypatches must be scoped, restored automatically, and independent of test order.
+
+Test reports must use exact counts. Do not report approximate test totals.
+
+### Canonical local gate
+
+The canonical gate is:
+
+```
+python scripts/ci.py
+```
+
+Do not substitute reduced commands such as `mypy src/`. The canonical Mypy configuration checks both `src/freecad_mcp` and `tests`. At the current Milestone 28 baseline, Mypy reports 199 checked files.
+
+After the canonical gate run, inspect the complete diff and verify Git state:
+
+```
+git diff --check
+git status --short --branch
+git diff --stat
+git diff --name-status
+git diff --cached --name-status
+```
+
+If any tracked file changes after the final canonical gate begins, rerun the full canonical gate.
+
+### Publication and runtime boundary
+
+Stop before:
+
+- staging;
+- committing;
+- pushing;
+- deployment;
+- FreeCAD installation changes;
+- FreeCAD startup or restart.
+
+These actions remain user-controlled.
+
+### Independent live acceptance
+
+After deployment and restart are confirmed, perform final acceptance in a fresh test context through the deployed public MCP endpoint.
+
+Acceptance must:
+
+- avoid implementation changes;
+- record exact requests and responses;
+- test the public schemas and behavior;
+- verify native FreeCAD effects;
+- return `PASS`, `FAIL`, or `INCONCLUSIVE`;
+- report failures without attempting repairs.
+
+Native adapter tests do not replace public MCP acceptance.
+
+Keep README and permanent documentation synchronized with public or architectural changes.
 
 ## Delegation
 
-The lead agent owns discovery, contract decisions, transaction design, semantic
-review, test strategy, and final acceptance.
+The default workflow is a Python Engineer with Aider enabled.
 
-Delegate only bounded implementation after the native behavior and public
-contract are frozen.
+### Bounded implementation slices
 
-Delegated agents must not:
+Delegate implementation as bounded slices after the native behavior and public contract are frozen. Each slice must specify:
+
+- one bounded purpose;
+- exact files permitted;
+- exact required behavior;
+- explicit exclusions;
+- focused test requirements;
+- completion criteria;
+- a stop-and-report boundary.
+
+Delegated implementation must not:
 
 - redesign the frozen contract;
 - weaken validation, verification, rollback, or refusal behavior;
@@ -220,7 +387,21 @@ Delegated agents must not:
 - edit outside the active repository or task worktree;
 - commit or push without explicit authorization.
 
-Review every meaningful delegated diff before proceeding.
+Review every delegated diff before proceeding.
+
+### Session continuity
+
+One healthy session may continue across related slices. Use a concise self-contained handover when a session must be replaced.
+
+Handovers must contain:
+
+- verified repository baseline;
+- frozen contract;
+- completed slices and cumulative changed files;
+- current test and quality state;
+- exact immediate task and explicit exclusions.
+
+---
 
 ## Change Control
 
@@ -229,6 +410,8 @@ Review every meaningful delegated diff before proceeding.
 - Do not perform destructive file operations, install packages, or alter
   machine-wide configuration without explicit approval.
 - Do not modify unrelated repositories or workspaces.
+- Do not use `git add -f`.
+- Do not modify FreeCAD installation directories or restart FreeCAD.
 - Prefer focused patches over broad rewrites.
 - Never commit secrets, local paths, caches, virtual environments, temporary
   probes, or FreeCAD user data.

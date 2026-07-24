@@ -55,6 +55,18 @@ per-user package target:
 This target is the location used by FreeCAD's Addon Manager. It is not the
 project `.venv` and does not modify `Program Files`.
 
+## Development Workflow
+
+The full development workflow is defined in `AGENTS.md`. Key points:
+
+- **Bounded slices**: each implementation change is one bounded slice with exact files, exclusions, tests, and a stop-and-report boundary.
+- **Canonical gate**: `python scripts/ci.py` is the single local quality entry point. Do not substitute reduced commands. At Milestone 28, Mypy checks 199 source files and 1885 tests pass.
+- **Disposable probes**: place under `workdir/`; keep permanent tests and implementation outside it.
+- **Git and runtime**: stop before staging, committing, pushing, deployment, FreeCAD installation changes, or restart. These are user-controlled actions.
+- **Live acceptance**: independent public MCP endpoint acceptance is separate from native adapter tests.
+
+Refer to `AGENTS.md` for slice boundaries, session continuity, handovers, editing constraints, and the complete publication boundary.
+
 ## Eclipse/PyDev
 
 Configure PyDev with standalone Python 3.11, preferably the project venv:
