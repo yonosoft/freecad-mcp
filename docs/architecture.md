@@ -224,9 +224,9 @@ geometry add/list/remove and sketch dependency inspection.
 `mcp.sketch_constraint_expression_tools` explicitly appends constraint naming,
 expression set/clear, and expression listing as tools 36–39.
 `mcp.sketch_topology_editing_tools` appends trim, split, and extend as tools
-40–42. `mcp.sketch_geometry_transform_tools` appends the six copy-only
-transform tools at 43–48. `mcp.sketch_constraint_state_tools` appends driving,
-active, and virtual-space state management as tools 49–51.
+41–43. `mcp.sketch_geometry_transform_tools` appends the six copy-only selected-geometry
+transform tools at 46–51. `mcp.sketch_constraint_state_tools` appends driving,
+active, and virtual-space state management as tools 52–54.
 `mcp.server` is the small composition
 module that constructs FastMCP and invokes those registration functions in
 authoritative tool-registry order. `get_sketch` remains exactly tool ten,
@@ -244,8 +244,9 @@ exactly tools eighteen and nineteen; `create_sketch_slot` and
 and `get_sketch_dependencies` are exactly tools twenty-five through
 twenty-eight; removal/construction tools are 29–31, editing tools are 32–34,
 reference-constraint addition is 35, constraint name/expression tools are
-36–39, topology-editing tools are 40–42, geometry-transform tools are 43–48,
-and constraint-state tools are 49–51.
+36–39, topology-editing tools are 41–43, geometry-transform tools are 46–51,
+and constraint-state tools are 52–54.
+whole-sketch transform tools are 55–58.
 No registration loop is used.
 Registration modules depend on handlers and the tool registry, never on the
 concrete FreeCAD adapter.
@@ -254,7 +255,7 @@ A dependency-free tool registry is the authoritative source for tool names and
 ordering. FastMCP registration and lifecycle status both consume that registry,
 so reported capabilities cannot drift from the registered set.
 
-The registry currently exposes exactly 54 public tools. The maintained
+The registry currently exposes exactly 58 public tools. The maintained
 [public tool inventory](public-tool-inventory.md) records their exact names and
 order without duplicating registration definitions in architecture prose.
 
@@ -2064,8 +2065,8 @@ direction. The full capability contract is maintained in
 
 ## Sketch Topology-Editing Boundary
 
-Milestone 23 appends three explicit tools at positions 40–42 without changing
-the first 39:
+Milestone 23 appends three explicit tools at positions 41–43 without changing
+the first 40:
 
 ```text
 mcp/sketch_topology_editing_tools.py
@@ -2168,8 +2169,8 @@ The permanent capability matrix is
 
 ## Sketch Geometry-Transform Boundary
 
-Milestone 24 appends six explicit tools at positions 43–48 without changing the
-first 42:
+Milestone 24 appends six explicit tools at positions 46–51 without changing the
+first 45:
 
 ```text
 mcp/sketch_geometry_transform_tools.py
@@ -2258,8 +2259,37 @@ The frozen public matrix, request rules, error taxonomy, transaction labels,
 and response shape are summarized in the README and enforced by focused tests.
 Isolated evidence is in `scripts/probe_sketch_geometry_transforms.py`; the
 permanent production-adapter campaign is
-`scripts/smoke_sketch_geometry_transforms.py`. Whole-sketch and cross-sketch
-transforms remain deferred to Milestone 28.
+`scripts/smoke_sketch_geometry_transforms.py`. Whole-sketch and cross-sketch transforms were deferred to Milestone 28 and are now implemented.
+
+## Milestone 28 — Whole-Sketch Copy-Only Transforms
+
+Milestone 28 appends four explicit tools at positions 55–58 without changing the first 54:
+
+```text
+mcp/sketch_whole_transform_tools.py
+-> commands/sketch_geometry_transforms.py
+   (TranslateSketchHandler, RotateSketchHandler,
+    ScaleSketchHandler, MirrorSketchHandler)
+-> SketchGeometryTransformAdapter protocol
+-> FreeCADDocumentAdapter
+-> freecad/sketch_geometry_transforms.py
+   (_execute_copy shared mutation engine)
+-> native addGeometry of controlled affine reconstructions
+-> controlled readback, mapping, and transaction verification
+-> SketchGeometryTransformResult
+```
+
+Each tool enumerates every internal geometry element, classifies each as supported or unsupported by the shared whitelist, and refuses the complete operation when any element is unsupported. Supported families are line segment, point, circle, circular arc, and their construction counterparts. There is no geometry_indices field.
+
+The shared _execute_copy engine constructs one affine copy per source element in deterministic source-index order, appends them, recomputes, verifies semantic readback, commits one owned transaction, and returns the reused SketchGeometryTransformResult. Originals keep exact current indices; copies are appended. Constraints, expressions, and names are never copied. Sketch placement, attachment, offset, and map mode are preserved.
+
+Mirror references are limited to horizontal_axis, vertical_axis, and origin. Construction-line and internal-point references are rejected. Translation, rotation, and uniform scaling semantics match the existing selected-geometry contracts.
+
+Owned operations open one named transaction per sketch and commit only after full semantic verification. Caller-owned transactions remain open. Refusals and invariant no-change results open no transaction. No operation saves automatically.
+
+Success codes are sketch_translated, sketch_rotated, sketch_scaled, and sketch_mirrored. The frozen public contract, request rules, and exact deferrals are summarized in the README and enforced by focused tests. Isolated native evidence was collected against FreeCAD 1.1.2.
+
+Existing selected-geometry transform tools (46–51) and schemas remain unchanged.
 
 ## Test Ownership
 
@@ -2301,7 +2331,7 @@ collecting all adapter or transport behavior in single modules:
   tool 35 has exact schema, order, and no-chaining coverage in
   `tests/test_mcp_sketch_reference_constraint_tools.py`; tools 36–39 have strict
   schema, order, description, and delegation coverage in
-  `tests/test_mcp_sketch_constraint_expression_tools.py`; tools 40–42 have
+  `tests/test_mcp_sketch_constraint_expression_tools.py`; tools 41–43 have
   strict schema, order, description, and typed delegation coverage in
   `tests/test_mcp_sketch_topology_editing_tools.py`;
   server composition, authoritative

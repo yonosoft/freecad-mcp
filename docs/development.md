@@ -107,6 +107,8 @@ Use these practices:
 - do not add the whole FreeCAD installation to the standalone interpreter unless
   a tested local setup proves compatible.
 
+The verified FreeCAD runtime for Milestone 28 acceptance is FreeCAD 1.1.2.
+
 ## Development Install
 
 Current Windows development uses a PowerShell script and a directory junction:
@@ -168,6 +170,10 @@ The canonical quality gate on every platform is:
    python scripts/ci.py
 
 ```
+
+It is the single entry point: compile, Ruff lint, Ruff formatting, Mypy, and Pytest in that order.
+
+The current Milestone 28 baseline is Mypy checking 199 source files and 1885 tests passing.
 
 GitHub uses an Ubuntu hosted runner. Codeberg uses Forgejo Actions: enable the
 repository's **Actions** unit and provide a repository or organization runner
@@ -2260,7 +2266,7 @@ restart, public acceptance, commit, push, or milestone closure.
 
 ## Milestone 24 Geometry-Transform Verification
 
-Tools 43–48 add bounded copy-only mirror, translation, rotation, uniform scale,
+Tools 46–51 add bounded copy-only mirror, translation, rotation, uniform scale,
 rectangular-array, and polar-array operations. Use the exact FreeCAD embedded
 runtime for discovery and all native verification:
 
@@ -2351,6 +2357,17 @@ neighbors:
 & $FreeCADPython ".\scripts\smoke_sketch_topology_editing.py"
 & $FreeCADPython ".\scripts\smoke_sketch_external_geometry.py"
 ```
+
+The Milestone 28 native FreeCAD 1.1.2 verification script is
+`scripts/smoke_sketch_whole_transforms.py`. Run it with the embedded Python
+interpreter. It covers translate, rotate, scale, and all three mirror references
+on complete sketches; construction flag preservation; native undo/redo;
+caller-owned transaction behavior; no-auto-save; existing-file hash
+preservation; and save/reopen semantic parity.
+
+The final public acceptance boundary is the live MCP endpoint at
+`http://127.0.0.1:8765/mcp` after a human-controlled FreeCAD restart. No
+agent-controlled FreeCAD installation changes are performed.
 
 Finish with `git diff --check`, a complete architecture/mapping/transaction/
 error-leakage review, and `git status --short --branch`. Local verification does

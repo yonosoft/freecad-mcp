@@ -14,7 +14,7 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- 54 typed MCP tools for document creation, inspection, saving,
+- 58 typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
@@ -24,7 +24,7 @@ Current capabilities include:
   external geometry, read-only sketch dependency inspection, controlled sketch
   removal/construction state, precise sketch geometry/constraint editing, and
   evidence-bounded line-segment trim, split, and extend, plus bounded copy-only
-  mirror, translation, rotation, uniform scaling, and array transforms, plus
+  mirror, translation, rotation, uniform scaling, and array transforms, whole-sketch copy-only translation, rotation, uniform scaling, and mirror, plus
   controlled driving/reference, active/inactive, and virtual-space constraint
   state;
 - shared handlers used by both MCP and FreeCAD GUI adapters;
@@ -110,11 +110,9 @@ Restart FreeCAD, select **MCP**, and use **Start Server**, **Stop Server**, or
 }
 ```
 
-The exact 54 tool names and order are defined by the authoritative
+The exact 58 tool names and order are defined by the authoritative
 `src/freecad_mcp/tool_registry.py` registry and listed in the
-[public tool inventory](docs/public-tool-inventory.md). Tools 51–53 are
-`set_sketch_constraint_driving`, `set_sketch_constraint_active`, and
-`set_sketch_constraint_virtual_space`.
+[public tool inventory](docs/public-tool-inventory.md). Tools 52–54 are `set_sketch_constraint_driving`, `set_sketch_constraint_active`, and `set_sketch_constraint_virtual_space`. Tools 55–58 are `translate_sketch`, `rotate_sketch`, `scale_sketch`, and `mirror_sketch`.
 
 `create_body` requires exact internal document and body names, accepts an
 optional visible label, creates one `PartDesign::Body` in a transaction,
@@ -254,8 +252,7 @@ Success has this exact shape:
 
 The returned indices describe the immediate post-operation state only. Later
 mutations can renumber them, so clients must call `get_sketch` after each
-mutation for authoritative readback. Ellipses, conics, B-splines, and any other
-unsupported creation discriminator are controlled request errors. Valid
+mutation for authoritative readback. Valid
 unsupported geometry already present in a sketch remains inspectable through
 `get_sketch`; mutation support intentionally does not exceed controlled
 inspection support.
@@ -1377,7 +1374,7 @@ above.
 
 ### Copy-only sketch geometry transforms
 
-Tools 43–48 are `mirror_sketch_geometry`, `translate_sketch_geometry`,
+Tools 46–51 are `mirror_sketch_geometry`, `translate_sketch_geometry`,
 `rotate_sketch_geometry`, `scale_sketch_geometry`,
 `rectangular_array_sketch_geometry`, and `polar_array_sketch_geometry`. They
 append independent copies of a canonical, unique selection of at most 50
@@ -1441,11 +1438,33 @@ tool. Refusals and the 1×1 no-op create no history. Failures restore exact stat
 and no transform saves automatically. Move modes, copied constraints,
 non-uniform or negative scaling, external mirror references, whole-sketch and
 cross-sketch operations, destination-sketch creation, and merging are not in
-this contract. Whole-sketch operations remain deferred to Milestone 28.
+this contract.
+
+### Whole-sketch copy-only transforms
+
+Tools 55–58 are `translate_sketch`, `rotate_sketch`, `scale_sketch`, and `mirror_sketch`. They append transformed independent copies of every geometry element in a sketch. Each tool:
+
+- appends one deterministic copy per source element;
+- preserves all original geometry exactly;
+- preserves sketch placement, attachment, offset, and map mode;
+- does not copy constraints, expressions, or names;
+- accepts no `geometry_indices` field;
+- refuses the complete operation if any internal geometry is unsupported;
+- never silently skips unsupported internal geometry.
+
+Supported geometry: line segment, point, circle, arc of circle, and construction versions of those families.
+
+Unsupported geometry for transforms: ellipse, arc_of_ellipse, arc_of_parabola, arc_of_hyperbola, b_spline, and unknown future geometry variants. These remain inspectable through `get_sketch` and supported by `add_sketch_geometry` for creation but are not supported by transform operations.
+
+`translate_sketch` accepts one finite, non-zero `displacement` vector. `rotate_sketch` accepts a finite `center` point and signed finite `angle_degrees`. `scale_sketch` accepts a finite `center` point and a `factor` of at least 1e-6. `mirror_sketch` accepts only `horizontal_axis`, `vertical_axis`, or `origin` as its `reference`; it rejects `construction_line` and `internal_point`.
+
+Success codes are `sketch_translated`, `sketch_rotated`, `sketch_scaled`, and `sketch_mirrored`. Results contain the existing `SketchGeometryTransformResult` model with complete original-order geometry and constraint mappings, ordered copy records, instance provenance, and verified construction and sketch state.
+
+Existing selected-geometry transform tools (46–51) and schemas remain unchanged. Whole-sketch mirror using an internal construction line or point is not supported. Exact deferrals: whole-sketch rectangular arrays, polar arrays, constraint-preserving transformed copies, cross-sketch copying, cross-document transforms, sketch merging, destination-sketch creation, and offset geometry.
 
 ### Controlled sketch constraint state
 
-Tools 51–53 are `set_sketch_constraint_driving`,
+Tools 52–54 are `set_sketch_constraint_driving`,
 `set_sketch_constraint_active`, and `set_sketch_constraint_virtual_space`.
 Each takes one current constraint index and a desired Boolean final state; none
 is a toggle. Driving/reference conversion is limited to supported dimensional

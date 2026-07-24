@@ -1,6 +1,6 @@
 # Public MCP Tool Inventory
 
-The authoritative registry contains exactly 54 public tools. The names and
+The authoritative registry contains exactly 58 public tools. The names and
 order below mirror `src/freecad_mcp/tool_registry.py`; repository consistency
 tests prevent the registry, runtime registration, and this inventory from
 drifting apart.
@@ -28,37 +28,41 @@ drifting apart.
 21. `create_sketch_rounded_rectangle`
 22. `create_sketch_polyline`
 23. `analyze_sketch`
-23. `validate_sketch_profile`
-24. `list_sketch_open_vertices`
-25. `add_external_geometry`
-26. `list_external_geometry`
-27. `remove_external_geometry`
-28. `get_sketch_dependencies`
-29. `remove_sketch_constraints`
-30. `remove_sketch_geometry`
-31. `set_sketch_geometry_construction`
-32. `update_sketch_geometry`
-33. `replace_sketch_constraint`
-34. `update_sketch_constraint_value`
-35. `add_sketch_reference_constraints`
-36. `set_sketch_constraint_name`
-37. `set_sketch_constraint_expression`
-38. `clear_sketch_constraint_expression`
-39. `list_sketch_constraint_expressions`
-40. `trim_sketch_geometry`
-41. `split_sketch_geometry`
-42. `extend_sketch_geometry`
-43. `chamfer_sketch_geometry`
-44. `fillet_sketch_geometry`
-45. `mirror_sketch_geometry`
-46. `translate_sketch_geometry`
-47. `rotate_sketch_geometry`
-48. `scale_sketch_geometry`
-49. `rectangular_array_sketch_geometry`
-50. `polar_array_sketch_geometry`
-51. `set_sketch_constraint_driving`
-52. `set_sketch_constraint_active`
-53. `set_sketch_constraint_virtual_space`
+24. `validate_sketch_profile`
+25. `list_sketch_open_vertices`
+26. `add_external_geometry`
+27. `list_external_geometry`
+28. `remove_external_geometry`
+29. `get_sketch_dependencies`
+30. `remove_sketch_constraints`
+31. `remove_sketch_geometry`
+32. `set_sketch_geometry_construction`
+33. `update_sketch_geometry`
+34. `replace_sketch_constraint`
+35. `update_sketch_constraint_value`
+36. `add_sketch_reference_constraints`
+37. `set_sketch_constraint_name`
+38. `set_sketch_constraint_expression`
+39. `clear_sketch_constraint_expression`
+40. `list_sketch_constraint_expressions`
+41. `trim_sketch_geometry`
+42. `split_sketch_geometry`
+43. `extend_sketch_geometry`
+44. `chamfer_sketch_geometry`
+45. `fillet_sketch_geometry`
+46. `mirror_sketch_geometry`
+47. `translate_sketch_geometry`
+48. `rotate_sketch_geometry`
+49. `scale_sketch_geometry`
+50. `rectangular_array_sketch_geometry`
+51. `polar_array_sketch_geometry`
+52. `set_sketch_constraint_driving`
+53. `set_sketch_constraint_active`
+54. `set_sketch_constraint_virtual_space`
+55. `translate_sketch`
+56. `rotate_sketch`
+57. `scale_sketch`
+58. `mirror_sketch`
 
 ## Deferred
 

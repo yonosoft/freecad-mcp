@@ -128,18 +128,10 @@ def test_public_documentation_matches_the_registry() -> None:
     architecture = (REPOSITORY_ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
     inventory = INVENTORY_PATH.read_text(encoding="utf-8")
 
-    assert "54 typed MCP tools" in readme
-    assert "exactly 54 public tools" in architecture
-    assert "exactly 54 public tools" in inventory
-    # Milestone 28: documentation not yet updated for tools 55--58
-    _M28_WHOLE_TOOLS = {
-        "translate_sketch",
-        "rotate_sketch",
-        "scale_sketch",
-        "mirror_sketch",
-    }
-    pre_m28 = tuple(name for name in REGISTERED_TOOL_NAMES if name not in _M28_WHOLE_TOOLS)
-    assert _documented_inventory() == pre_m28
+    assert "58 typed MCP tools" in readme
+    assert "exactly 58 public tools" in architecture
+    assert "exactly 58 public tools" in inventory
+    assert _documented_inventory() == REGISTERED_TOOL_NAMES
 
 
 # ---------------------------------------------------------------------------
