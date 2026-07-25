@@ -113,6 +113,7 @@ Restart FreeCAD, select **MCP**, and use **Start Server**, **Stop Server**, or
 The exact 59 tool names and order are defined by the authoritative
 `src/freecad_mcp/tool_registry.py` registry and listed in the
 [public tool inventory](docs/public-tool-inventory.md). Tools 52–54 are `set_sketch_constraint_driving`, `set_sketch_constraint_active`, and `set_sketch_constraint_virtual_space`. Tools 55–58 are `translate_sketch`, `rotate_sketch`, `scale_sketch`, and `mirror_sketch`.
+Tool 59 is `analyze_sketch_constraints`, a strictly read-only constraint and solver diagnostic tool. It reports solver availability, freshness, degrees of freedom, fully-constrained state, conflicts, redundancies, partial redundancies, malformed constraints, inactive and reference and virtual-space constraint counts, and controlled candidate repair actions. All public constraint indices are zero-based. Candidate actions are non-binding suggestions referencing existing mutation tools and do not perform automatic repair. The tool never recomputes, opens a transaction, modifies the sketch, consumes undo/redo history, or saves.
 
 `create_body` requires exact internal document and body names, accepts an
 optional visible label, creates one `PartDesign::Body` in a transaction,
@@ -157,6 +158,14 @@ performs no save, and does not implicitly solve or recompute the sketch.
 Geometry and constraint indices describe only the current sketch state; they
 are not permanent identifiers and clients must inspect again after later
 mutations.
+
+### analyze_sketch_constraints
+
+`analyze_sketch_constraints` returns structured read-only constraint and solver diagnostics for one sketch. It accepts only `document_name` and `sketch_name`. The result includes eight deterministic classifications (`unavailable`, `malformed`, `mixed`, `conflicting`, `redundant`, `stale`, `fully_constrained`, `under_constrained`), solver data, constraint-state counts, and ordered issues with per-constraint metadata. Each issue carries zero-based constraint indices and non-binding `candidate_actions` that reference `set_sketch_constraint_active`, `set_sketch_constraint_driving`, or `remove_sketch_constraints`. Delete is the only action marked destructive.
+
+The tool never recomputes, opens a transaction, modifies geometry or constraints, consumes undo or redo history, changes the active document, or saves. Conflicting and redundant constraint indices are reported even when cached solver state is stale; degrees-of-freedom and fully-constrained values remain unavailable in that case.
+
+It is separate from `analyze_sketch` (broad topology and solver summary) and `validate_sketch_profile` (closed-profile validation). Use it when the primary question is about which constraints are conflicting, redundant, or inactive.
 
 ### add_sketch_geometry
 

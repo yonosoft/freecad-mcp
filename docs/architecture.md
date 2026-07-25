@@ -2375,3 +2375,34 @@ MCP runner/lifecycle service. Dependency direction remains MCP registration to
 application handlers to shared protocols/models/exceptions/validation to the
 concrete FreeCAD integration and Qt dispatcher; lower layers do not import the
 composition root or transport registration.
+
+### Milestone 29 — Constraint Diagnostics
+
+The constraint diagnostics capability adds one public tool (59) without modifying tools 1–58.
+
+Diagnostic foundation corrections:
+
+- FreeCAD solver issue lists are native one-based; the inspection adapter normalizes them to public zero-based indices that are validated, sorted, and deduplicated. Invalid native indices produce a controlled inspection failure.
+- Cached solver state may be stale or invalid, yet conflicting, redundant, partially redundant, and malformed constraint index lists remain available. Degrees-of-freedom and fully-constrained values are null when solver freshness cannot be confirmed.
+
+Layered path:
+
+1. strict two-field request model (document_name, sketch_name)
+2. validation (validate_analyze_sketch_constraints_request)
+3. command handler (AnalyzeSketchConstraintsHandler)
+4. application/runtime composition
+5. FreeCADDocumentAdapter.analyze_constraints
+6. diagnostics adapter (sketch_diagnostics.py)
+7. corrected solver inspection (`_inspect_solver`)
+8. controlled result models (SketchConstraintDiagnosticsResult et al.)
+9. MCP registration as tool 59
+
+Classification: unavailable, malformed, mixed, conflicting, redundant, stale, fully_constrained, under_constrained. Structured issue classifications may apply even when solver freshness is false.
+
+Issues and candidate actions: deterministic issue order; deterministic candidate-action order; candidate actions reference existing public mutation tools only; delete is the only destructive action; informational issues contain no candidate actions; no new repair mutation tool was added.
+
+Read-only boundary: diagnostics do not recompute, open transactions, mutate geometry or constraints, consume undo/redo history, change the active document, or save.
+
+Compatibility: tools 1–58 retain exact order and schemas. LD-1 normalizes one-based solver indices to zero-based. LD-2 exposes structured issue lists previously hidden in stale states. Healthy sketch behaviour is unchanged.
+
+Verification: 2002 automated tests and 206 Mypy files pass; native FreeCAD 1.1.2 verification passed for all required scenarios; bounded native limitations (mixed, partial-redundancy, malformed, geometric-conflict) are covered by permanent production-path regression tests.

@@ -67,6 +67,10 @@ drifting apart.
 
 ## Deferred
 
+### `analyze_sketch_constraints`
+
+Read-only constraint and solver diagnostics. Accepts `document_name` and `sketch_name`. Returns structured solver state, eight deterministic classifications, constraint-state counts, and ordered issues with zero-based constraint indices. Each issue includes non-binding candidate repair actions using existing tools. Never recomputes, modifies the sketch, opens transactions, consumes history, or saves.
+
 `offset_sketch_geometry` is not exposed. FreeCAD 1.1 does not provide a
 headless Sketcher offset API; the GUI command uses OpenCASCADE internally and
 has no supported Python binding. Implementing offset would require a separate
