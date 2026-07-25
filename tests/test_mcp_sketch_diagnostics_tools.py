@@ -10,7 +10,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 
 from freecad_mcp.commands.sketch_diagnostics import AnalyzeSketchConstraintsHandler
 from freecad_mcp.mcp.server import build_mcp_server
-from freecad_mcp.mcp.sketch_diagnostics_tools import ANALYZE_SKETCH_CONSTRAINTS_DESCRIPTION
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import ANALYZE_SKETCH_CONSTRAINTS_TOOL
 from mcp_server_stubs import make_handlers
@@ -93,7 +92,8 @@ def test_description_states_read_only() -> None:
     description = tool.description
     assert "read-only" in description.lower() or "read only" in description.lower()
     assert "does not recompute" in description.lower() or "never recomputes" in description.lower()
-    assert "repair" not in description.lower().split("it is")[-1] if "it is" in description.lower() else True
+    split_desc = description.lower().split("it is")[-1] if "it is" in description.lower() else ""
+    assert "repair" not in split_desc
     assert "candidate" in description.lower()
     # Description states candidate actions do not guarantee resolution (correctly)
     assert "do not guarantee" in description.lower() or "does not guarantee" in description.lower()
@@ -107,13 +107,11 @@ def test_description_states_read_only() -> None:
 def test_handler_called_once_with_correct_names() -> None:
     import asyncio
 
-    handlers, adapter = make_handlers()
+    handlers, _ = make_handlers()
     server = build_mcp_server(handlers, ServerConfig())
     arguments = {"document_name": "TestDoc", "sketch_name": "TestSketch"}
 
-    _, result = asyncio.run(
-        server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments)
-    )
+    _, result = asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
     result = cast(dict[str, object], result)
     assert result["ok"] is True
 
@@ -125,9 +123,7 @@ def test_result_passes_through_diagnostics() -> None:
     server = build_mcp_server(handlers, ServerConfig())
     arguments = {"document_name": "TestDoc", "sketch_name": "TestSketch"}
 
-    _, result = asyncio.run(
-        server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments)
-    )
+    _, result = asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
     result = cast(dict[str, object], result)
     assert result["ok"] is True
     assert result["code"] == "sketch_diagnostics_complete"
@@ -140,9 +136,7 @@ def test_result_is_json_compatible() -> None:
     server = build_mcp_server(handlers, ServerConfig())
     arguments = {"document_name": "TestDoc", "sketch_name": "TestSketch"}
 
-    _, result = asyncio.run(
-        server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments)
-    )
+    _, result = asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
     serialized = json.dumps(result)
     assert isinstance(serialized, str)
 
@@ -174,7 +168,12 @@ def test_validation_error_passes_through() -> None:
     server = build_mcp_server(handlers, ServerConfig())
 
     with pytest.raises(ToolError) as exc_info:
-        asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, {"document_name": 123, "sketch_name": "Sk"}))
+        asyncio.run(
+            server.call_tool(
+                ANALYZE_SKETCH_CONSTRAINTS_TOOL,
+                {"document_name": 123, "sketch_name": "Sk"},
+            )
+        )
     assert "validation" in str(exc_info.value).lower()
 
 
