@@ -22,6 +22,7 @@ from freecad_mcp.models import (
     SketchCenteredRectangleCreationResult,
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
+    SketchConstraintDiagnosticsResult,
     SketchConstraintExpressionListResult,
     SketchConstraintExpressionMutationResult,
     SketchConstraintInput,
@@ -217,6 +218,17 @@ class SketchAnalysisAdapter(Protocol):
         request: SketchProfileAnalysisRequestInput,
     ) -> SketchOpenVerticesResult:
         """Return only degree-one topology vertices."""
+
+
+class SketchDiagnosticsAdapter(Protocol):
+    """Read-only constraint diagnostics backed by controlled inspection."""
+
+    def analyze_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchConstraintDiagnosticsResult:
+        """Return structured constraint diagnostics without mutation."""
 
 
 class SketchExternalGeometryAdapter(Protocol):
@@ -563,6 +575,7 @@ __all__ = [
     "SketchControlledMutationAdapter",
     "SketchCurvedProfileAdapter",
     "SketchDependencyAdapter",
+    "SketchDiagnosticsAdapter",
     "SketchEditingAdapter",
     "SketchExternalGeometryAdapter",
     "SketchPolygonAdapter",

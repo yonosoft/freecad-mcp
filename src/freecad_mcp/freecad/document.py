@@ -17,6 +17,7 @@ from freecad_mcp.freecad import (
     sketch_constraint_state,
     sketch_creation,
     sketch_dependencies,
+    sketch_diagnostics,
     sketch_editing,
     sketch_external_geometry,
     sketch_fillet,
@@ -80,6 +81,7 @@ from freecad_mcp.models import (
     SketchCenteredRectangleCreationResult,
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
+    SketchConstraintDiagnosticsResult,
     SketchConstraintExpressionListResult,
     SketchConstraintExpressionMutationResult,
     SketchConstraintInput,
@@ -211,6 +213,14 @@ class FreeCADDocumentAdapter:
     ) -> SketchOpenVerticesResult:
         """Return only degree-one endpoints from shared topology analysis."""
         return sketch_analysis.list_sketch_open_vertices(request)
+
+    def analyze_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchConstraintDiagnosticsResult:
+        """Return structured constraint diagnostics without document mutation."""
+        return sketch_diagnostics.analyze_constraints(document_name, sketch_name)
 
     def add_sketch_geometry(
         self,
