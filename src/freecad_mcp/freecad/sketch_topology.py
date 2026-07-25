@@ -1194,7 +1194,6 @@ def _append_solver_findings(
                 "Cached solver diagnostics are not fresh; analysis did not recompute the sketch.",
             )
         )
-        return
     mapping = (
         (solver.conflicting_constraint_indices, "solver_conflicts", "conflicting"),
         (solver.redundant_constraint_indices, "solver_redundancies", "redundant"),
@@ -1215,7 +1214,7 @@ def _append_solver_findings(
                     constraint_indices=indices,
                 )
             )
-    if solver.fully_constrained is False:
+    if solver.fresh and solver.fully_constrained is False:
         findings.append(
             _finding(
                 "warning",

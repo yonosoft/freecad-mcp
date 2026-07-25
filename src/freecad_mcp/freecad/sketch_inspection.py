@@ -1141,8 +1141,26 @@ def _inspect_solver(sketch: Any) -> SketchSolverData:
         partially_redundant_constraint_indices=None,
         malformed_constraint_indices=None,
     )
+
+    try:
+        constraint_count = len(sketch.Constraints)
+    except Exception:
+        return unavailable
+
     try:
         state = {str(item) for item in sketch.State}
+    except Exception:
+        return unavailable
+
+    try:
+        conflicting = _solver_indices(sketch.ConflictingConstraints, constraint_count)
+        redundant = _solver_indices(sketch.RedundantConstraints, constraint_count)
+        partially_redundant = _solver_indices(
+            sketch.PartiallyRedundantConstraints, constraint_count
+        )
+        malformed = _solver_indices(sketch.MalformedConstraints, constraint_count)
+    except SketchInspectionError:
+        raise
     except Exception:
         return unavailable
 
@@ -1153,31 +1171,52 @@ def _inspect_solver(sketch: Any) -> SketchSolverData:
             fresh=False,
             degrees_of_freedom=None,
             fully_constrained=None,
-            conflicting_constraint_indices=None,
-            redundant_constraint_indices=None,
-            partially_redundant_constraint_indices=None,
-            malformed_constraint_indices=None,
+            conflicting_constraint_indices=conflicting,
+            redundant_constraint_indices=redundant,
+            partially_redundant_constraint_indices=partially_redundant,
+            malformed_constraint_indices=malformed,
         )
 
     try:
-        return SketchSolverData(
-            available=True,
-            fresh=True,
-            degrees_of_freedom=_required_integer(sketch.DoF),
-            fully_constrained=bool(sketch.FullyConstrained),
-            conflicting_constraint_indices=_solver_indices(sketch.ConflictingConstraints),
-            redundant_constraint_indices=_solver_indices(sketch.RedundantConstraints),
-            partially_redundant_constraint_indices=_solver_indices(
-                sketch.PartiallyRedundantConstraints
-            ),
-            malformed_constraint_indices=_solver_indices(sketch.MalformedConstraints),
-        )
+        dof = _required_integer(sketch.DoF)
+        if dof < 0:
+            raise SketchInspectionError("negative_degrees_of_freedom")
+        fully_constrained = bool(sketch.FullyConstrained)
+    except SketchInspectionError:
+        raise
     except Exception:
         return unavailable
 
+    return SketchSolverData(
+        available=True,
+        fresh=True,
+        degrees_of_freedom=dof,
+        fully_constrained=fully_constrained,
+        conflicting_constraint_indices=conflicting,
+        redundant_constraint_indices=redundant,
+        partially_redundant_constraint_indices=partially_redundant,
+        malformed_constraint_indices=malformed,
+    )
 
-def _solver_indices(value: Any) -> tuple[int, ...]:
-    return tuple(_required_integer(item) for item in value)
+
+def _solver_indices(value: Any, constraint_count: int) -> tuple[int, ...]:
+    seen: set[int] = set()
+    result: list[int] = []
+    for item in value:
+        try:
+            raw = _required_integer(item)
+        except Exception as exc:
+            raise SketchInspectionError("solver_index_unreadable") from exc
+        if raw < 1:
+            raise SketchInspectionError("solver_index_below_one")
+        zero_based = raw - 1
+        if zero_based < 0 or zero_based >= constraint_count:
+            raise SketchInspectionError("solver_index_out_of_range")
+        if zero_based not in seen:
+            seen.add(zero_based)
+            result.append(zero_based)
+    result.sort()
+    return tuple(result)
 
 
 def _point_from_vector(value: Any, geometry_index: int) -> SketchPoint2D:

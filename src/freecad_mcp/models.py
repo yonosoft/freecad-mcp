@@ -836,6 +836,39 @@ class SketchPointPosition(StrEnum):
     POINT = "point"
 
 
+class SketchDiagnosticClassification(StrEnum):
+    UNAVAILABLE = "unavailable"
+    MALFORMED = "malformed"
+    MIXED = "mixed"
+    CONFLICTING = "conflicting"
+    REDUNDANT = "redundant"
+    STALE = "stale"
+    FULLY_CONSTRAINED = "fully_constrained"
+    UNDER_CONSTRAINED = "under_constrained"
+
+
+class SketchDiagnosticSeverity(StrEnum):
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+
+
+class SketchDiagnosticIssueCode(StrEnum):
+    CONFLICTING = "conflicting_constraints"
+    REDUNDANT = "redundant_constraints"
+    PARTIALLY_REDUNDANT = "partially_redundant_constraints"
+    MALFORMED = "malformed_constraints"
+    INACTIVE_PRESENT = "inactive_constraints_present"
+    REFERENCE_PRESENT = "reference_constraints_present"
+    VIRTUAL_SPACE_PRESENT = "virtual_space_constraints_present"
+
+
+class SketchCandidateActionType(StrEnum):
+    DEACTIVATE = "deactivate"
+    CONVERT_TO_REFERENCE = "convert_to_reference"
+    DELETE = "delete"
+
+
 class _SketchConstraintInputModel(BaseModel):
     """Strict base for controlled sketch-constraint mutation inputs."""
 
@@ -3388,6 +3421,86 @@ class SketchPolylineCreationResult:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class SketchCandidateAction:
+    action: SketchCandidateActionType
+    target_constraint_index: int
+    tool: str
+    destructive: bool
+    description: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "action": self.action.value,
+            "target_constraint_index": self.target_constraint_index,
+            "tool": self.tool,
+            "destructive": self.destructive,
+            "description": self.description,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintIssue:
+    severity: SketchDiagnosticSeverity
+    code: SketchDiagnosticIssueCode
+    message: str
+    constraint_indices: tuple[int, ...]
+    constraints: tuple[SketchConstraint, ...]
+    candidate_actions: tuple[SketchCandidateAction, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "severity": self.severity.value,
+            "code": self.code.value,
+            "message": self.message,
+            "constraint_indices": list(self.constraint_indices),
+            "constraints": [c.to_dict() for c in self.constraints],
+            "candidate_actions": [a.to_dict() for a in self.candidate_actions],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintDiagnostics:
+    solver: SketchSolverData
+    classification: SketchDiagnosticClassification
+    constraint_count: int
+    active_count: int
+    inactive_count: int
+    driving_count: int
+    reference_count: int
+    driving_state_unavailable_count: int
+    virtual_space_count: int
+    issues: tuple[SketchConstraintIssue, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "solver": self.solver.to_dict(),
+            "classification": self.classification.value,
+            "constraint_count": self.constraint_count,
+            "active_count": self.active_count,
+            "inactive_count": self.inactive_count,
+            "driving_count": self.driving_count,
+            "reference_count": self.reference_count,
+            "driving_state_unavailable_count": self.driving_state_unavailable_count,
+            "virtual_space_count": self.virtual_space_count,
+            "issues": [i.to_dict() for i in self.issues],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchConstraintDiagnosticsResult:
+    diagnostics: SketchConstraintDiagnostics
+    sketch: Mapping[str, object]
+    document: DocumentSummary
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "diagnostics": self.diagnostics.to_dict(),
+            "sketch": dict(self.sketch),
+            "document": self.document.to_dict(),
+        }
+
+
 __all__ = [
     "MAX_REGULAR_POLYGON_SIDE_COUNT",
     "MAX_SKETCH_CONSTRAINT_BATCH_SIZE",
@@ -3496,6 +3609,8 @@ __all__ = [
     "SketchAxisReferenceInput",
     "SketchBSplineGeometry",
     "SketchBoundedArcProfile",
+    "SketchCandidateAction",
+    "SketchCandidateActionType",
     "SketchCenterPointInput",
     "SketchCenteredRectangleCreationResult",
     "SketchCenteredRectangleProfile",
@@ -3507,11 +3622,14 @@ __all__ = [
     "SketchConstraintAdditionResult",
     "SketchConstraintBatch",
     "SketchConstraintData",
+    "SketchConstraintDiagnostics",
+    "SketchConstraintDiagnosticsResult",
     "SketchConstraintExpressionBinding",
     "SketchConstraintExpressionDependency",
     "SketchConstraintExpressionListResult",
     "SketchConstraintExpressionMutationResult",
     "SketchConstraintInput",
+    "SketchConstraintIssue",
     "SketchConstraintNameResult",
     "SketchConstraintPointReferenceInput",
     "SketchConstraintReference",
@@ -3522,6 +3640,9 @@ __all__ = [
     "SketchCreationResult",
     "SketchCurvedProfileJoin",
     "SketchDependencyInspectionResult",
+    "SketchDiagnosticClassification",
+    "SketchDiagnosticIssueCode",
+    "SketchDiagnosticSeverity",
     "SketchEllipseGeometry",
     "SketchEquilateralTriangleRequestInput",
     "SketchFilletResult",

@@ -19,9 +19,11 @@ from freecad_mcp.exceptions import (
     ObjectNotFoundError,
     SketchConstraintMalformedError,
     SketchGeometryMalformedError,
+    SketchInspectionError,
     SketchTypeMismatchError,
 )
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter
+from freecad_mcp.models import SketchAnalysisRequestInput
 
 
 class Vector:
@@ -334,10 +336,10 @@ def test_get_sketch_serializes_supported_and_unsupported_items(
         "fresh": True,
         "degrees_of_freedom": 4,
         "fully_constrained": False,
-        "conflicting_constraint_indices": [1],
-        "redundant_constraint_indices": [2],
-        "partially_redundant_constraint_indices": [3],
-        "malformed_constraint_indices": [4],
+        "conflicting_constraint_indices": [0],
+        "redundant_constraint_indices": [1],
+        "partially_redundant_constraint_indices": [2],
+        "malformed_constraint_indices": [3],
     }
     assert document.recompute_calls == 0
     assert document.save_calls == 0
@@ -890,7 +892,7 @@ def test_get_sketch_does_not_misreport_axis_coincident_as_origin(
     assert "references" not in constraint
 
 
-def test_get_sketch_reports_stale_solver_cache_without_values(
+def test_get_sketch_stale_rejects_out_of_range_index(
     monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
 ) -> None:
     sketch = SketchStub()
@@ -899,18 +901,8 @@ def test_get_sketch_reports_stale_solver_cache_without_values(
     sketch.ConflictingConstraints = [8]
     _install_document(monkeypatch, [sketch])
 
-    solver = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").solver.to_dict()
-
-    assert solver == {
-        "available": True,
-        "fresh": False,
-        "degrees_of_freedom": None,
-        "fully_constrained": None,
-        "conflicting_constraint_indices": None,
-        "redundant_constraint_indices": None,
-        "partially_redundant_constraint_indices": None,
-        "malformed_constraint_indices": None,
-    }
+    with pytest.raises(SketchInspectionError):
+        FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch")
 
 
 def test_get_sketch_recognizes_body_origin_plane_attachment(
@@ -1008,3 +1000,234 @@ def test_get_sketch_exact_lookup_and_type_errors(
     regular_object.isDerivedFrom = lambda _type_id: False  # type: ignore[attr-defined]
     with pytest.raises(SketchTypeMismatchError):
         adapter.get_sketch("TestDoc", "NotSketch")
+
+
+def test_solver_indices_convert_one_based_to_zero_based(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0))],
+        constraints=[ConstraintStub("Horizontal", first=0)],
+    )
+    sketch.ConflictingConstraints = [1]
+    _install_document(monkeypatch, [sketch])
+    solver = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").solver.to_dict()
+    assert solver["conflicting_constraint_indices"] == [0]
+
+
+def test_solver_indices_reject_index_below_one(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0))],
+        constraints=[ConstraintStub("Horizontal", first=0)],
+    )
+    sketch.ConflictingConstraints = [0]
+    _install_document(monkeypatch, [sketch])
+    with pytest.raises(SketchInspectionError):
+        FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch")
+
+
+def test_solver_indices_reject_out_of_range(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0))],
+        constraints=[ConstraintStub("Horizontal", first=0)],
+    )
+    sketch.ConflictingConstraints = [5]
+    _install_document(monkeypatch, [sketch])
+    with pytest.raises(SketchInspectionError):
+        FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch")
+
+
+def test_solver_indices_deduplicate_and_sort(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0)),
+            LineSegment(Vector(0.0, 10.0), Vector(10.0, 10.0)),
+            LineSegment(Vector(0.0, 20.0), Vector(10.0, 20.0)),
+        ],
+        constraints=[
+            ConstraintStub("Horizontal", first=0),
+            ConstraintStub("Vertical", first=1),
+            ConstraintStub("Distance", first=2, value=10.0),
+        ],
+    )
+    sketch.ConflictingConstraints = [3, 2, 2]
+    _install_document(monkeypatch, [sketch])
+    solver = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").solver.to_dict()
+    assert solver["conflicting_constraint_indices"] == [1, 2]
+
+
+def test_get_sketch_stale_returns_conflict_indices(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0)),
+            LineSegment(Vector(0.0, 10.0), Vector(10.0, 10.0)),
+        ],
+        constraints=[
+            ConstraintStub("Horizontal", first=0),
+            ConstraintStub("Vertical", first=1),
+        ],
+    )
+    sketch.State = ["Touched"]
+    sketch.ConflictingConstraints = [2]
+    _install_document(monkeypatch, [sketch])
+    solver = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").solver.to_dict()
+    assert solver["available"] is True
+    assert solver["fresh"] is False
+    assert solver["degrees_of_freedom"] is None
+    assert solver["fully_constrained"] is None
+    assert solver["conflicting_constraint_indices"] == [1]
+    assert solver["redundant_constraint_indices"] == []
+    assert solver["partially_redundant_constraint_indices"] == []
+    assert solver["malformed_constraint_indices"] == []
+
+
+def test_get_sketch_stale_returns_redundant_indices(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0)),
+            LineSegment(Vector(0.0, 10.0), Vector(10.0, 10.0)),
+        ],
+        constraints=[
+            ConstraintStub("Horizontal", first=0),
+            ConstraintStub("Vertical", first=1),
+        ],
+    )
+    sketch.State = ["Touched"]
+    sketch.RedundantConstraints = [1]
+    _install_document(monkeypatch, [sketch])
+    solver = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").solver.to_dict()
+    assert solver["redundant_constraint_indices"] == [0]
+    assert solver["conflicting_constraint_indices"] == []
+    assert solver["partially_redundant_constraint_indices"] == []
+    assert solver["malformed_constraint_indices"] == []
+
+
+def test_get_sketch_stale_with_empty_issue_lists(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0))],
+        constraints=[ConstraintStub("Horizontal", first=0)],
+    )
+    sketch.State = ["Touched"]
+    sketch.ConflictingConstraints = []
+    sketch.RedundantConstraints = []
+    sketch.PartiallyRedundantConstraints = []
+    sketch.MalformedConstraints = []
+    _install_document(monkeypatch, [sketch])
+    solver = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").solver.to_dict()
+    assert solver["conflicting_constraint_indices"] == []
+    assert solver["redundant_constraint_indices"] == []
+    assert solver["partially_redundant_constraint_indices"] == []
+    assert solver["malformed_constraint_indices"] == []
+
+
+def test_analyze_sketch_stale_returns_conflict_indices(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0))],
+        constraints=[
+            ConstraintStub("Horizontal", first=0),
+            ConstraintStub("Distance", first=0, value=10.0),
+            ConstraintStub("Distance", first=0, value=20.0),
+        ],
+    )
+    sketch.State = ["Touched"]
+    sketch.ConflictingConstraints = [2, 3]
+    _install_document(monkeypatch, [sketch])
+
+    request = SketchAnalysisRequestInput(
+        document_name="TestDoc",
+        sketch_name="BaseSketch",
+    )
+    result = FreeCADDocumentAdapter().analyze_sketch(request)
+    analysis = result.analysis
+    solver = cast(dict[str, object], analysis["solver"])
+    assert solver["available"] is True
+    assert solver["fresh"] is False
+    assert solver["conflicting"] == [1, 2]
+    assert solver["redundant"] == []
+    assert solver["partially_redundant"] == []
+    assert solver["malformed"] == []
+
+    findings = cast(list[dict[str, object]], analysis["findings"])
+    assert any(
+        finding["code"] == "solver_conflicts" and finding["constraint_indices"] == [1, 2]
+        for finding in findings
+    )
+
+
+def test_analyze_sketch_stale_returns_redundant_indices(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0))],
+        constraints=[
+            ConstraintStub("Horizontal", first=0),
+            ConstraintStub("Distance", first=0, value=10.0),
+            ConstraintStub("Coincident", first=0, first_pos=1, second=-1, second_pos=1),
+            ConstraintStub("Horizontal", first=0),
+        ],
+    )
+    sketch.State = ["Touched"]
+    sketch.RedundantConstraints = [4]
+    _install_document(monkeypatch, [sketch])
+
+    request = SketchAnalysisRequestInput(
+        document_name="TestDoc",
+        sketch_name="BaseSketch",
+    )
+    result = FreeCADDocumentAdapter().analyze_sketch(request)
+    analysis = result.analysis
+    solver = cast(dict[str, object], analysis["solver"])
+    assert solver["available"] is True
+    assert solver["fresh"] is False
+    assert solver["redundant"] == [3]
+    assert solver["conflicting"] == []
+    assert solver["partially_redundant"] == []
+    assert solver["malformed"] == []
+
+    findings = cast(list[dict[str, object]], analysis["findings"])
+    assert any(
+        finding["code"] == "solver_redundancies" and finding["constraint_indices"] == [3]
+        for finding in findings
+    )
+
+
+def test_get_sketch_fresh_healthy_unaffected(
+    monkeypatch: pytest.MonkeyPatch, part_module: ModuleType
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0)),
+            LineSegment(Vector(0.0, 10.0), Vector(10.0, 10.0)),
+        ],
+        constraints=[
+            ConstraintStub("Horizontal", first=0),
+            ConstraintStub("Vertical", first=1),
+        ],
+    )
+    sketch.State = ["Up-to-date"]
+    sketch.DoF = 3
+    sketch.FullyConstrained = False
+    _install_document(monkeypatch, [sketch])
+    solver = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").solver.to_dict()
+    assert solver["available"] is True
+    assert solver["fresh"] is True
+    assert solver["degrees_of_freedom"] == 3
+    assert solver["fully_constrained"] is False
+    assert solver["conflicting_constraint_indices"] == []
+    assert solver["redundant_constraint_indices"] == []
+    assert solver["partially_redundant_constraint_indices"] == []
+    assert solver["malformed_constraint_indices"] == []
