@@ -54,6 +54,7 @@ from freecad_mcp.models import (
     SketchConstraintGeometryReferenceInput,
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
+    SketchDiagnosticsRequestInput,
     SketchEquilateralTriangleRequestInput,
     SketchGeometryExternalGeometrySourceInput,
     SketchGeometryInput,
@@ -392,6 +393,22 @@ def validate_analyze_sketch_request(
         sketch_name=sketch_name,
         include_construction=include_construction,
         include_external=include_external,
+    )
+
+
+def validate_analyze_sketch_constraints_request(
+    document_name: object,
+    sketch_name: object,
+) -> CommandResult | SketchDiagnosticsRequestInput:
+    """Validate the strict constraint-diagnostics request."""
+    reference_error = validate_object_reference(document_name, sketch_name)
+    if reference_error is not None:
+        return reference_error
+    assert isinstance(document_name, str)
+    assert isinstance(sketch_name, str)
+    return SketchDiagnosticsRequestInput(
+        document_name=document_name,
+        sketch_name=sketch_name,
     )
 
 
@@ -2896,6 +2913,7 @@ __all__ = [
     "validate_add_sketch_constraints_request",
     "validate_add_sketch_geometry_request",
     "validate_add_sketch_reference_constraints_request",
+    "validate_analyze_sketch_constraints_request",
     "validate_analyze_sketch_request",
     "validate_chamfer_sketch_geometry_request",
     "validate_create_body_request",

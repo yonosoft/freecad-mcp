@@ -67,6 +67,7 @@ from freecad_mcp.commands.sketch_constraint_state import (
     SetSketchConstraintDrivingHandler,
     SetSketchConstraintVirtualSpaceHandler,
 )
+from freecad_mcp.commands.sketch_diagnostics import AnalyzeSketchConstraintsHandler
 from freecad_mcp.commands.sketch_polyline import CreateSketchPolylineHandler
 from freecad_mcp.exceptions import SketchConstraintStateUnsafeError
 from freecad_mcp.freecad import sketch_topology
@@ -90,8 +91,11 @@ from freecad_mcp.models import (
     SketchCenteredRectangleProfile,
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
+    SketchConstraintDiagnostics,
+    SketchConstraintDiagnosticsResult,
     SketchConstraintInput,
     SketchCreationResult,
+    SketchDiagnosticClassification,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchGeometryUpdateInput,
@@ -323,6 +327,44 @@ class AdapterStub:
             self.get_sketch(request.document_name, request.sketch_name),
             self.document,
             request,
+        )
+
+    def analyze_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchConstraintDiagnosticsResult:
+        return SketchConstraintDiagnosticsResult(
+            diagnostics=SketchConstraintDiagnostics(
+                solver=SketchSolverData(
+                    available=True,
+                    fresh=True,
+                    degrees_of_freedom=0,
+                    fully_constrained=True,
+                    conflicting_constraint_indices=(),
+                    redundant_constraint_indices=(),
+                    partially_redundant_constraint_indices=(),
+                    malformed_constraint_indices=(),
+                ),
+                classification=SketchDiagnosticClassification.FULLY_CONSTRAINED,
+                constraint_count=0,
+                active_count=0,
+                inactive_count=0,
+                driving_count=0,
+                reference_count=0,
+                driving_state_unavailable_count=0,
+                virtual_space_count=0,
+                issues=(),
+            ),
+            sketch={},
+            document=DocumentSummary(
+                name="Doc",
+                label="Doc",
+                file_path=None,
+                modified=False,
+                active=True,
+                object_count=0,
+            ),
         )
 
     def validate_sketch_profile(
@@ -1033,6 +1075,7 @@ def make_application() -> Application:
         fillet_sketch_geometry=FilletSketchGeometryHandler(adapter, dispatcher),
         chamfer_sketch_geometry=ChamferSketchGeometryHandler(adapter, dispatcher),
         recompute=RecomputeDocumentHandler(adapter, dispatcher),
+        analyze_sketch_constraints=AnalyzeSketchConstraintsHandler(adapter, dispatcher),
     )
     return create_application(lifecycle, handlers)
 
@@ -1345,3 +1388,17 @@ def test_application_dispatches_regular_polygon_with_requested_side_count() -> N
     assert profile["type"] == "regular_polygon"  # type: ignore[index]
     assert profile["side_count"] == 6  # type: ignore[index]
     assert profile["first_vertex_angle_degrees"] == 30.0  # type: ignore[index]
+
+
+class TestAnalyzeSketchConstraintsApplication:
+    def test_application_dispatches_to_handler(self) -> None:
+        """Application.analyze_sketch_constraints must dispatch to handler."""
+        app = make_application()
+        result = app.analyze_sketch_constraints("TestDoc", "TestSketch")
+        assert result.code == "sketch_diagnostics_complete"
+
+    def test_application_result_passes_through(self) -> None:
+        """Application method must return handler result unchanged."""
+        app = make_application()
+        result = app.analyze_sketch_constraints("TestDoc", "TestSketch")
+        assert result.ok is True

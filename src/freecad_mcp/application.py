@@ -142,6 +142,17 @@ class Application:
             include_external=include_external,
         )
 
+    def analyze_sketch_constraints(
+        self,
+        document_name: object,
+        sketch_name: object,
+    ) -> CommandResult:
+        """Return structured constraint diagnostics through the shared handler."""
+        return self.documents.analyze_sketch_constraints.execute(
+            document_name=document_name,
+            sketch_name=sketch_name,
+        )
+
     def validate_sketch_profile(
         self,
         document_name: object,

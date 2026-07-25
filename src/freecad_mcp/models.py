@@ -611,6 +611,13 @@ class SketchAnalysisRequestInput(_SketchGeometryInputModel):
     include_external: bool = Field(default=False, strict=True)
 
 
+class SketchDiagnosticsRequestInput(_SketchGeometryInputModel):
+    """Strict request for read-only constraint diagnostics."""
+
+    document_name: str = Field(strict=True)
+    sketch_name: str = Field(strict=True)
+
+
 class SketchProfileAnalysisRequestInput(_SketchGeometryInputModel):
     """Strict shared request for profile validation and open-vertex listing.
 
@@ -3643,6 +3650,7 @@ __all__ = [
     "SketchDiagnosticClassification",
     "SketchDiagnosticIssueCode",
     "SketchDiagnosticSeverity",
+    "SketchDiagnosticsRequestInput",
     "SketchEllipseGeometry",
     "SketchEquilateralTriangleRequestInput",
     "SketchFilletResult",

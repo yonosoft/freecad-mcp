@@ -11,6 +11,7 @@ from freecad_mcp.commands import (
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
     AddSketchReferenceConstraintsHandler,
+    AnalyzeSketchConstraintsHandler,
     AnalyzeSketchHandler,
     ChamferSketchGeometryHandler,
     ClearSketchConstraintExpressionHandler,
@@ -94,9 +95,12 @@ from freecad_mcp.models import (
     SketchCenteredRectangleProfile,
     SketchCenteredRectangleRequestInput,
     SketchConstraintAdditionResult,
+    SketchConstraintDiagnostics,
+    SketchConstraintDiagnosticsResult,
     SketchConstraintInput,
     SketchCreationResult,
     SketchDependencyInspectionResult,
+    SketchDiagnosticClassification,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchGeometryUpdateInput,
@@ -166,6 +170,7 @@ class AdapterStub:
         self.create_sketch_calls: list[tuple[str, str, str, str | None, OriginPlane | None]] = []
         self.get_sketch_calls: list[tuple[str, str]] = []
         self.analyze_sketch_calls: list[SketchAnalysisRequestInput] = []
+        self.analyze_constraints_calls: list[tuple[str, str]] = []
         self.validate_sketch_profile_calls: list[SketchProfileAnalysisRequestInput] = []
         self.list_sketch_open_vertices_calls: list[SketchProfileAnalysisRequestInput] = []
         self.add_sketch_geometry_calls: list[tuple[str, str, tuple[SketchGeometryInput, ...]]] = []
@@ -392,6 +397,45 @@ class AdapterStub:
             self.get_sketch(request.document_name, request.sketch_name),
             self.document,
             request,
+        )
+
+    def analyze_constraints(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchConstraintDiagnosticsResult:
+        self.analyze_constraints_calls.append((document_name, sketch_name))
+        return SketchConstraintDiagnosticsResult(
+            diagnostics=SketchConstraintDiagnostics(
+                solver=SketchSolverData(
+                    available=True,
+                    fresh=True,
+                    degrees_of_freedom=0,
+                    fully_constrained=True,
+                    conflicting_constraint_indices=(),
+                    redundant_constraint_indices=(),
+                    partially_redundant_constraint_indices=(),
+                    malformed_constraint_indices=(),
+                ),
+                classification=SketchDiagnosticClassification.FULLY_CONSTRAINED,
+                constraint_count=0,
+                active_count=0,
+                inactive_count=0,
+                driving_count=0,
+                reference_count=0,
+                driving_state_unavailable_count=0,
+                virtual_space_count=0,
+                issues=(),
+            ),
+            sketch={},
+            document=DocumentSummary(
+                name="Doc",
+                label="Doc",
+                file_path=None,
+                modified=False,
+                active=True,
+                object_count=0,
+            ),
         )
 
     def validate_sketch_profile(
@@ -1174,6 +1218,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[DocumentHandlers,
             create_sketch=CreateSketchHandler(actual_adapter, dispatcher),
             get_sketch=GetSketchHandler(actual_adapter, dispatcher),
             analyze_sketch=AnalyzeSketchHandler(actual_adapter, dispatcher),
+            analyze_sketch_constraints=AnalyzeSketchConstraintsHandler(actual_adapter, dispatcher),
             validate_sketch_profile=ValidateSketchProfileHandler(actual_adapter, dispatcher),
             list_sketch_open_vertices=ListSketchOpenVerticesHandler(
                 actual_adapter,

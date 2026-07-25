@@ -10,6 +10,7 @@ from freecad_mcp.commands import (
     AddSketchConstraintsHandler,
     AddSketchGeometryHandler,
     AddSketchReferenceConstraintsHandler,
+    AnalyzeSketchConstraintsHandler,
     AnalyzeSketchHandler,
     ClearSketchConstraintExpressionHandler,
     CreateDocumentHandler,
@@ -120,6 +121,10 @@ def _build_runtime() -> Runtime:
         create_sketch=CreateSketchHandler(adapter=adapter, dispatcher=dispatcher),
         get_sketch=GetSketchHandler(adapter=adapter, dispatcher=dispatcher),
         analyze_sketch=AnalyzeSketchHandler(adapter=adapter, dispatcher=dispatcher),
+        analyze_sketch_constraints=AnalyzeSketchConstraintsHandler(
+            adapter=adapter,
+            dispatcher=dispatcher,
+        ),
         validate_sketch_profile=ValidateSketchProfileHandler(
             adapter=adapter,
             dispatcher=dispatcher,
