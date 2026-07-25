@@ -111,8 +111,10 @@ def test_handler_called_once_with_correct_names() -> None:
     server = build_mcp_server(handlers, ServerConfig())
     arguments = {"document_name": "TestDoc", "sketch_name": "TestSketch"}
 
-    _, result = asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
-    result = cast(dict[str, object], result)
+    call_result = cast(
+        Any, asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
+    )
+    result = cast(dict[str, object], call_result[1])
     assert result["ok"] is True
 
 
@@ -123,8 +125,10 @@ def test_result_passes_through_diagnostics() -> None:
     server = build_mcp_server(handlers, ServerConfig())
     arguments = {"document_name": "TestDoc", "sketch_name": "TestSketch"}
 
-    _, result = asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
-    result = cast(dict[str, object], result)
+    call_result = cast(
+        Any, asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
+    )
+    result = cast(dict[str, object], call_result[1])
     assert result["ok"] is True
     assert result["code"] == "sketch_diagnostics_complete"
 
@@ -136,7 +140,10 @@ def test_result_is_json_compatible() -> None:
     server = build_mcp_server(handlers, ServerConfig())
     arguments = {"document_name": "TestDoc", "sketch_name": "TestSketch"}
 
-    _, result = asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
+    call_result = cast(
+        Any, asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
+    )
+    result = cast(dict[str, object], call_result[1])
     serialized = json.dumps(result)
     assert isinstance(serialized, str)
 
@@ -148,7 +155,10 @@ def test_result_no_native_objects() -> None:
     server = build_mcp_server(handlers, ServerConfig())
     arguments = {"document_name": "TestDoc", "sketch_name": "TestSketch"}
 
-    _, raw = asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
+    call_result = cast(
+        Any, asyncio.run(server.call_tool(ANALYZE_SKETCH_CONSTRAINTS_TOOL, arguments))
+    )
+    raw = cast(dict[str, object], call_result[1])
     serialized = json.dumps(raw)
 
     # Verify serialized string contains no Python object repr patterns

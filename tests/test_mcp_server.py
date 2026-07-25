@@ -152,6 +152,11 @@ def test_mcp_server_composes_explicit_registration_groups(
         "register_sketch_whole_transform_tools",
         recorder("sketch_whole_transform_tools"),
     )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_diagnostics_tools",
+        recorder("sketch_diagnostics_tools"),
+    )
 
     server = mcp_server_module.build_mcp_server(handlers, ServerConfig())
 
