@@ -1,6 +1,6 @@
 # Public MCP Tool Inventory
 
-The authoritative registry contains exactly 58 public tools. The names and
+The authoritative registry contains exactly 59 public tools. The names and
 order below mirror `src/freecad_mcp/tool_registry.py`; repository consistency
 tests prevent the registry, runtime registration, and this inventory from
 drifting apart.
@@ -63,6 +63,7 @@ drifting apart.
 56. `rotate_sketch`
 57. `scale_sketch`
 58. `mirror_sketch`
+59. `analyze_sketch_constraints`
 
 ## Deferred
 

@@ -58,8 +58,8 @@ def _defs(schema: dict[str, Any]) -> dict[str, Any]:
 def test_whole_sketch_tools_are_discoverable_at_positions_55_to_58() -> None:
     names = [item.name for item in asyncio.run(_server().list_tools())]
 
-    assert len(names) == 58
-    assert names[54:] == [
+    assert len(names) == 59
+    assert names[54:58] == [
         TRANSLATE_SKETCH_TOOL,
         ROTATE_SKETCH_TOOL,
         SCALE_SKETCH_TOOL,
@@ -69,7 +69,7 @@ def test_whole_sketch_tools_are_discoverable_at_positions_55_to_58() -> None:
 
 def test_previous_54_tools_retain_order() -> None:
     names = [item.name for item in asyncio.run(_server().list_tools())]
-    assert len(names) == 58
+    assert len(names) == 59
     pre_existing = names[:54]
     for i, name in enumerate(pre_existing):
         assert names[i] == name

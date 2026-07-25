@@ -27,6 +27,7 @@ from freecad_mcp.mcp.sketch_constraint_state_tools import (
 )
 from freecad_mcp.mcp.sketch_constraint_tools import register_add_sketch_constraints_tool
 from freecad_mcp.mcp.sketch_curved_profile_tools import register_sketch_curved_profile_tools
+from freecad_mcp.mcp.sketch_diagnostics_tools import register_sketch_diagnostics_tools
 from freecad_mcp.mcp.sketch_editing_tools import register_sketch_editing_tools
 from freecad_mcp.mcp.sketch_external_geometry_tools import (
     register_sketch_external_geometry_tools,
@@ -84,6 +85,9 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
             "usable closed profiles. Use list_sketch_open_vertices when locating profile gaps, "
             "and get_sketch for detailed controlled geometry and constraints. Analysis tools "
             "never repair geometry and exclude construction and external geometry by default."
+            " Use analyze_sketch_constraints for structured constraint diagnostics:"
+            " conflicts, redundancies, state counts, and candidate repair actions;"
+            " it is strictly read-only and never repairs."
             " Use add_external_geometry for one proven same-document edge, vertex, or supported "
             "source-sketch geometry reference. Use list_external_geometry for controlled mapping "
             "readback and get_sketch_dependencies for dependency impact. Remove only through "
@@ -144,5 +148,6 @@ def build_mcp_server(handlers: DocumentHandlers, config: ServerConfig) -> FastMC
     register_sketch_geometry_transform_tools(server, handlers)
     register_sketch_constraint_state_tools(server, handlers)
     register_sketch_whole_transform_tools(server, handlers)
+    register_sketch_diagnostics_tools(server, handlers)
 
     return server

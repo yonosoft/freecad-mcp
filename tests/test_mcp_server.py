@@ -180,6 +180,7 @@ def test_mcp_server_composes_explicit_registration_groups(
         "sketch_geometry_transform_tools",
         "sketch_constraint_state_tools",
         "sketch_whole_transform_tools",
+        "sketch_diagnostics_tools",
     ]
     assert [tool.name for tool in asyncio.run(server.list_tools())] == ["create_sketch_polyline"]
 

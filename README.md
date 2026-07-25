@@ -14,7 +14,7 @@ Current capabilities include:
 - a discoverable external FreeCAD workbench named **MCP**;
 - start, stop, and status toolbar/menu commands for the embedded server;
 - a local Streamable HTTP server at `http://127.0.0.1:8765/mcp`;
-- 58 typed MCP tools for document creation, inspection, saving,
+- 59 typed MCP tools for document creation, inspection, saving,
   recomputation, controlled Part Design body and sketch creation, read-only
   sketch inspection, atomic controlled sketch-geometry addition, and atomic
   controlled sketch-constraint addition, controlled document-history
@@ -110,7 +110,7 @@ Restart FreeCAD, select **MCP**, and use **Start Server**, **Stop Server**, or
 }
 ```
 
-The exact 58 tool names and order are defined by the authoritative
+The exact 59 tool names and order are defined by the authoritative
 `src/freecad_mcp/tool_registry.py` registry and listed in the
 [public tool inventory](docs/public-tool-inventory.md). Tools 52–54 are `set_sketch_constraint_driving`, `set_sketch_constraint_active`, and `set_sketch_constraint_virtual_space`. Tools 55–58 are `translate_sketch`, `rotate_sketch`, `scale_sketch`, and `mirror_sketch`.
 
