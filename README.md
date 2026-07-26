@@ -40,7 +40,7 @@ and [Codeberg](https://codeberg.org/aeromaker/freecad-mcp).
 
 ## Verified Environment
 
-The currently verified live environment is FreeCAD `1.1.1.20260414` with
+The currently verified live environment is FreeCAD `1.1.2R20260723` with
 embedded Python `3.11.14` and PySide6 / Qt `6.8.3`. The MCP SDK uses stable v1
 (`>=1.27.2,<2`). Pure-Python automated checks run with standalone Python 3.11;
 direct FreeCAD adapter smokes use the embedded runtime, while live MCP endpoint
