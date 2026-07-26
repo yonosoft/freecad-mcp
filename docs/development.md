@@ -25,9 +25,11 @@ Keep FreeCAD/Python work separate from any ESP32 workspace or toolchain setup.
 
 ## Python Tooling
 
-Use standalone CPython 3.11 for PyDev, linting, type checking, and tests.
-FreeCAD 1.1.x release builds also use Python 3.11, but FreeCAD runtime modules
-are supplied by FreeCAD itself.
+Python 3.11 is required for PyDev, linting, type checking, and tests. Python
+3.12, 3.13, and 3.14 are not supported for the project virtual environment.
+A normal standalone CPython 3.11 installation is supported and preferred when
+available. FreeCAD 1.1.x release builds also bundle Python 3.11, but FreeCAD
+runtime modules remain supplied by FreeCAD itself.
 
 The `freecad-mcp` project uses its own `.venv` for local tooling where
 practical:
@@ -38,6 +40,20 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 .\scripts\test.ps1
 ```
+
+If standalone CPython 3.11 is unavailable, use the verified Windows fallback:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m venv --copies .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+This uses FreeCAD's bundled CPython only to create the development `.venv`.
+The currently verified `.venv` was created by this fallback. Pure-Python tests
+still run from `.venv` as ordinary external processes outside a live FreeCAD
+application. Native FreeCAD probes continue to use `freecadcmd.exe`; they do
+not turn the project `.venv` into a FreeCAD runtime.
 
 The repository scripts never install packages automatically.
 
@@ -212,67 +228,67 @@ start or stop the MCP server
 Add tests beside the responsibility they exercise:
 
 - command-handler behavior belongs in the existing operation-focused modules,
-  such as `test_create_document.py`, `test_save_document.py`,
-  `test_get_object.py`, `test_get_sketch.py`, `test_create_body.py`, and
-  `test_create_sketch.py`; `test_add_sketch_geometry.py` owns the geometry
-  input contract, while `test_add_sketch_constraints.py` owns constraint input
+  such as `tests/commands/test_document.py`, `tests/commands/test_save_document.py`,
+  `tests/commands/test_get_object.py`, `tests/commands/test_get_sketch.py`, `tests/commands/test_body.py`, and
+  `tests/commands/test_sketch.py`; `tests/commands/test_add_sketch_geometry.py` owns the geometry
+  input contract, while `tests/commands/test_add_sketch_constraints.py` owns constraint input
   models, validation, result serialization, and handler behavior;
 - FreeCAD document lifecycle and persistence belong in
-  `test_freecad_document_operations.py`;
+  `tests/freecad/test_document_operations.py`;
 - object hierarchy, visibility, lookup, and placement extraction belong in
-  `test_freecad_object_inspection.py`;
+  `tests/freecad/test_object_inspection.py`;
 - transactional body and sketch creation belong in
-  `test_freecad_body_creation.py` and `test_freecad_sketch_creation.py`;
+  `tests/freecad/test_body_creation.py` and `tests/freecad/test_sketch_creation.py`;
 - origin-plane resolution, support parsing and fallback, MapMode, attachment
-  results, and attachment rollback belong in `test_freecad_sketch_attachment.py`;
+  results, and attachment rollback belong in `tests/freecad/test_sketch_attachment.py`;
 - read-only sketch geometry, constraints, cached solver facts, malformed data,
-  and non-mutation safeguards belong in `test_freecad_sketch_inspection.py`;
+  and non-mutation safeguards belong in `tests/freecad/test_sketch_inspection.py`;
 - atomic insertion, ordered indices, construction state, transaction ownership,
   injected failures, and verified rollback belong in
-  `test_freecad_sketch_geometry_creation.py`;
+  `tests/freecad/test_sketch_geometry_creation.py`;
 - atomic constraint construction, compatibility validation, ordered indices,
   transaction ownership, geometry/flag preservation, and rollback belong in
-  `test_freecad_sketch_constraint_creation.py`;
+  `tests/freecad/test_sketch_constraint_creation.py`;
 - history models, validation, handlers, and application delegation belong in
-  `test_document_history.py`; native stack transitions, preconditions,
+  `tests/commands/test_document_history.py`; native stack transitions, preconditions,
   verification, file state, and isolation belong in
-  `test_freecad_document_history.py`;
+  `tests/freecad/test_document_history.py`;
 - semantic rectangle models, validation, serialization, handler behavior, and
-  focused error mapping belong in `test_create_sketch_rectangle.py`; native
+  focused error mapping belong in `tests/commands/test_sketch_rectangle.py`; native
   construction order, all placement branches, caller-owned transactions,
   verification injection, and exact rollback belong in
-  `test_freecad_sketch_rectangle_creation.py`; centred request/result and
-  handler coverage belongs in `test_create_sketch_centered_rectangle.py`, with
+  `tests/freecad/test_sketch_rectangle_creation.py`; centred request/result and
+  handler coverage belongs in `tests/commands/test_sketch_centered_rectangle.py`, with
   exact point/edge/constraint order, all centre branches, transaction ownership,
   corruption injection, and rollback in
-  `test_freecad_sketch_centered_rectangle_creation.py`;
+  `tests/freecad/test_sketch_centered_rectangle_creation.py`;
 - exact public catalogue order, uniqueness, registration completeness,
   lifecycle agreement, documented inventory, and maintained Markdown links
-  belong in `test_tool_catalogue.py`;
+  belong in `tests/contracts/test_tool_catalogue.py`;
 - MCP schemas, descriptions, and delegation belong in
-  `test_mcp_document_tools.py`, `test_mcp_object_tools.py`, or
-  `test_mcp_creation_tools.py`; the exact geometry union and tool-eleven
-  contract belong in `test_mcp_sketch_geometry_tools.py`, while the strict
+  `tests/mcp/test_document_tools.py`, `tests/mcp/test_object_tools.py`, or
+  `tests/mcp/test_creation_tools.py`; the exact geometry union and tool-eleven
+  contract belong in `tests/mcp/test_sketch_geometry_tools.py`, while the strict
   nested constraint union and tool-twelve contract belong in
-  `test_mcp_sketch_constraint_tools.py`; strict tool 13–15 schemas,
+  `tests/mcp/test_sketch_constraint_tools.py`; strict tool 13–15 schemas,
   descriptions, recovery guidance, and MCP errors belong in
-  `test_mcp_document_history_tools.py`; tool-sixteen discovery, strict schema,
+  `tests/mcp/test_document_history_tools.py`; tool-sixteen discovery, strict schema,
   structured result, and selection/recovery guidance belong in
-  `test_mcp_sketch_rectangle_tools.py`; tool-seventeen discovery, strict centre
+  `tests/mcp/test_sketch_rectangle_tools.py`; tool-seventeen discovery, strict centre
   schema, semantic reference result, and tool-selection guidance belong in
-  `test_mcp_sketch_centered_rectangle_tools.py`; server composition,
+  `tests/mcp/test_sketch_centered_rectangle_tools.py`; server composition,
   inventory agreement, lifecycle reporting, and HTTP transport belong in
-  `test_mcp_server.py`;
+  `tests/mcp/test_server.py`;
 - deterministic clustering, topology, profile traversal, analytic area,
   containment, intersections, and finding projections belong in
-  `test_sketch_topology.py`; strict analysis validation and handler delegation
-  belong in `test_sketch_analysis_commands.py`; exact tools 22--24 schemas,
+  `tests/freecad/test_sketch_topology.py`; strict analysis validation and handler delegation
+  belong in `tests/commands/test_sketch_analysis.py`; exact tools 22--24 schemas,
   descriptions, registration order, and serialization belong in
-  `test_mcp_sketch_analysis_tools.py`;
-- compatibility identity belongs in `test_module_compatibility.py`, and stable
-  dependency-direction safeguards belong in `test_architecture.py`.
+  `tests/mcp/test_sketch_analysis_tools.py`;
+- compatibility identity belongs in `tests/contracts/test_module_compatibility.py`, and stable
+  dependency-direction safeguards belong in `tests/contracts/test_architecture.py`.
 
-The non-collectable `freecad_adapter_stubs.py` and `mcp_server_stubs.py` modules
+The non-collectable `tests/support/freecad_stubs.py` and `tests/support/mcp_stubs.py` modules
 contain only test fakes shared across several responsibility files. Keep small
 dispatchers, builders, and mutable state local when only one test module needs
 them; do not grow a global `conftest.py` for convenience.
@@ -709,8 +725,9 @@ Use a dedicated MCP client test profile containing only:
 }
 ```
 
-Confirm the client lists exactly these MCP tools, in the order defined by
-`src/freecad_mcp/tool_registry.py`:
+Confirm the client lists exactly these MCP tools, in the unchanged legacy wire
+order defined by `src/freecad_mcp/catalog/definitions.py` and derived by
+`src/freecad_mcp/catalog/registry.py`:
 
 ```text
 create_document
@@ -1675,10 +1692,10 @@ permanent native campaign at the integration checkpoint:
 
 ```powershell
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pytest -q `
-  tests\test_sketch_external_geometry_commands.py `
-  tests\test_freecad_sketch_external_geometry.py `
-  tests\test_freecad_sketch_dependencies.py `
-  tests\test_mcp_sketch_external_geometry_tools.py
+  tests\commands\test_sketch_external_geometry.py `
+  tests\freecad\test_sketch_external_geometry.py `
+  tests\freecad\test_sketch_dependencies.py `
+  tests\mcp\test_sketch_external_geometry_tools.py
 
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" `
   scripts\smoke_sketch_external_geometry.py
@@ -1714,8 +1731,8 @@ undo after a failure that restored its own snapshot.
 
 | Changed responsibility | Principal files | Required focused evidence |
 | --- | --- | --- |
-| Strict source/reference schemas | `models.py`, `validation.py` | pure validation plus raw MCP schema tests |
-| Handler and Qt-dispatch boundary | `commands/sketch_external_geometry.py`, `application.py`, `protocols.py`, `runtime.py` | controlled-error, application delegation, and runtime composition tests |
+| Strict source/reference schemas | `models/`, `validation/` | pure validation plus raw MCP schema tests |
+| Handler and Qt-dispatch boundary | `commands/sketch_external_geometry.py`, `application.py`, `protocols/`, `runtime.py` | controlled-error, application delegation, and runtime composition tests |
 | Tool order and transport | `tool_registry.py`, `mcp/sketch_external_geometry_tools.py`, `mcp/server.py` | exact 28-tool order, unchanged first 24, strict extra-field rejection, HTTP composition |
 | External mapping and identity | `freecad/sketch_external_geometry.py` | adapter translation tests plus native edge/vertex/sketch, constraint, broken, and isolation cases |
 | Add/remove transactions | `freecad/sketch_external_geometry.py`, `transaction_names.py` | native labels, duplicate/refusal zero mutation, owned/caller-owned rollback, undo/redo, same-sketch recovery |
@@ -1762,11 +1779,11 @@ handler/MCP/adapter surface plus direct architecture neighbors:
 
 ```powershell
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pytest -q `
-  tests\test_sketch_removal_commands.py `
-  tests\test_freecad_sketch_removal.py `
-  tests\test_mcp_sketch_removal_tools.py `
-  tests\test_runtime.py `
-  tests\test_mcp_server.py
+  tests\commands\test_sketch_removal.py `
+  tests\freecad\test_sketch_removal.py `
+  tests\mcp\test_sketch_removal_tools.py `
+  tests\integration\test_runtime.py `
+  tests\mcp\test_server.py
 
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m ruff check `
   src\freecad_mcp\commands\sketch_removal.py `
@@ -1801,7 +1818,7 @@ cross-document isolation.
 
 | Changed responsibility | Principal files | Focused evidence |
 | --- | --- | --- |
-| Strict selections and desired Boolean | `models.py`, `validation.py` | empty, duplicate, Boolean-as-integer, negative, type, and deterministic-order validation tests |
+| Strict selections and desired Boolean | `models/`, `validation/` | empty, duplicate, Boolean-as-integer, negative, type, and deterministic-order validation tests |
 | Typed handlers and error envelopes | `commands/sketch_removal.py` | dispatch, unsafe impact, not-found, rollback, and no-change result tests |
 | Tool inventory and schemas | `tool_registry.py`, `mcp/sketch_removal_tools.py`, `mcp/server.py` | exact 31 order, unchanged first 28, unchanged 17 constraint variants, strict extras, no MCP-to-MCP routing |
 | Native preflight and remapping | `freecad/sketch_removal.py` | all constraint reference slots, descending deletion, geometry/constraint survivor mapping, controlled results |
@@ -1856,18 +1873,18 @@ changed adapter/handler/transport surface and direct composition neighbors:
 
 ```powershell
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pytest -q `
-  tests\test_freecad_sketch_editing.py `
-  tests\test_sketch_editing_commands.py `
-  tests\test_mcp_sketch_editing_tools.py `
-  tests\test_application.py `
-  tests\test_runtime.py `
-  tests\test_mcp_server.py
+  tests\freecad\test_sketch_editing.py `
+  tests\commands\test_sketch_editing.py `
+  tests\mcp\test_sketch_editing_tools.py `
+  tests\integration\test_application.py `
+  tests\integration\test_runtime.py `
+  tests\mcp\test_server.py
 
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m ruff check `
   src\freecad_mcp\commands\sketch_editing.py `
   src\freecad_mcp\freecad\sketch_editing.py `
   src\freecad_mcp\mcp\sketch_editing_tools.py `
-  tests\test_freecad_sketch_editing.py
+  tests\freecad\test_sketch_editing.py
 
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m mypy `
   src\freecad_mcp\commands\sketch_editing.py `
@@ -1917,9 +1934,9 @@ isolation; and no edit-mode mutation.
 
 | Changed responsibility | Principal files | Focused evidence |
 | --- | --- | --- |
-| Strict geometry/value/index schemas | `models.py`, `validation.py` | finite values, Boolean/string/float index rejection, closed objects, four geometry variants |
-| Existing constraint language reuse | `models.py`, `mcp/sketch_editing_tools.py` | replacement schema equals the unchanged 17-variant add union |
-| Handler and Qt boundary | `commands/sketch_editing.py`, `application.py`, `protocols.py`, `runtime.py` | dispatch, controlled refusal/error/no-op envelopes, composition tests |
+| Strict geometry/value/index schemas | `models/`, `validation/` | finite values, Boolean/string/float index rejection, closed objects, four geometry variants |
+| Existing constraint language reuse | `models/`, `mcp/sketch_editing_tools.py` | replacement schema equals the unchanged 17-variant add union |
+| Handler and Qt boundary | `commands/sketch_editing.py`, `application.py`, `protocols/`, `runtime.py` | dispatch, controlled refusal/error/no-op envelopes, composition tests |
 | Geometry identity and dependency policy | `freecad/sketch_editing.py` | same-type/no-op/dependency unit tests plus all four native geometry cases |
 | Datum identity and solver behavior | `freecad/sketch_editing.py` | six native dimensional types, unsupported/expression refusal, no-op, history, undo/redo |
 | Replacement/remapping | `freecad/sketch_editing.py` | semantic no-op, duplicate refusal, exact survivor mapping, geometric/dimensional native replacement |
@@ -1968,22 +1985,22 @@ transaction/rollback behavior. Develop with narrow tests first:
 
 ```powershell
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pytest -q `
-  tests\test_freecad_sketch_reference_constraints.py `
-  tests\test_sketch_reference_constraint_capabilities.py `
-  tests\test_mcp_sketch_reference_constraint_tools.py `
-  tests\test_freecad_sketch_inspection.py `
-  tests\test_freecad_sketch_removal.py `
-  tests\test_freecad_sketch_editing.py `
-  tests\test_application.py `
-  tests\test_runtime.py `
-  tests\test_mcp_server.py
+  tests\freecad\test_sketch_reference_constraints.py `
+  tests\validation\test_sketch_reference_constraints.py `
+  tests\mcp\test_sketch_reference_constraint_tools.py `
+  tests\freecad\test_sketch_inspection.py `
+  tests\freecad\test_sketch_removal.py `
+  tests\freecad\test_sketch_editing.py `
+  tests\integration\test_application.py `
+  tests\integration\test_runtime.py `
+  tests\mcp\test_server.py
 
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m ruff check `
   src\freecad_mcp\reference_constraint_capabilities.py `
   src\freecad_mcp\commands\sketch_reference_constraints.py `
   src\freecad_mcp\freecad\sketch_reference_constraints.py `
   src\freecad_mcp\mcp\sketch_reference_constraint_tools.py `
-  tests\test_sketch_reference_constraint_capabilities.py
+  tests\validation\test_sketch_reference_constraints.py
 
 & "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m mypy `
   src\freecad_mcp\reference_constraint_capabilities.py `
@@ -2107,17 +2124,17 @@ Develop against narrow pure-Python slices before the full gate:
 
 ```powershell
 & $FreeCADPython -m pytest -q `
-  tests\test_constraint_expression_language.py `
-  tests\test_freecad_sketch_constraint_expressions.py `
-  tests\test_sketch_constraint_expression_commands.py `
-  tests\test_mcp_sketch_constraint_expression_tools.py `
-  tests\test_freecad_sketch_inspection.py `
-  tests\test_freecad_sketch_dependencies.py `
-  tests\test_freecad_sketch_removal.py `
-  tests\test_freecad_sketch_editing.py `
-  tests\test_application.py `
-  tests\test_runtime.py `
-  tests\test_mcp_server.py
+  tests\validation\test_constraint_expression_language.py `
+  tests\freecad\test_sketch_constraint_expressions.py `
+  tests\commands\test_sketch_constraint_expressions.py `
+  tests\mcp\test_sketch_constraint_expression_tools.py `
+  tests\freecad\test_sketch_inspection.py `
+  tests\freecad\test_sketch_dependencies.py `
+  tests\freecad\test_sketch_removal.py `
+  tests\freecad\test_sketch_editing.py `
+  tests\integration\test_application.py `
+  tests\integration\test_runtime.py `
+  tests\mcp\test_server.py
 
 & $FreeCADPython -m ruff check `
   src\freecad_mcp\constraint_expression_language.py `
@@ -2204,16 +2221,16 @@ Develop with focused pure-Python checks:
 
 ```powershell
 & $FreeCADPython -m pytest -q `
-  tests\test_freecad_sketch_topology_editing.py `
-  tests\test_sketch_topology_editing_commands.py `
-  tests\test_mcp_sketch_topology_editing_tools.py `
-  tests\test_application.py `
-  tests\test_runtime.py `
-  tests\test_mcp_server.py `
-  tests\test_freecad_sketch_removal.py `
-  tests\test_freecad_sketch_editing.py `
-  tests\test_freecad_sketch_dependencies.py `
-  tests\test_freecad_sketch_constraint_expressions.py
+  tests\freecad\test_sketch_topology_editing.py `
+  tests\commands\test_sketch_topology_editing.py `
+  tests\mcp\test_sketch_topology_editing_tools.py `
+  tests\integration\test_application.py `
+  tests\integration\test_runtime.py `
+  tests\mcp\test_server.py `
+  tests\freecad\test_sketch_removal.py `
+  tests\freecad\test_sketch_editing.py `
+  tests\freecad\test_sketch_dependencies.py `
+  tests\freecad\test_sketch_constraint_expressions.py
 
 & $FreeCADPython -m ruff check `
   src\freecad_mcp\commands\sketch_topology_editing.py `
@@ -2221,19 +2238,19 @@ Develop with focused pure-Python checks:
   src\freecad_mcp\mcp\sketch_topology_editing_tools.py `
   scripts\probe_sketch_topology_editing.py `
   scripts\smoke_sketch_topology_editing.py `
-  tests\test_freecad_sketch_topology_editing.py `
-  tests\test_sketch_topology_editing_commands.py `
-  tests\test_mcp_sketch_topology_editing_tools.py
+  tests\freecad\test_sketch_topology_editing.py `
+  tests\commands\test_sketch_topology_editing.py `
+  tests\mcp\test_sketch_topology_editing_tools.py
 
 & $FreeCADPython -m mypy --strict `
   src\freecad_mcp\commands\sketch_topology_editing.py `
   src\freecad_mcp\freecad\sketch_topology_editing.py `
   src\freecad_mcp\mcp\sketch_topology_editing_tools.py `
   src\freecad_mcp\freecad\document.py `
-  src\freecad_mcp\models.py `
-  src\freecad_mcp\protocols.py `
+  src\freecad_mcp\models `
+  src\freecad_mcp\protocols `
   src\freecad_mcp\runtime.py `
-  src\freecad_mcp\validation.py
+  src\freecad_mcp\validation
 ```
 
 The authoritative real-adapter campaign is:
@@ -2306,16 +2323,16 @@ Develop with focused pure-Python checks:
 
 ```powershell
 & $FreeCADPython -m pytest -q `
-  tests\test_freecad_sketch_geometry_transforms.py `
-  tests\test_sketch_geometry_transform_commands.py `
-  tests\test_mcp_sketch_geometry_transform_tools.py `
-  tests\test_application.py `
-  tests\test_runtime.py `
-  tests\test_mcp_server.py `
-  tests\test_freecad_sketch_removal.py `
-  tests\test_freecad_sketch_dependencies.py `
-  tests\test_freecad_sketch_constraint_expressions.py `
-  tests\test_freecad_sketch_topology_editing.py
+  tests\freecad\test_sketch_geometry_transforms.py `
+  tests\commands\test_sketch_geometry_transforms.py `
+  tests\mcp\test_sketch_geometry_transform_tools.py `
+  tests\integration\test_application.py `
+  tests\integration\test_runtime.py `
+  tests\mcp\test_server.py `
+  tests\freecad\test_sketch_removal.py `
+  tests\freecad\test_sketch_dependencies.py `
+  tests\freecad\test_sketch_constraint_expressions.py `
+  tests\freecad\test_sketch_topology_editing.py
 
 & $FreeCADPython -m ruff check `
   src\freecad_mcp\commands\sketch_geometry_transforms.py `
@@ -2323,9 +2340,9 @@ Develop with focused pure-Python checks:
   src\freecad_mcp\mcp\sketch_geometry_transform_tools.py `
   scripts\probe_sketch_geometry_transforms.py `
   scripts\smoke_sketch_geometry_transforms.py `
-  tests\test_freecad_sketch_geometry_transforms.py `
-  tests\test_sketch_geometry_transform_commands.py `
-  tests\test_mcp_sketch_geometry_transform_tools.py
+  tests\freecad\test_sketch_geometry_transforms.py `
+  tests\commands\test_sketch_geometry_transforms.py `
+  tests\mcp\test_sketch_geometry_transform_tools.py
 
 & $FreeCADPython -m mypy --strict `
   src\freecad_mcp\commands\sketch_geometry_transforms.py `
@@ -2333,10 +2350,10 @@ Develop with focused pure-Python checks:
   src\freecad_mcp\mcp\sketch_geometry_transform_tools.py `
   src\freecad_mcp\application.py `
   src\freecad_mcp\freecad\document.py `
-  src\freecad_mcp\models.py `
-  src\freecad_mcp\protocols.py `
+  src\freecad_mcp\models `
+  src\freecad_mcp\protocols `
   src\freecad_mcp\runtime.py `
-  src\freecad_mcp\validation.py
+  src\freecad_mcp\validation
 ```
 
 The authoritative real-adapter campaign is:

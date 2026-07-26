@@ -1,0 +1,1 @@
+"""Domain-neutral core tests."""

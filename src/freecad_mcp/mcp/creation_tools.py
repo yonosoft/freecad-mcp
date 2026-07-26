@@ -6,11 +6,11 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.tool_registry import CREATE_BODY_TOOL, CREATE_SKETCH_TOOL
 
 
-def register_creation_tools(server: FastMCP[Any], handlers: DocumentHandlers) -> None:
+def register_creation_tools(server: FastMCP[Any], handlers: HandlerGroups) -> None:
     """Register Part Design Body and sketch creation tools."""
 
     @server.tool(
@@ -29,7 +29,7 @@ def register_creation_tools(server: FastMCP[Any], handlers: DocumentHandlers) ->
         name: str,
         label: str | None = None,
     ) -> dict[str, object]:
-        return handlers.create_body.execute(
+        return handlers.part_design.create_body.execute(
             document_name=document_name,
             name=name,
             label=label,
@@ -56,7 +56,7 @@ def register_creation_tools(server: FastMCP[Any], handlers: DocumentHandlers) ->
         label: str | None = None,
         support_plane: str | None = None,
     ) -> dict[str, object]:
-        return handlers.create_sketch.execute(
+        return handlers.sketcher.create_sketch.execute(
             document_name=document_name,
             body_name=body_name,
             name=name,

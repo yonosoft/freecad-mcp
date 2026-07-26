@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import (
     SketchConstraintInput,
     SketchConstraintValueInput,
@@ -51,7 +51,7 @@ UPDATE_SKETCH_CONSTRAINT_VALUE_DESCRIPTION = (
 
 def register_sketch_editing_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append Milestone 20 tools in authoritative 32--34 order."""
 
@@ -66,7 +66,7 @@ def register_sketch_editing_tools(
         geometry_index: SketchMutationIndex,
         geometry: SketchGeometryUpdateInput,
     ) -> dict[str, object]:
-        return handlers.update_sketch_geometry.execute(
+        return handlers.sketcher.update_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_index=geometry_index,
@@ -84,7 +84,7 @@ def register_sketch_editing_tools(
         constraint_index: SketchMutationIndex,
         replacement: SketchConstraintInput,
     ) -> dict[str, object]:
-        return handlers.replace_sketch_constraint.execute(
+        return handlers.sketcher.replace_sketch_constraint.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -102,7 +102,7 @@ def register_sketch_editing_tools(
         constraint_index: SketchMutationIndex,
         value: SketchConstraintValueInput,
     ) -> dict[str, object]:
-        return handlers.update_sketch_constraint_value.execute(
+        return handlers.sketcher.update_sketch_constraint_value.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,

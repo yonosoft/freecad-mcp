@@ -6,14 +6,14 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import SketchReferenceConstraintBatch
 from freecad_mcp.tool_registry import ADD_SKETCH_REFERENCE_CONSTRAINTS_TOOL
 
 
 def register_sketch_reference_constraint_tool(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Register the dedicated reference-constraint tool."""
 
@@ -41,7 +41,7 @@ def register_sketch_reference_constraint_tool(
         sketch_name: str,
         constraints: SketchReferenceConstraintBatch,
     ) -> dict[str, object]:
-        return handlers.add_sketch_reference_constraints.execute(
+        return handlers.sketcher.add_sketch_reference_constraints.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraints=constraints,

@@ -7,7 +7,7 @@ from contextlib import suppress
 from threading import Event, Lock, Thread
 from typing import Any
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.server.config import ServerConfig
 
 
@@ -17,7 +17,7 @@ class UvicornMCPRunner:
     def __init__(
         self,
         config: ServerConfig,
-        handlers: DocumentHandlers,
+        handlers: HandlerGroups,
         start_timeout_seconds: float = 10.0,
         stop_timeout_seconds: float = 5.0,
     ) -> None:

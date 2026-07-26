@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.commands.status import report_status
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.server.lifecycle import LifecycleService
@@ -15,7 +15,7 @@ class Application:
     """Dispatches user-facing operations to typed command handlers."""
 
     lifecycle: LifecycleService
-    documents: DocumentHandlers
+    handlers: HandlerGroups
 
     def start_server(self) -> CommandResult:
         """Start the local MCP server."""
@@ -31,15 +31,15 @@ class Application:
 
     def create_document(self, name: object, label: object | None = None) -> CommandResult:
         """Create a document through the shared application handler."""
-        return self.documents.create.execute(name=name, label=label)
+        return self.handlers.document.create.execute(name=name, label=label)
 
     def list_documents(self) -> CommandResult:
         """List all open documents through the shared application handler."""
-        return self.documents.list.execute()
+        return self.handlers.document.list.execute()
 
     def get_document(self, name: object) -> CommandResult:
         """Inspect one open document through the shared application handler."""
-        return self.documents.get.execute(name=name)
+        return self.handlers.document.get.execute(name=name)
 
     def save_document(
         self,
@@ -48,7 +48,7 @@ class Application:
         overwrite: object = False,
     ) -> CommandResult:
         """Persist one open document through the shared application handler."""
-        return self.documents.save.execute(
+        return self.handlers.document.save.execute(
             name=name,
             file_path=file_path,
             overwrite=overwrite,
@@ -56,22 +56,22 @@ class Application:
 
     def list_objects(self, document_name: object) -> CommandResult:
         """List objects in an open document through the shared application handler."""
-        return self.documents.object_query.execute(document_name=document_name)
+        return self.handlers.document.object_query.execute(document_name=document_name)
 
     def get_object(self, document_name: object, object_name: object) -> CommandResult:
         """Retrieve one object through the shared application handler."""
-        return self.documents.get_object.execute(
+        return self.handlers.document.get_object.execute(
             document_name=document_name,
             object_name=object_name,
         )
 
     def recompute_document(self, document_name: object) -> CommandResult:
         """Recompute one open document through the shared application handler."""
-        return self.documents.recompute.execute(document_name=document_name)
+        return self.handlers.document.recompute.execute(document_name=document_name)
 
     def get_document_history(self, document_name: object) -> CommandResult:
         """Inspect controlled document history through the shared handler."""
-        return self.documents.get_history.execute(document_name=document_name)
+        return self.handlers.document.get_history.execute(document_name=document_name)
 
     def undo_document(
         self,
@@ -79,7 +79,7 @@ class Application:
         expected_transaction_name: object | None = None,
     ) -> CommandResult:
         """Undo exactly one controlled document transaction."""
-        return self.documents.undo.execute(
+        return self.handlers.document.undo.execute(
             document_name=document_name,
             expected_transaction_name=expected_transaction_name,
         )
@@ -90,7 +90,7 @@ class Application:
         expected_transaction_name: object | None = None,
     ) -> CommandResult:
         """Redo exactly one controlled document transaction."""
-        return self.documents.redo.execute(
+        return self.handlers.document.redo.execute(
             document_name=document_name,
             expected_transaction_name=expected_transaction_name,
         )
@@ -99,7 +99,7 @@ class Application:
         self, document_name: object, name: object, label: object | None = None
     ) -> CommandResult:
         """Create a PartDesign::Body in an open document through the shared application handler."""
-        return self.documents.create_body.execute(
+        return self.handlers.part_design.create_body.execute(
             document_name=document_name, name=name, label=label
         )
 
@@ -112,7 +112,7 @@ class Application:
         support_plane: object | None = None,
     ) -> CommandResult:
         """Create a Sketcher::SketchObject in a PartDesign::Body through the shared handler."""
-        return self.documents.create_sketch.execute(
+        return self.handlers.sketcher.create_sketch.execute(
             document_name=document_name,
             body_name=body_name,
             name=name,
@@ -122,7 +122,7 @@ class Application:
 
     def get_sketch(self, document_name: object, sketch_name: object) -> CommandResult:
         """Inspect a Sketcher::SketchObject through the shared application handler."""
-        return self.documents.get_sketch.execute(
+        return self.handlers.sketcher.get_sketch.execute(
             document_name=document_name,
             sketch_name=sketch_name,
         )
@@ -135,7 +135,7 @@ class Application:
         include_external: object = False,
     ) -> CommandResult:
         """Return broad read-only sketch topology and solver diagnostics."""
-        return self.documents.analyze_sketch.execute(
+        return self.handlers.sketcher.analyze_sketch.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             include_construction=include_construction,
@@ -148,7 +148,7 @@ class Application:
         sketch_name: object,
     ) -> CommandResult:
         """Return structured constraint diagnostics through the shared handler."""
-        return self.documents.analyze_sketch_constraints.execute(
+        return self.handlers.sketcher.analyze_sketch_constraints.execute(
             document_name=document_name,
             sketch_name=sketch_name,
         )
@@ -162,7 +162,7 @@ class Application:
         include_external: object = False,
     ) -> CommandResult:
         """Validate all or selected sketch geometry as closed profiles."""
-        return self.documents.validate_sketch_profile.execute(
+        return self.handlers.sketcher.validate_sketch_profile.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -179,7 +179,7 @@ class Application:
         include_external: object = False,
     ) -> CommandResult:
         """Return unmatched degree-one endpoints for all or selected geometry."""
-        return self.documents.list_sketch_open_vertices.execute(
+        return self.handlers.sketcher.list_sketch_open_vertices.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -194,7 +194,7 @@ class Application:
         geometry: object,
     ) -> CommandResult:
         """Atomically append controlled geometry through the shared application handler."""
-        return self.documents.add_sketch_geometry.execute(
+        return self.handlers.sketcher.add_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry=geometry,
@@ -207,7 +207,7 @@ class Application:
         constraints: object,
     ) -> CommandResult:
         """Atomically append controlled constraints through the shared application handler."""
-        return self.documents.add_sketch_constraints.execute(
+        return self.handlers.sketcher.add_sketch_constraints.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraints=constraints,
@@ -220,7 +220,7 @@ class Application:
         constraints: object,
     ) -> CommandResult:
         """Atomically add constraints with unified internal/external operands."""
-        return self.documents.add_sketch_reference_constraints.execute(
+        return self.handlers.sketcher.add_sketch_reference_constraints.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraints=constraints,
@@ -235,7 +235,7 @@ class Application:
         placement: object,
     ) -> CommandResult:
         """Create one verified semantic rectangle through the shared handler."""
-        return self.documents.create_sketch_rectangle.execute(
+        return self.handlers.sketcher.create_sketch_rectangle.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             width=width,
@@ -252,7 +252,7 @@ class Application:
         center: object,
     ) -> CommandResult:
         """Create one verified centre-defined rectangle through the shared handler."""
-        return self.documents.create_sketch_centered_rectangle.execute(
+        return self.handlers.sketcher.create_sketch_centered_rectangle.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             width=width,
@@ -269,7 +269,7 @@ class Application:
         first_vertex_angle_degrees: object = 90.0,
     ) -> CommandResult:
         """Create one verified equilateral triangle through the shared polygon engine."""
-        return self.documents.create_sketch_equilateral_triangle.execute(
+        return self.handlers.sketcher.create_sketch_equilateral_triangle.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             circumradius=circumradius,
@@ -287,7 +287,7 @@ class Application:
         first_vertex_angle_degrees: object = 0.0,
     ) -> CommandResult:
         """Create one verified regular polygon through the shared polygon engine."""
-        return self.documents.create_sketch_regular_polygon.execute(
+        return self.handlers.sketcher.create_sketch_regular_polygon.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             side_count=side_count,
@@ -306,7 +306,7 @@ class Application:
         angle_degrees: object = 0.0,
     ) -> CommandResult:
         """Create one verified straight slot through the shared curved-profile layer."""
-        return self.documents.create_sketch_slot.execute(
+        return self.handlers.sketcher.create_sketch_slot.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             overall_length=overall_length,
@@ -325,7 +325,7 @@ class Application:
         placement: object,
     ) -> CommandResult:
         """Create one verified rounded rectangle through the shared curved-profile layer."""
-        return self.documents.create_sketch_rounded_rectangle.execute(
+        return self.handlers.sketcher.create_sketch_rounded_rectangle.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             width=width,
@@ -342,7 +342,7 @@ class Application:
         closed: object = False,
     ) -> CommandResult:
         """Create one verified semantic polyline through the shared handler."""
-        return self.documents.create_sketch_polyline.execute(
+        return self.handlers.sketcher.create_sketch_polyline.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             points=points,
@@ -356,7 +356,7 @@ class Application:
         source: object,
     ) -> CommandResult:
         """Add one controlled same-document external reference."""
-        return self.documents.add_external_geometry.execute(
+        return self.handlers.sketcher.add_external_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             source=source,
@@ -368,7 +368,7 @@ class Application:
         sketch_name: object,
     ) -> CommandResult:
         """List controlled external references without modifying the sketch."""
-        return self.documents.list_external_geometry.execute(
+        return self.handlers.sketcher.list_external_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
         )
@@ -380,7 +380,7 @@ class Application:
         external_reference_number: object,
     ) -> CommandResult:
         """Remove one preflighted unused controlled external reference."""
-        return self.documents.remove_external_geometry.execute(
+        return self.handlers.sketcher.remove_external_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             external_reference_number=external_reference_number,
@@ -392,7 +392,7 @@ class Application:
         sketch_name: object,
     ) -> CommandResult:
         """Inspect controlled sketch dependency categories without mutation."""
-        return self.documents.get_sketch_dependencies.execute(
+        return self.handlers.sketcher.get_sketch_dependencies.execute(
             document_name=document_name,
             sketch_name=sketch_name,
         )
@@ -404,7 +404,7 @@ class Application:
         constraint_indices: object,
     ) -> CommandResult:
         """Remove explicitly selected current sketch constraints atomically."""
-        return self.documents.remove_sketch_constraints.execute(
+        return self.handlers.sketcher.remove_sketch_constraints.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_indices=constraint_indices,
@@ -417,7 +417,7 @@ class Application:
         geometry_indices: object,
     ) -> CommandResult:
         """Remove selected unconstrained internal sketch geometry atomically."""
-        return self.documents.remove_sketch_geometry.execute(
+        return self.handlers.sketcher.remove_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -431,7 +431,7 @@ class Application:
         construction: object,
     ) -> CommandResult:
         """Set selected internal geometry to an exact desired construction state."""
-        return self.documents.set_sketch_geometry_construction.execute(
+        return self.handlers.sketcher.set_sketch_geometry_construction.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -446,7 +446,7 @@ class Application:
         geometry: object,
     ) -> CommandResult:
         """Update one same-type internal sketch geometry element."""
-        return self.documents.update_sketch_geometry.execute(
+        return self.handlers.sketcher.update_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_index=geometry_index,
@@ -461,7 +461,7 @@ class Application:
         replacement: object,
     ) -> CommandResult:
         """Replace one current sketch constraint with one controlled constraint."""
-        return self.documents.replace_sketch_constraint.execute(
+        return self.handlers.sketcher.replace_sketch_constraint.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -476,7 +476,7 @@ class Application:
         value: object,
     ) -> CommandResult:
         """Set one supported driving dimensional constraint value."""
-        return self.documents.update_sketch_constraint_value.execute(
+        return self.handlers.sketcher.update_sketch_constraint_value.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -491,7 +491,7 @@ class Application:
         driving: object,
     ) -> CommandResult:
         """Set one supported dimensional constraint to driving or reference state."""
-        return self.documents.set_sketch_constraint_driving.execute(
+        return self.handlers.sketcher.set_sketch_constraint_driving.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -506,7 +506,7 @@ class Application:
         active: object,
     ) -> CommandResult:
         """Set one supported constraint to active or inactive state."""
-        return self.documents.set_sketch_constraint_active.execute(
+        return self.handlers.sketcher.set_sketch_constraint_active.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -521,7 +521,7 @@ class Application:
         virtual: object,
     ) -> CommandResult:
         """Move one supported constraint into or out of virtual space."""
-        return self.documents.set_sketch_constraint_virtual_space.execute(
+        return self.handlers.sketcher.set_sketch_constraint_virtual_space.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -536,7 +536,7 @@ class Application:
         name: object,
     ) -> CommandResult:
         """Assign, rename, or clear one supported scalar constraint name."""
-        return self.documents.set_sketch_constraint_name.execute(
+        return self.handlers.sketcher.set_sketch_constraint_name.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -551,7 +551,7 @@ class Application:
         pick_point: object,
     ) -> CommandResult:
         """Trim one evidence-supported internal line-segment portion."""
-        return self.documents.trim_sketch_geometry.execute(
+        return self.handlers.sketcher.trim_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_index=geometry_index,
@@ -566,7 +566,7 @@ class Application:
         point: object,
     ) -> CommandResult:
         """Split one evidence-supported internal line segment."""
-        return self.documents.split_sketch_geometry.execute(
+        return self.handlers.sketcher.split_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_index=geometry_index,
@@ -582,7 +582,7 @@ class Application:
         target_point: object,
     ) -> CommandResult:
         """Extend one evidence-supported internal line endpoint."""
-        return self.documents.extend_sketch_geometry.execute(
+        return self.handlers.sketcher.extend_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_index=geometry_index,
@@ -598,7 +598,7 @@ class Application:
         reference: object,
     ) -> CommandResult:
         """Copy selected geometry reflected across one controlled sketch reference."""
-        return self.documents.mirror_sketch_geometry.execute(
+        return self.handlers.sketcher.mirror_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -613,7 +613,7 @@ class Application:
         displacement: object,
     ) -> CommandResult:
         """Copy selected geometry by one controlled displacement."""
-        return self.documents.translate_sketch_geometry.execute(
+        return self.handlers.sketcher.translate_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -629,7 +629,7 @@ class Application:
         angle_degrees: object,
     ) -> CommandResult:
         """Copy selected geometry through one controlled planar rotation."""
-        return self.documents.rotate_sketch_geometry.execute(
+        return self.handlers.sketcher.rotate_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -646,7 +646,7 @@ class Application:
         factor: object,
     ) -> CommandResult:
         """Copy selected geometry with one controlled uniform scale."""
-        return self.documents.scale_sketch_geometry.execute(
+        return self.handlers.sketcher.scale_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -665,7 +665,7 @@ class Application:
         column_displacement: object,
     ) -> CommandResult:
         """Copy selected geometry into one bounded rectangular array."""
-        return self.documents.rectangular_array_sketch_geometry.execute(
+        return self.handlers.sketcher.rectangular_array_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -685,7 +685,7 @@ class Application:
         step_angle_degrees: object,
     ) -> CommandResult:
         """Copy selected geometry into one bounded polar array."""
-        return self.documents.polar_array_sketch_geometry.execute(
+        return self.handlers.sketcher.polar_array_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -701,7 +701,7 @@ class Application:
         displacement: object,
     ) -> CommandResult:
         """Append translated copies of every internal geometry item."""
-        return self.documents.translate_sketch.execute(
+        return self.handlers.sketcher.translate_sketch.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             displacement=displacement,
@@ -715,7 +715,7 @@ class Application:
         angle_degrees: object,
     ) -> CommandResult:
         """Append rotated copies of every internal geometry item."""
-        return self.documents.rotate_sketch.execute(
+        return self.handlers.sketcher.rotate_sketch.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             center=center,
@@ -730,7 +730,7 @@ class Application:
         factor: object,
     ) -> CommandResult:
         """Append uniformly scaled copies of every internal geometry item."""
-        return self.documents.scale_sketch.execute(
+        return self.handlers.sketcher.scale_sketch.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             center=center,
@@ -744,7 +744,7 @@ class Application:
         reference: object,
     ) -> CommandResult:
         """Append mirrored copies of every internal geometry item."""
-        return self.documents.mirror_sketch.execute(
+        return self.handlers.sketcher.mirror_sketch.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             reference=reference,
@@ -758,7 +758,7 @@ class Application:
         expression: object,
     ) -> CommandResult:
         """Set or replace one finite validated scalar constraint expression."""
-        return self.documents.set_sketch_constraint_expression.execute(
+        return self.handlers.sketcher.set_sketch_constraint_expression.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -772,7 +772,7 @@ class Application:
         constraint_index: object,
     ) -> CommandResult:
         """Clear one supported expression while preserving its evaluated value."""
-        return self.documents.clear_sketch_constraint_expression.execute(
+        return self.handlers.sketcher.clear_sketch_constraint_expression.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -784,7 +784,7 @@ class Application:
         sketch_name: object,
     ) -> CommandResult:
         """Inspect scalar constraint expressions without mutation."""
-        return self.documents.list_sketch_constraint_expressions.execute(
+        return self.handlers.sketcher.list_sketch_constraint_expressions.execute(
             document_name=document_name,
             sketch_name=sketch_name,
         )
@@ -797,7 +797,7 @@ class Application:
         distance: object,
     ) -> CommandResult:
         """Chamfer two intersecting line segments in a sketch through the shared handler."""
-        return self.documents.chamfer_sketch_geometry.execute(
+        return self.handlers.sketcher.chamfer_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             first_geometry_index=first_geometry_index,
@@ -812,7 +812,7 @@ class Application:
         radius: object,
     ) -> CommandResult:
         """Fillet two intersecting line segments in a sketch through the shared handler."""
-        return self.documents.fillet_sketch_geometry.execute(
+        return self.handlers.sketcher.fillet_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             first_geometry_index=first_geometry_index,
@@ -828,9 +828,9 @@ class Application:
         return self.lifecycle.can_stop()
 
 
-def create_application(lifecycle: LifecycleService, documents: DocumentHandlers) -> Application:
+def create_application(lifecycle: LifecycleService, handlers: HandlerGroups) -> Application:
     """Create an application service from explicitly owned dependencies."""
     return Application(
         lifecycle=lifecycle,
-        documents=documents,
+        handlers=handlers,
     )

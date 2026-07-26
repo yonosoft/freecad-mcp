@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import (
     SketchMirrorReferenceInput,
     SketchPoint2DInput,
@@ -69,7 +69,7 @@ POLAR_ARRAY_SKETCH_GEOMETRY_DESCRIPTION = (
 
 def register_sketch_geometry_transform_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append the authoritative Milestone 24 tools in 43--48 order."""
 
@@ -84,7 +84,7 @@ def register_sketch_geometry_transform_tools(
         geometry_indices: SketchTransformSelection,
         reference: SketchMirrorReferenceInput,
     ) -> dict[str, object]:
-        return handlers.mirror_sketch_geometry.execute(
+        return handlers.sketcher.mirror_sketch_geometry.execute(
             document_name, sketch_name, geometry_indices, reference
         ).to_dict()
 
@@ -99,7 +99,7 @@ def register_sketch_geometry_transform_tools(
         geometry_indices: SketchTransformSelection,
         displacement: SketchPoint2DInput,
     ) -> dict[str, object]:
-        return handlers.translate_sketch_geometry.execute(
+        return handlers.sketcher.translate_sketch_geometry.execute(
             document_name, sketch_name, geometry_indices, displacement
         ).to_dict()
 
@@ -115,7 +115,7 @@ def register_sketch_geometry_transform_tools(
         center: SketchPoint2DInput,
         angle_degrees: SketchTransformAngleDegrees,
     ) -> dict[str, object]:
-        return handlers.rotate_sketch_geometry.execute(
+        return handlers.sketcher.rotate_sketch_geometry.execute(
             document_name, sketch_name, geometry_indices, center, angle_degrees
         ).to_dict()
 
@@ -131,7 +131,7 @@ def register_sketch_geometry_transform_tools(
         center: SketchPoint2DInput,
         factor: SketchTransformScaleFactor,
     ) -> dict[str, object]:
-        return handlers.scale_sketch_geometry.execute(
+        return handlers.sketcher.scale_sketch_geometry.execute(
             document_name, sketch_name, geometry_indices, center, factor
         ).to_dict()
 
@@ -149,7 +149,7 @@ def register_sketch_geometry_transform_tools(
         row_displacement: SketchPoint2DInput,
         column_displacement: SketchPoint2DInput,
     ) -> dict[str, object]:
-        return handlers.rectangular_array_sketch_geometry.execute(
+        return handlers.sketcher.rectangular_array_sketch_geometry.execute(
             document_name,
             sketch_name,
             geometry_indices,
@@ -172,7 +172,7 @@ def register_sketch_geometry_transform_tools(
         instance_count: SketchPolarArrayInstanceCount,
         step_angle_degrees: SketchTransformAngleDegrees,
     ) -> dict[str, object]:
-        return handlers.polar_array_sketch_geometry.execute(
+        return handlers.sketcher.polar_array_sketch_geometry.execute(
             document_name,
             sketch_name,
             geometry_indices,

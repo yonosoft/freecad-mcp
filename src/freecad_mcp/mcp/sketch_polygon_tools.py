@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import (
     Circumradius,
     PolygonAngleDegrees,
@@ -62,7 +62,7 @@ CREATE_SKETCH_REGULAR_POLYGON_DESCRIPTION = (
 
 def register_sketch_polygon_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append the triangle and regular polygon exactly as tools eighteen and nineteen."""
 
@@ -78,7 +78,7 @@ def register_sketch_polygon_tools(
         center: SketchCenterPointInput,
         first_vertex_angle_degrees: PolygonAngleDegrees = 90.0,
     ) -> dict[str, object]:
-        return handlers.create_sketch_equilateral_triangle.execute(
+        return handlers.sketcher.create_sketch_equilateral_triangle.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             circumradius=circumradius,
@@ -99,7 +99,7 @@ def register_sketch_polygon_tools(
         center: SketchCenterPointInput,
         first_vertex_angle_degrees: PolygonAngleDegrees = 0.0,
     ) -> dict[str, object]:
-        return handlers.create_sketch_regular_polygon.execute(
+        return handlers.sketcher.create_sketch_regular_polygon.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             side_count=side_count,

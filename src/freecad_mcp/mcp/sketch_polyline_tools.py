@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import SketchPolylinePointInput
 from freecad_mcp.tool_registry import CREATE_SKETCH_POLYLINE_TOOL
 
@@ -33,7 +33,7 @@ CREATE_SKETCH_POLYLINE_DESCRIPTION = (
 
 def register_create_sketch_polyline_tool(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Register the semantic polyline operation as tool #22."""
 
@@ -48,7 +48,7 @@ def register_create_sketch_polyline_tool(
         points: list[SketchPolylinePointInput],
         closed: bool = False,
     ) -> dict[str, object]:
-        return handlers.create_sketch_polyline.execute(
+        return handlers.sketcher.create_sketch_polyline.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             points=points,

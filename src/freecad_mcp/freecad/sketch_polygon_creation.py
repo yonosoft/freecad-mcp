@@ -73,10 +73,11 @@ def create_sketch_polygon(
     request: SketchSemanticPolygonRequest,
 ) -> SketchPolygonCreationResult:
     """Append, constrain, recompute, and verify one regular polygon atomically."""
-    import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
     import Sketcher  # type: ignore[import-not-found]
+
+    import FreeCAD as App  # type: ignore[import-not-found]
 
     document = _find_document(App, request.document_name)
     sketch = _polygon_call(lambda: _find_sketch(document, request.sketch_name), phase="lookup")

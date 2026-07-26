@@ -24,9 +24,10 @@ def get_sketch_dependencies(
     sketch_name: str,
 ) -> SketchDependencyInspectionResult:
     """Inspect supported dependency categories without recompute or document mutation."""
-    import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
+
+    import FreeCAD as App  # type: ignore[import-not-found]
 
     document, sketch = find_document_and_sketch(App, document_name, sketch_name)
     try:

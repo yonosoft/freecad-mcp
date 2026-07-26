@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import sys
 
-import FreeCAD as App  # type: ignore[import-not-found]
 import FreeCADGui as Gui  # type: ignore[import-not-found]
+
+import FreeCAD as App  # type: ignore[import-not-found]
 
 _WORKBENCH_ID = "MCPWorkbench"
 _WORKBENCH_NAME = "MCP"

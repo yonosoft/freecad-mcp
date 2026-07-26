@@ -75,9 +75,10 @@ def add_external_geometry(
     source: ExternalGeometrySourceInput,
 ) -> ExternalGeometryMutationResult:
     """Add one normal same-document external reference atomically."""
-    import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
+
+    import FreeCAD as App  # type: ignore[import-not-found]
 
     document, sketch = find_document_and_sketch(App, document_name, sketch_name)
     source_object, subelement, identity = resolve_external_source(
@@ -201,9 +202,10 @@ def remove_external_geometry(
     external_reference_number: int,
 ) -> ExternalGeometryMutationResult:
     """Remove one resolved unused normal reference without native cascading."""
-    import FreeCAD as App
     import FreeCADGui as Gui
     import Part
+
+    import FreeCAD as App
 
     document, sketch = find_document_and_sketch(App, document_name, sketch_name)
     before_references = enumerate_external_geometry(document, sketch, Part)
@@ -346,9 +348,10 @@ def list_external_geometry(
     sketch_name: str,
 ) -> ExternalGeometryListResult:
     """Enumerate one sketch without recompute, transaction, solve, or GUI mutation."""
-    import FreeCAD as App
     import FreeCADGui as Gui
     import Part
+
+    import FreeCAD as App
 
     document, sketch = find_document_and_sketch(App, document_name, sketch_name)
     references = enumerate_external_geometry(document, sketch, Part)

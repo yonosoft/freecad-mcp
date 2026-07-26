@@ -6,12 +6,12 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import SketchGeometryBatch
 from freecad_mcp.tool_registry import ADD_SKETCH_GEOMETRY_TOOL
 
 
-def register_add_sketch_geometry_tool(server: FastMCP[Any], handlers: DocumentHandlers) -> None:
+def register_add_sketch_geometry_tool(server: FastMCP[Any], handlers: HandlerGroups) -> None:
     """Register atomic geometry mutation explicitly as tool eleven."""
 
     @server.tool(
@@ -33,7 +33,7 @@ def register_add_sketch_geometry_tool(server: FastMCP[Any], handlers: DocumentHa
         sketch_name: str,
         geometry: SketchGeometryBatch,
     ) -> dict[str, object]:
-        return handlers.add_sketch_geometry.execute(
+        return handlers.sketcher.add_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry=geometry,

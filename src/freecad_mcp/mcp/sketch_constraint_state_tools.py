@@ -6,7 +6,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.tool_registry import (
     SET_SKETCH_CONSTRAINT_ACTIVE_TOOL,
     SET_SKETCH_CONSTRAINT_DRIVING_TOOL,
@@ -42,7 +42,7 @@ SET_SKETCH_CONSTRAINT_VIRTUAL_SPACE_DESCRIPTION = (
 
 def register_sketch_constraint_state_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append Milestone 25 tools in authoritative 49--51 order."""
 
@@ -57,7 +57,7 @@ def register_sketch_constraint_state_tools(
         constraint_index: int,
         driving: bool,
     ) -> dict[str, object]:
-        return handlers.set_sketch_constraint_driving.execute(
+        return handlers.sketcher.set_sketch_constraint_driving.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -75,7 +75,7 @@ def register_sketch_constraint_state_tools(
         constraint_index: int,
         active: bool,
     ) -> dict[str, object]:
-        return handlers.set_sketch_constraint_active.execute(
+        return handlers.sketcher.set_sketch_constraint_active.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -93,7 +93,7 @@ def register_sketch_constraint_state_tools(
         constraint_index: int,
         virtual: bool,
     ) -> dict[str, object]:
-        return handlers.set_sketch_constraint_virtual_space.execute(
+        return handlers.sketcher.set_sketch_constraint_virtual_space.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,

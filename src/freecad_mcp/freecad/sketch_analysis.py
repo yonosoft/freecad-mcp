@@ -79,8 +79,9 @@ def _inspect_external_geometry(
     external geometry from native index ``-3`` onward.  Public analysis maps
     these to ``-1, -2, ...`` so native axis offsets are never exposed.
     """
-    import FreeCAD as App  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
+
+    import FreeCAD as App  # type: ignore[import-not-found]
 
     try:
         document = App.listDocuments().get(document_name)

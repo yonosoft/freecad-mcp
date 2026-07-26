@@ -87,9 +87,10 @@ def add_sketch_constraints(
     constraints: tuple[SketchConstraintInput, ...],
 ) -> SketchConstraintAdditionResult:
     """Append an ordered constraint batch atomically without recomputing or saving."""
-    import FreeCAD as App  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
     import Sketcher  # type: ignore[import-not-found]
+
+    import FreeCAD as App  # type: ignore[import-not-found]
 
     document = _find_document(App, document_name)
     sketch = _find_sketch(document, sketch_name)

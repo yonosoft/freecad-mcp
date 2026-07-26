@@ -42,9 +42,12 @@ and [Codeberg](https://codeberg.org/aeromaker/freecad-mcp).
 
 The currently verified live environment is FreeCAD `1.1.2R20260723` with
 embedded Python `3.11.14` and PySide6 / Qt `6.8.3`. The MCP SDK uses stable v1
-(`>=1.27.2,<2`). Pure-Python automated checks run with standalone Python 3.11;
-direct FreeCAD adapter smokes use the embedded runtime, while live MCP endpoint
-acceptance remains a separate recorded check.
+(`>=1.27.2,<2`). Pure-Python automated checks run as ordinary external
+processes in the project Python 3.11 virtual environment. The currently
+verified `.venv` was created from FreeCAD's bundled CPython 3.11 using the
+fallback documented below. Native FreeCAD probes continue to use
+`freecadcmd.exe`, while live MCP endpoint acceptance remains a separate
+recorded check.
 
 ## Repository Layout
 
@@ -58,7 +61,24 @@ freecad-mcp/
 |   |-- package.xml
 |   |-- Resources/
 |   `-- freecad_mcp/
+|       |-- catalog/
+|       |-- exceptions/
+|       |-- models/
+|       |-- protocols/
+|       `-- validation/
 `-- tests/
+    |-- catalog/
+    |-- commands/
+    |-- contracts/
+    |-- core/
+    |-- freecad/
+    |-- gui/
+    |-- integration/
+    |-- mcp/
+    |-- models/
+    |-- server/
+    |-- support/
+    `-- validation/
 ```
 
 `src` is the installable FreeCAD addon root. The Python import package remains
@@ -66,13 +86,29 @@ freecad-mcp/
 
 ## Quick Development Setup
 
-Use Python 3.11 for local tooling:
+Python 3.11 is required for local tooling; Python 3.12, 3.13, and 3.14 are not
+supported for the project virtual environment. A normal standalone CPython
+3.11 installation is supported and preferred when available:
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 .\scripts\test.ps1
 ```
+
+When standalone CPython 3.11 is unavailable, the currently verified Windows
+fallback uses FreeCAD's bundled CPython only to create the development virtual
+environment:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m venv --copies .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+The resulting `.venv` still runs pure-Python checks as ordinary processes
+outside a live FreeCAD application. Native FreeCAD probes use
+`freecadcmd.exe`.
 
 The embedded server also requires `mcp>=1.27.2,<2` in FreeCAD's Python
 environment. For the current FreeCAD 1.1 Windows development setup, install it
@@ -110,9 +146,16 @@ Restart FreeCAD, select **MCP**, and use **Start Server**, **Stop Server**, or
 }
 ```
 
-The exact 59 tool names and order are defined by the authoritative
-`src/freecad_mcp/tool_registry.py` registry and listed in the
-[public tool inventory](docs/public-tool-inventory.md). Tools 52–54 are `set_sketch_constraint_driving`, `set_sketch_constraint_active`, and `set_sketch_constraint_virtual_space`. Tools 55–58 are `translate_sketch`, `rotate_sketch`, `scale_sketch`, and `mirror_sketch`.
+The structured catalogue under `src/freecad_mcp/catalog/` is the authoritative
+source for all 59 public identifiers, human-readable titles, groups, sections,
+logical order, and unchanged legacy MCP wire order. The
+`src/freecad_mcp/tool_registry.py` module remains a compatibility façade. The
+[public tool inventory](docs/public-tool-inventory.md) lists the current wire
+order; catalogue grouping is metadata only and does not filter tool visibility.
+Tools 52–54 are `set_sketch_constraint_driving`,
+`set_sketch_constraint_active`, and `set_sketch_constraint_virtual_space`.
+Tools 55–58 are `translate_sketch`, `rotate_sketch`, `scale_sketch`, and
+`mirror_sketch`.
 Tool 59 is `analyze_sketch_constraints`, a strictly read-only constraint and solver diagnostic tool. It reports solver availability, freshness, degrees of freedom, fully-constrained state, conflicts, redundancies, partial redundancies, malformed constraints, inactive and reference and virtual-space constraint counts, and controlled candidate repair actions. All public constraint indices are zero-based. Candidate actions are non-binding suggestions referencing existing mutation tools and do not perform automatic repair. The tool never recomputes, opens a transaction, modifies the sketch, consumes undo/redo history, or saves.
 
 `create_body` requires exact internal document and body names, accepts an

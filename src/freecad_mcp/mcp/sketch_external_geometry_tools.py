@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import ExternalGeometrySourceInput, ExternalReferenceNumber
 from freecad_mcp.tool_registry import (
     ADD_EXTERNAL_GEOMETRY_TOOL,
@@ -55,7 +55,7 @@ GET_SKETCH_DEPENDENCIES_DESCRIPTION = (
 
 def register_sketch_external_geometry_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append Milestone 18 tools in their authoritative 25--28 order."""
 
@@ -69,7 +69,7 @@ def register_sketch_external_geometry_tools(
         sketch_name: str,
         source: ExternalGeometrySourceInput,
     ) -> dict[str, object]:
-        return handlers.add_external_geometry.execute(
+        return handlers.sketcher.add_external_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             source=source,
@@ -84,7 +84,7 @@ def register_sketch_external_geometry_tools(
         document_name: str,
         sketch_name: str,
     ) -> dict[str, object]:
-        return handlers.list_external_geometry.execute(
+        return handlers.sketcher.list_external_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
         ).to_dict()
@@ -99,7 +99,7 @@ def register_sketch_external_geometry_tools(
         sketch_name: str,
         external_reference_number: ExternalReferenceNumber,
     ) -> dict[str, object]:
-        return handlers.remove_external_geometry.execute(
+        return handlers.sketcher.remove_external_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             external_reference_number=external_reference_number,
@@ -114,7 +114,7 @@ def register_sketch_external_geometry_tools(
         document_name: str,
         sketch_name: str,
     ) -> dict[str, object]:
-        return handlers.get_sketch_dependencies.execute(
+        return handlers.sketcher.get_sketch_dependencies.execute(
             document_name=document_name,
             sketch_name=sketch_name,
         ).to_dict()

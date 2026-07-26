@@ -82,10 +82,11 @@ def create_sketch_centered_rectangle(
     request: SketchCenteredRectangleRequestInput,
 ) -> SketchCenteredRectangleCreationResult:
     """Append, constrain, recompute, and verify one centred rectangle atomically."""
-    import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
     import Sketcher  # type: ignore[import-not-found]
+
+    import FreeCAD as App  # type: ignore[import-not-found]
 
     document = _find_document(App, request.document_name)
     sketch = _shared_creation_call(

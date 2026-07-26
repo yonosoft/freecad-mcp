@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import SketchConstructionState, SketchMutationIndexSelection
 from freecad_mcp.tool_registry import (
     REMOVE_SKETCH_CONSTRAINTS_TOOL,
@@ -43,7 +43,7 @@ SET_SKETCH_GEOMETRY_CONSTRUCTION_DESCRIPTION = (
 
 def register_sketch_removal_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append Milestone 19 tools in authoritative 29--31 order."""
 
@@ -57,7 +57,7 @@ def register_sketch_removal_tools(
         sketch_name: str,
         constraint_indices: SketchMutationIndexSelection,
     ) -> dict[str, object]:
-        return handlers.remove_sketch_constraints.execute(
+        return handlers.sketcher.remove_sketch_constraints.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_indices=constraint_indices,
@@ -73,7 +73,7 @@ def register_sketch_removal_tools(
         sketch_name: str,
         geometry_indices: SketchMutationIndexSelection,
     ) -> dict[str, object]:
-        return handlers.remove_sketch_geometry.execute(
+        return handlers.sketcher.remove_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -90,7 +90,7 @@ def register_sketch_removal_tools(
         geometry_indices: SketchMutationIndexSelection,
         construction: SketchConstructionState,
     ) -> dict[str, object]:
-        return handlers.set_sketch_geometry_construction.execute(
+        return handlers.sketcher.set_sketch_geometry_construction.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,

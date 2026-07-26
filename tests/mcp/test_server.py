@@ -1,0 +1,257 @@
+from __future__ import annotations
+
+import asyncio
+import socket
+from collections.abc import Callable
+from typing import Any
+
+import pytest
+from mcp.client.streamable_http import streamable_http_client
+
+from freecad_mcp.commands import HandlerGroups
+from freecad_mcp.mcp import server as mcp_server_module
+from freecad_mcp.mcp.runner import UvicornMCPRunner
+from freecad_mcp.mcp.server import build_mcp_server
+from freecad_mcp.server.config import ServerConfig
+from freecad_mcp.server.lifecycle import LifecycleService
+from freecad_mcp.tool_registry import CREATE_DOCUMENT_TOOL
+from mcp import ClientSession
+from tests.support.mcp_stubs import make_handlers
+
+
+def test_mcp_server_composes_explicit_registration_groups(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    handlers, _ = make_handlers()
+    calls: list[str] = []
+
+    def recorder(name: str) -> Callable[[Any, HandlerGroups], None]:
+        def register(_server: Any, actual_handlers: HandlerGroups) -> None:
+            assert actual_handlers is handlers
+            calls.append(name)
+
+        return register
+
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_document_tools",
+        recorder("document_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_object_tools",
+        recorder("object_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_recompute_document_tool",
+        recorder("recompute_document_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_creation_tools",
+        recorder("creation_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_get_sketch_tool",
+        recorder("get_sketch_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_add_sketch_geometry_tool",
+        recorder("add_sketch_geometry_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_add_sketch_constraints_tool",
+        recorder("add_sketch_constraints_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_document_history_tools",
+        recorder("document_history_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_create_sketch_rectangle_tool",
+        recorder("create_sketch_rectangle_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_create_sketch_centered_rectangle_tool",
+        recorder("create_sketch_centered_rectangle_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_polygon_tools",
+        recorder("sketch_polygon_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_curved_profile_tools",
+        recorder("sketch_curved_profile_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_analysis_tools",
+        recorder("sketch_analysis_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_external_geometry_tools",
+        recorder("sketch_external_geometry_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_removal_tools",
+        recorder("sketch_removal_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_editing_tools",
+        recorder("sketch_editing_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_topology_editing_tools",
+        recorder("sketch_topology_editing_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_fillet_tool",
+        recorder("sketch_fillet_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_chamfer_tool",
+        recorder("sketch_chamfer_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_geometry_transform_tools",
+        recorder("sketch_geometry_transform_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_reference_constraint_tool",
+        recorder("sketch_reference_constraint_tool"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_constraint_expression_tools",
+        recorder("sketch_constraint_expression_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_constraint_state_tools",
+        recorder("sketch_constraint_state_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_whole_transform_tools",
+        recorder("sketch_whole_transform_tools"),
+    )
+    monkeypatch.setattr(
+        mcp_server_module,
+        "register_sketch_diagnostics_tools",
+        recorder("sketch_diagnostics_tools"),
+    )
+
+    server = mcp_server_module.build_mcp_server(handlers, ServerConfig())
+
+    assert calls == [
+        "document_tools",
+        "object_tools",
+        "recompute_document_tool",
+        "creation_tools",
+        "get_sketch_tool",
+        "add_sketch_geometry_tool",
+        "add_sketch_constraints_tool",
+        "document_history_tools",
+        "create_sketch_rectangle_tool",
+        "create_sketch_centered_rectangle_tool",
+        "sketch_polygon_tools",
+        "sketch_curved_profile_tools",
+        "sketch_analysis_tools",
+        "sketch_external_geometry_tools",
+        "sketch_removal_tools",
+        "sketch_editing_tools",
+        "sketch_reference_constraint_tool",
+        "sketch_constraint_expression_tools",
+        "sketch_topology_editing_tools",
+        "sketch_chamfer_tool",
+        "sketch_fillet_tool",
+        "sketch_geometry_transform_tools",
+        "sketch_constraint_state_tools",
+        "sketch_whole_transform_tools",
+        "sketch_diagnostics_tools",
+    ]
+    assert [tool.name for tool in asyncio.run(server.list_tools())] == ["create_sketch_polyline"]
+
+
+def test_registered_tools_match_lifecycle_status() -> None:
+    handlers, _ = make_handlers()
+    config = ServerConfig()
+    server = build_mcp_server(handlers, config)
+    lifecycle = LifecycleService(config, lambda: UvicornMCPRunner(config, handlers))
+
+    actual_tools = [tool.name for tool in asyncio.run(server.list_tools())]
+
+    assert lifecycle.status().data["tools"] == actual_tools
+    assert "MCP_CreateDocument" not in actual_tools
+    assert "list_objects" in actual_tools
+    assert "get_object" in actual_tools
+    assert "create_body" in actual_tools
+    assert "create_sketch" in actual_tools
+    assert "recompute_document" in actual_tools
+    assert "get_sketch" in actual_tools
+    assert "add_sketch_geometry" in actual_tools
+    assert "add_sketch_constraints" in actual_tools
+
+
+def test_streamable_http_runner_serves_tools_and_stops_cleanly() -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+
+    config = ServerConfig(port=port)
+    handlers, adapter = make_handlers()
+    runner = UvicornMCPRunner(config, handlers)
+    exits: list[BaseException | None] = []
+    runner.start(exits.append)
+
+    async def exercise_server() -> tuple[list[str], dict[str, object] | None]:
+        async with (
+            streamable_http_client(config.url) as (read_stream, write_stream, _),
+            ClientSession(read_stream, write_stream) as session,
+        ):
+            await session.initialize()
+            tools = await session.list_tools()
+            result = await session.call_tool(
+                CREATE_DOCUMENT_TOOL,
+                {"name": "HttpDocument", "label": "HTTP Test"},
+            )
+            return [tool.name for tool in tools.tools], result.structuredContent
+
+    try:
+        tool_names, structured_result = asyncio.run(exercise_server())
+    finally:
+        runner.stop()
+
+    assert CREATE_DOCUMENT_TOOL in tool_names
+    assert structured_result == {
+        "ok": True,
+        "document": {
+            "name": "HttpDocument",
+            "label": "HTTP Test",
+            "file_path": None,
+            "saved": False,
+            "modified": True,
+            "active": True,
+            "object_count": 0,
+        },
+        "message": "FreeCAD document created but not saved.",
+    }
+    assert adapter.create_calls == [("HttpDocument", "HTTP Test")]
+    assert exits == [None]

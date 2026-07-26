@@ -90,14 +90,22 @@ imports. Handlers return `CommandResult` objects with stable codes, user-facing
 messages, and structured data. This layer is the common entry point for GUI
 commands and MCP transport adapters.
 
-Shared structural concerns sit below the handlers: `freecad_mcp.models` owns
-controlled document, object, placement, and attachment data;
-`freecad_mcp.protocols` defines the document-adapter, dispatch, executor, and
-server-runner boundaries; `freecad_mcp.exceptions` owns controlled failures;
-and `freecad_mcp.validation` owns explicit request validation. These modules
-remain pure Python and do not import handlers or concrete FreeCAD, Qt, MCP, or
-server implementations. Legacy command-module imports are compatibility
-re-exports of the same objects.
+Shared structural concerns sit below the handlers as focused packages:
+`freecad_mcp.models` owns controlled document, Part Design, Sketcher geometry,
+constraint, profile, editing, transform, inspection, and diagnostic data;
+`freecad_mcp.protocols` defines core, document, Sketcher, and server boundaries;
+`freecad_mcp.exceptions` owns common, document, Part Design, and Sketcher
+failures; and `freecad_mcp.validation` owns common and domain-specific request
+validation. Their package `__init__.py` files preserve the original import
+surfaces and object identities. These packages remain pure Python and do not
+import handlers or concrete FreeCAD, Qt, MCP, or server implementations.
+Legacy command-module imports are compatibility re-exports of the same
+objects.
+
+Runtime composition groups handlers by actual responsibility through
+`HandlerGroups`: document lifecycle and inspection, Part Design, and Sketcher.
+All groups still receive the same single concrete FreeCAD adapter and Qt
+dispatcher; public application methods and MCP registrations remain unchanged.
 
 Document handlers validate requests and dispatch adapter operations to the main
 Qt thread. The MCP server accepts internal names consisting of an ASCII letter
@@ -248,12 +256,18 @@ reference-constraint addition is 35, constraint name/expression tools are
 and constraint-state tools are 52–54.
 whole-sketch transform tools are 55–58.
 No registration loop is used.
-Registration modules depend on handlers and the tool registry, never on the
+Registration modules depend on handlers and the catalogue, never on the
 concrete FreeCAD adapter.
 
-A dependency-free tool registry is the authoritative source for tool names and
-ordering. FastMCP registration and lifecycle status both consume that registry,
-so reported capabilities cannot drift from the registered set.
+`freecad_mcp.catalog.definitions` is the single authoritative 59-definition
+catalogue. It records stable identifiers, titles, primary groups, sections,
+logical positions, and legacy wire positions in human-readable logical order.
+`freecad_mcp.catalog.registry` derives both `LOGICAL_TOOL_NAMES` and the
+unchanged `REGISTERED_TOOL_NAMES`; `freecad_mcp.tool_registry` is a
+compatibility façade. FastMCP registration and lifecycle status continue to
+use the legacy order, so reported capabilities cannot drift from the
+registered set. Catalogue groups do not filter visibility, and future empty
+groups have no runtime effect.
 
 The registry currently exposes exactly 59 public tools. The maintained
 [public tool inventory](public-tool-inventory.md) records their exact names and
@@ -2296,58 +2310,63 @@ Existing selected-geometry transform tools (46–51) and schemas remain unchange
 The pure-Python suite mirrors the production responsibilities rather than
 collecting all adapter or transport behavior in single modules:
 
-- handler and validation tests remain grouped by application operation under
-  `tests/test_*.py`, including `tests/test_get_sketch.py` and
-  `tests/test_add_sketch_geometry.py`;
+- handler and validation tests are grouped by responsibility under
+  `tests/commands/` and `tests/validation/`, including
+  `tests/commands/test_get_sketch.py` and
+  `tests/commands/test_add_sketch_geometry.py`;
 - FreeCAD adapter tests are split into document operations, object inspection,
   body creation, sketch creation, sketch attachment, and read-only sketch
   inspection modules; atomic geometry mutation and rollback belong in
-  `tests/test_freecad_sketch_geometry_creation.py`; external mapping and source
-  translation belong in `tests/test_freecad_sketch_external_geometry.py`, and
-  dependency categories belong in `tests/test_freecad_sketch_dependencies.py`;
+  `tests/freecad/test_sketch_geometry_creation.py`; external mapping and source
+  translation belong in `tests/freecad/test_sketch_external_geometry.py`, and
+  dependency categories belong in `tests/freecad/test_sketch_dependencies.py`;
   Milestone 19 preflight, remapping, transaction, construction no-op, and
-  rollback behavior belong in `tests/test_freecad_sketch_removal.py`; Milestone
+  rollback behavior belong in `tests/freecad/test_sketch_removal.py`; Milestone
   20 comparison, move sequencing, editing preflight, transaction, remapping, and
-  rollback routing belong in `tests/test_freecad_sketch_editing.py`; reference
+  rollback routing belong in `tests/freecad/test_sketch_editing.py`; reference
   operand preflight and the tested allowlist belong in
-  `tests/test_sketch_reference_constraint_capabilities.py`; owned/caller-owned
+  `tests/validation/test_sketch_reference_constraints.py`; owned/caller-owned
   abort-versus-inverse ordering belongs in
-  `tests/test_freecad_sketch_reference_constraints.py`; parser and dimensional
-  semantics belong in `tests/test_constraint_expression_language.py`; graph
+  `tests/freecad/test_sketch_reference_constraints.py`; parser and dimensional
+  semantics belong in `tests/validation/test_constraint_expression_language.py`; graph
   resolution, exact native calls, and transaction ownership belong in
-  `tests/test_freecad_sketch_constraint_expressions.py`; handler validation and
-  error mapping belong in `tests/test_sketch_constraint_expression_commands.py`;
+  `tests/freecad/test_sketch_constraint_expressions.py`; handler validation and
+  error mapping belong in `tests/commands/test_sketch_constraint_expressions.py`;
   topology planning, exact native argument translation, mapping verification,
   history isolation, and rollback routing belong in
-  `tests/test_freecad_sketch_topology_editing.py`; topology handler validation
+  `tests/freecad/test_sketch_topology_editing.py`; topology handler validation
   and error translation belong in
-  `tests/test_sketch_topology_editing_commands.py`;
+  `tests/commands/test_sketch_topology_editing.py`;
 - MCP tests are split into document, object, creation, and sketch-geometry
   registrations; tools 25--28 have exact schema and delegation coverage in
-  `tests/test_mcp_sketch_external_geometry_tools.py`; tools 29–31 have strict
+  `tests/mcp/test_sketch_external_geometry_tools.py`; tools 29–31 have strict
   schema, order, and delegation coverage in
-  `tests/test_mcp_sketch_removal_tools.py`; tools 32–34 have strict schema,
-  order, and delegation coverage in `tests/test_mcp_sketch_editing_tools.py`;
+  `tests/mcp/test_sketch_removal_tools.py`; tools 32–34 have strict schema,
+  order, and delegation coverage in `tests/mcp/test_sketch_editing_tools.py`;
   tool 35 has exact schema, order, and no-chaining coverage in
-  `tests/test_mcp_sketch_reference_constraint_tools.py`; tools 36–39 have strict
+  `tests/mcp/test_sketch_reference_constraint_tools.py`; tools 36–39 have strict
   schema, order, description, and delegation coverage in
-  `tests/test_mcp_sketch_constraint_expression_tools.py`; tools 41–43 have
+  `tests/mcp/test_sketch_constraint_expression_tools.py`; tools 41–43 have
   strict schema, order, description, and typed delegation coverage in
-  `tests/test_mcp_sketch_topology_editing_tools.py`;
+  `tests/mcp/test_sketch_topology_editing_tools.py`;
   server composition, authoritative
   inventory, lifecycle agreement, and HTTP transport remain together;
-- `tests/test_module_compatibility.py` exclusively owns legacy/canonical identity
+- `tests/contracts/test_module_compatibility.py` exclusively owns legacy/canonical identity
   promises;
-- `tests/test_architecture.py` owns stable import-direction, explicit-registration,
+- `tests/contracts/test_architecture.py` owns stable import-direction, explicit-registration,
   canonical-definition, and clean-process import safeguards.
 
-`freecad_adapter_stubs.py` and `mcp_server_stubs.py` are non-collectable,
-test-only support modules. They provide only stateful fakes genuinely shared by
-multiple responsibility files; each test constructs fresh mutable state.
+`tests/support/freecad_stubs.py`, `tests/support/mcp_stubs.py`, and
+`tests/support/bootstrap_stubs.py` are non-collectable test-only support
+modules. They provide only stateful fakes genuinely shared by multiple
+responsibility files; each test constructs fresh mutable state.
 
-These tests run under standalone Python 3.11 and do not import a running FreeCAD
-process. FreeCAD API behavior, Qt integration, workbench startup, and GUI state
-remain live acceptance responsibilities documented in `docs/development.md`.
+These tests run as ordinary external processes under the project Python 3.11
+virtual environment and do not import a running FreeCAD process. A standalone
+CPython 3.11 base is preferred, while the currently verified `.venv` uses
+FreeCAD's bundled CPython fallback described below. FreeCAD API behavior, Qt
+integration, workbench startup, and GUI state remain live acceptance
+responsibilities documented in `docs/development.md`.
 
 ## Tool Levels
 
@@ -2367,7 +2386,27 @@ used.
 The official MCP SDK is the only declared runtime dependency and is constrained
 to `mcp>=1.27.2,<2` while SDK v2 remains prerelease. FreeCAD imports remain
 runtime adapter dependencies. Development tools (`pytest`, `ruff`, `mypy`) run
-under an external Python 3.11 virtual environment.
+under an external Python 3.11 virtual environment. Python 3.12, 3.13, and 3.14
+are not supported for that environment.
+
+A normal standalone CPython 3.11 base is supported and preferred:
+
+```powershell
+py -3.11 -m venv .venv
+```
+
+The currently verified Windows fallback creates the development environment
+from FreeCAD's bundled CPython:
+
+```powershell
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m venv --copies .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+This fallback uses the bundled interpreter only to create `.venv`;
+pure-Python checks still run as ordinary external processes. Native FreeCAD
+probes continue to use `freecadcmd.exe`.
 
 `runtime.py` is the concrete composition root. It constructs the single
 `FreeCADDocumentAdapter`, the Qt dispatcher, all application handlers, and the

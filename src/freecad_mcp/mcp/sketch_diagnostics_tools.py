@@ -6,7 +6,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.tool_registry import ANALYZE_SKETCH_CONSTRAINTS_TOOL
 
 ANALYZE_SKETCH_CONSTRAINTS_DESCRIPTION = (
@@ -20,7 +20,7 @@ ANALYZE_SKETCH_CONSTRAINTS_DESCRIPTION = (
 )
 
 
-def register_sketch_diagnostics_tools(server: FastMCP[Any], handlers: DocumentHandlers) -> None:
+def register_sketch_diagnostics_tools(server: FastMCP[Any], handlers: HandlerGroups) -> None:
     """Register the single constraint-diagnostics tool at position 59."""
 
     @server.tool(
@@ -32,7 +32,7 @@ def register_sketch_diagnostics_tools(server: FastMCP[Any], handlers: DocumentHa
         document_name: str,
         sketch_name: str,
     ) -> dict[str, object]:
-        return handlers.analyze_sketch_constraints.execute(
+        return handlers.sketcher.analyze_sketch_constraints.execute(
             document_name=document_name,
             sketch_name=sketch_name,
         ).to_dict()

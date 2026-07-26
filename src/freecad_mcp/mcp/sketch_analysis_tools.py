@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict, Field
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.tool_registry import (
     ANALYZE_SKETCH_TOOL,
     LIST_SKETCH_OPEN_VERTICES_TOOL,
@@ -44,7 +44,7 @@ LIST_SKETCH_OPEN_VERTICES_DESCRIPTION = (
 )
 
 
-def register_sketch_analysis_tools(server: FastMCP[Any], handlers: DocumentHandlers) -> None:
+def register_sketch_analysis_tools(server: FastMCP[Any], handlers: HandlerGroups) -> None:
     """Append the three analysis tools in their authoritative order."""
 
     @server.tool(
@@ -58,7 +58,7 @@ def register_sketch_analysis_tools(server: FastMCP[Any], handlers: DocumentHandl
         include_construction: StrictAnalysisFlag = False,
         include_external: StrictAnalysisFlag = False,
     ) -> dict[str, object]:
-        return handlers.analyze_sketch.execute(
+        return handlers.sketcher.analyze_sketch.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             include_construction=include_construction,
@@ -77,7 +77,7 @@ def register_sketch_analysis_tools(server: FastMCP[Any], handlers: DocumentHandl
         include_construction: StrictAnalysisFlag = False,
         include_external: StrictAnalysisFlag = False,
     ) -> dict[str, object]:
-        return handlers.validate_sketch_profile.execute(
+        return handlers.sketcher.validate_sketch_profile.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,
@@ -97,7 +97,7 @@ def register_sketch_analysis_tools(server: FastMCP[Any], handlers: DocumentHandl
         include_construction: StrictAnalysisFlag = False,
         include_external: StrictAnalysisFlag = False,
     ) -> dict[str, object]:
-        return handlers.list_sketch_open_vertices.execute(
+        return handlers.sketcher.list_sketch_open_vertices.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_indices=geometry_indices,

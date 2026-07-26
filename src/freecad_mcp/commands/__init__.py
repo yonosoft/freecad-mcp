@@ -93,7 +93,7 @@ from freecad_mcp.commands.status import report_status
 
 @dataclass(frozen=True, slots=True)
 class DocumentHandlers:
-    """Document-lifecycle handlers sharing one adapter and dispatcher boundary."""
+    """Document lifecycle and object-inspection handlers."""
 
     create: CreateDocumentHandler
     list: ListDocumentsHandler
@@ -104,7 +104,20 @@ class DocumentHandlers:
     save: SaveDocumentHandler
     object_query: ListObjectsHandler
     get_object: GetObjectHandler
+    recompute: RecomputeDocumentHandler
+
+
+@dataclass(frozen=True, slots=True)
+class PartDesignHandlers:
+    """Part Design handlers."""
+
     create_body: CreateBodyHandler
+
+
+@dataclass(frozen=True, slots=True)
+class SketcherHandlers:
+    """Sketcher lifecycle, modelling, editing, and inspection handlers."""
+
     create_sketch: CreateSketchHandler
     get_sketch: GetSketchHandler
     analyze_sketch: AnalyzeSketchHandler
@@ -153,7 +166,15 @@ class DocumentHandlers:
     set_sketch_constraint_virtual_space: SetSketchConstraintVirtualSpaceHandler
     chamfer_sketch_geometry: ChamferSketchGeometryHandler
     fillet_sketch_geometry: FilletSketchGeometryHandler
-    recompute: RecomputeDocumentHandler
+
+
+@dataclass(frozen=True, slots=True)
+class HandlerGroups:
+    """Coherent handler groups sharing one adapter and dispatcher boundary."""
+
+    document: DocumentHandlers
+    part_design: PartDesignHandlers
+    sketcher: SketcherHandlers
 
 
 __all__ = [
@@ -183,6 +204,7 @@ __all__ = [
     "GetObjectHandler",
     "GetSketchDependenciesHandler",
     "GetSketchHandler",
+    "HandlerGroups",
     "ListDocumentsHandler",
     "ListExternalGeometryHandler",
     "ListObjectsHandler",
@@ -190,6 +212,7 @@ __all__ = [
     "ListSketchOpenVerticesHandler",
     "MirrorSketchGeometryHandler",
     "MirrorSketchHandler",
+    "PartDesignHandlers",
     "PolarArraySketchGeometryHandler",
     "RecomputeDocumentHandler",
     "RectangularArraySketchGeometryHandler",
@@ -209,6 +232,7 @@ __all__ = [
     "SetSketchConstraintNameHandler",
     "SetSketchConstraintVirtualSpaceHandler",
     "SetSketchGeometryConstructionHandler",
+    "SketcherHandlers",
     "SplitSketchGeometryHandler",
     "TranslateSketchGeometryHandler",
     "TranslateSketchHandler",

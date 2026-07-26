@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import SketchMutationIndex
 from freecad_mcp.tool_registry import (
     CLEAR_SKETCH_CONSTRAINT_EXPRESSION_TOOL,
@@ -51,7 +51,7 @@ LIST_SKETCH_CONSTRAINT_EXPRESSIONS_DESCRIPTION = (
 
 def register_sketch_constraint_expression_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append Milestone 22 tools in authoritative 36--39 order."""
 
@@ -66,7 +66,7 @@ def register_sketch_constraint_expression_tools(
         constraint_index: SketchMutationIndex,
         name: str | None,
     ) -> dict[str, object]:
-        return handlers.set_sketch_constraint_name.execute(
+        return handlers.sketcher.set_sketch_constraint_name.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -84,7 +84,7 @@ def register_sketch_constraint_expression_tools(
         constraint_index: SketchMutationIndex,
         expression: str,
     ) -> dict[str, object]:
-        return handlers.set_sketch_constraint_expression.execute(
+        return handlers.sketcher.set_sketch_constraint_expression.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -101,7 +101,7 @@ def register_sketch_constraint_expression_tools(
         sketch_name: str,
         constraint_index: SketchMutationIndex,
     ) -> dict[str, object]:
-        return handlers.clear_sketch_constraint_expression.execute(
+        return handlers.sketcher.clear_sketch_constraint_expression.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraint_index=constraint_index,
@@ -116,7 +116,7 @@ def register_sketch_constraint_expression_tools(
         document_name: str,
         sketch_name: str,
     ) -> dict[str, object]:
-        return handlers.list_sketch_constraint_expressions.execute(
+        return handlers.sketcher.list_sketch_constraint_expressions.execute(
             document_name=document_name,
             sketch_name=sketch_name,
         ).to_dict()

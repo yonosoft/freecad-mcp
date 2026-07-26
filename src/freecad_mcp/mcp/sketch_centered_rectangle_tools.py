@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import RectangleDimension, SketchCenterPointInput
 from freecad_mcp.tool_registry import CREATE_SKETCH_CENTERED_RECTANGLE_TOOL
 
@@ -43,7 +43,7 @@ CREATE_SKETCH_CENTERED_RECTANGLE_DESCRIPTION = (
 
 def register_create_sketch_centered_rectangle_tool(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Register the centre-defined semantic rectangle exactly as tool seventeen."""
 
@@ -59,7 +59,7 @@ def register_create_sketch_centered_rectangle_tool(
         height: RectangleDimension,
         center: SketchCenterPointInput,
     ) -> dict[str, object]:
-        return handlers.create_sketch_centered_rectangle.execute(
+        return handlers.sketcher.create_sketch_centered_rectangle.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             width=width,

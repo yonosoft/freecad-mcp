@@ -1,9 +1,13 @@
 # Public MCP Tool Inventory
 
-The authoritative registry contains exactly 59 public tools. The names and
-order below mirror `src/freecad_mcp/tool_registry.py`; repository consistency
-tests prevent the registry, runtime registration, and this inventory from
-drifting apart.
+The structured catalogue under `src/freecad_mcp/catalog/` contains
+exactly 59 public tools, each with one complete definition. The numbered list
+below is the
+unchanged legacy MCP wire order derived as `REGISTERED_TOOL_NAMES`; it is
+intentionally distinct from the catalogue's human-readable logical order.
+Catalogue groups and sections are metadata only: all 59 tools remain visible,
+with no runtime filtering. Repository consistency tests prevent the catalogue,
+runtime registration, and this inventory from drifting apart.
 
 1. `create_document`
 2. `list_documents`

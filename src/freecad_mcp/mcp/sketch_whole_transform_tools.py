@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import (
     SketchPoint2DInput,
     SketchTransformAngleDegrees,
@@ -55,7 +55,7 @@ MIRROR_SKETCH_DESCRIPTION = (
 
 def register_sketch_whole_transform_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append the authoritative Milestone 28 whole-sketch tools in 55--58 order."""
 
@@ -69,7 +69,9 @@ def register_sketch_whole_transform_tools(
         sketch_name: str,
         displacement: SketchPoint2DInput,
     ) -> dict[str, object]:
-        return handlers.translate_sketch.execute(document_name, sketch_name, displacement).to_dict()
+        return handlers.sketcher.translate_sketch.execute(
+            document_name, sketch_name, displacement
+        ).to_dict()
 
     @server.tool(
         name=ROTATE_SKETCH_TOOL,
@@ -82,7 +84,7 @@ def register_sketch_whole_transform_tools(
         center: SketchPoint2DInput,
         angle_degrees: SketchTransformAngleDegrees,
     ) -> dict[str, object]:
-        return handlers.rotate_sketch.execute(
+        return handlers.sketcher.rotate_sketch.execute(
             document_name, sketch_name, center, angle_degrees
         ).to_dict()
 
@@ -97,7 +99,9 @@ def register_sketch_whole_transform_tools(
         center: SketchPoint2DInput,
         factor: SketchTransformScaleFactor,
     ) -> dict[str, object]:
-        return handlers.scale_sketch.execute(document_name, sketch_name, center, factor).to_dict()
+        return handlers.sketcher.scale_sketch.execute(
+            document_name, sketch_name, center, factor
+        ).to_dict()
 
     @server.tool(
         name=MIRROR_SKETCH_TOOL,
@@ -109,7 +113,9 @@ def register_sketch_whole_transform_tools(
         sketch_name: str,
         reference: SketchWholeMirrorReferenceInput,
     ) -> dict[str, object]:
-        return handlers.mirror_sketch.execute(document_name, sketch_name, reference).to_dict()
+        return handlers.sketcher.mirror_sketch.execute(
+            document_name, sketch_name, reference
+        ).to_dict()
 
     for name in (
         TRANSLATE_SKETCH_TOOL,

@@ -6,14 +6,14 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import SketchConstraintBatch
 from freecad_mcp.tool_registry import ADD_SKETCH_CONSTRAINTS_TOOL
 
 
 def register_add_sketch_constraints_tool(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Register atomic constraint mutation explicitly as tool twelve."""
 
@@ -70,7 +70,7 @@ def register_add_sketch_constraints_tool(
         sketch_name: str,
         constraints: SketchConstraintBatch,
     ) -> dict[str, object]:
-        return handlers.add_sketch_constraints.execute(
+        return handlers.sketcher.add_sketch_constraints.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             constraints=constraints,

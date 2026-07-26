@@ -88,10 +88,11 @@ def create_curved_profile(
     transaction_name: str,
 ) -> CurvedProfileNativeResult:
     """Append, constrain, recompute, verify, and atomically commit one profile."""
-    import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
     import Sketcher  # type: ignore[import-not-found]
+
+    import FreeCAD as App  # type: ignore[import-not-found]
 
     document = _find_document(App, document_name)
     sketch = _curved_call(lambda: _find_sketch(document, sketch_name), kind=kind, phase="lookup")

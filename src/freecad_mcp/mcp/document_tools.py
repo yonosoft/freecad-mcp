@@ -6,7 +6,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.tool_registry import (
     CREATE_DOCUMENT_TOOL,
     GET_DOCUMENT_TOOL,
@@ -16,7 +16,7 @@ from freecad_mcp.tool_registry import (
 )
 
 
-def register_document_tools(server: FastMCP[Any], handlers: DocumentHandlers) -> None:
+def register_document_tools(server: FastMCP[Any], handlers: HandlerGroups) -> None:
     """Register document creation, lookup, listing, and persistence tools."""
 
     @server.tool(
@@ -25,7 +25,7 @@ def register_document_tools(server: FastMCP[Any], handlers: DocumentHandlers) ->
         structured_output=True,
     )
     def create_document(name: str, label: str | None = None) -> dict[str, object]:
-        return handlers.create.execute(name=name, label=label).to_dict()
+        return handlers.document.create.execute(name=name, label=label).to_dict()
 
     @server.tool(
         name=LIST_DOCUMENTS_TOOL,
@@ -33,7 +33,7 @@ def register_document_tools(server: FastMCP[Any], handlers: DocumentHandlers) ->
         structured_output=True,
     )
     def list_documents() -> dict[str, object]:
-        return handlers.list.execute().to_dict()
+        return handlers.document.list.execute().to_dict()
 
     @server.tool(
         name=GET_DOCUMENT_TOOL,
@@ -41,7 +41,7 @@ def register_document_tools(server: FastMCP[Any], handlers: DocumentHandlers) ->
         structured_output=True,
     )
     def get_document(name: str) -> dict[str, object]:
-        return handlers.get.execute(name=name).to_dict()
+        return handlers.document.get.execute(name=name).to_dict()
 
     @server.tool(
         name=SAVE_DOCUMENT_TOOL,
@@ -53,14 +53,14 @@ def register_document_tools(server: FastMCP[Any], handlers: DocumentHandlers) ->
         file_path: str | None = None,
         overwrite: bool = False,
     ) -> dict[str, object]:
-        return handlers.save.execute(
+        return handlers.document.save.execute(
             name=name,
             file_path=file_path,
             overwrite=overwrite,
         ).to_dict()
 
 
-def register_recompute_document_tool(server: FastMCP[Any], handlers: DocumentHandlers) -> None:
+def register_recompute_document_tool(server: FastMCP[Any], handlers: HandlerGroups) -> None:
     """Register document recomputation at its authoritative inventory position."""
 
     @server.tool(
@@ -69,4 +69,4 @@ def register_recompute_document_tool(server: FastMCP[Any], handlers: DocumentHan
         structured_output=True,
     )
     def recompute_document(document_name: str) -> dict[str, object]:
-        return handlers.recompute.execute(document_name=document_name).to_dict()
+        return handlers.document.recompute.execute(document_name=document_name).to_dict()

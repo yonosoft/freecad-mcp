@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import (
     SketchMutationIndex,
     SketchPoint2DInput,
@@ -51,7 +51,7 @@ EXTEND_SKETCH_GEOMETRY_DESCRIPTION = (
 
 def register_sketch_topology_editing_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append trim, split, and extend in authoritative 40--42 order."""
 
@@ -66,7 +66,7 @@ def register_sketch_topology_editing_tools(
         geometry_index: SketchMutationIndex,
         pick_point: SketchPoint2DInput,
     ) -> dict[str, object]:
-        return handlers.trim_sketch_geometry.execute(
+        return handlers.sketcher.trim_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_index=geometry_index,
@@ -84,7 +84,7 @@ def register_sketch_topology_editing_tools(
         geometry_index: SketchMutationIndex,
         point: SketchPoint2DInput,
     ) -> dict[str, object]:
-        return handlers.split_sketch_geometry.execute(
+        return handlers.sketcher.split_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_index=geometry_index,
@@ -103,7 +103,7 @@ def register_sketch_topology_editing_tools(
         endpoint: SketchTopologyEndpoint,
         target_point: SketchPoint2DInput,
     ) -> dict[str, object]:
-        return handlers.extend_sketch_geometry.execute(
+        return handlers.sketcher.extend_sketch_geometry.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             geometry_index=geometry_index,

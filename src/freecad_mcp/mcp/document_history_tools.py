@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.tool_registry import (
     GET_DOCUMENT_HISTORY_TOOL,
     REDO_DOCUMENT_TOOL,
@@ -17,7 +17,7 @@ from freecad_mcp.tool_registry import (
 
 def register_document_history_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Register history inspection, one-step undo, and one-step redo as tools 13-15."""
 
@@ -33,7 +33,7 @@ def register_document_history_tools(
         structured_output=True,
     )
     def get_document_history(document_name: str) -> dict[str, object]:
-        return handlers.get_history.execute(document_name=document_name).to_dict()
+        return handlers.document.get_history.execute(document_name=document_name).to_dict()
 
     _forbid_extra_arguments(server, GET_DOCUMENT_HISTORY_TOOL)
 
@@ -54,7 +54,7 @@ def register_document_history_tools(
         document_name: str,
         expected_transaction_name: str | None = None,
     ) -> dict[str, object]:
-        return handlers.undo.execute(
+        return handlers.document.undo.execute(
             document_name=document_name,
             expected_transaction_name=expected_transaction_name,
         ).to_dict()
@@ -76,7 +76,7 @@ def register_document_history_tools(
         document_name: str,
         expected_transaction_name: str | None = None,
     ) -> dict[str, object]:
-        return handlers.redo.execute(
+        return handlers.document.redo.execute(
             document_name=document_name,
             expected_transaction_name=expected_transaction_name,
         ).to_dict()

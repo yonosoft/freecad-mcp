@@ -7,7 +7,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import ConfigDict
 
-from freecad_mcp.commands import DocumentHandlers
+from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.models import (
     ProfileAngleDegrees,
     ProfileDimension,
@@ -55,7 +55,7 @@ CREATE_SKETCH_ROUNDED_RECTANGLE_DESCRIPTION = (
 
 def register_sketch_curved_profile_tools(
     server: FastMCP[Any],
-    handlers: DocumentHandlers,
+    handlers: HandlerGroups,
 ) -> None:
     """Append slot and rounded rectangle exactly as tools twenty and twenty-one."""
 
@@ -72,7 +72,7 @@ def register_sketch_curved_profile_tools(
         center: SketchCenterPointInput,
         angle_degrees: ProfileAngleDegrees = 0.0,
     ) -> dict[str, object]:
-        return handlers.create_sketch_slot.execute(
+        return handlers.sketcher.create_sketch_slot.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             overall_length=overall_length,
@@ -94,7 +94,7 @@ def register_sketch_curved_profile_tools(
         corner_radius: ProfileDimension,
         placement: RoundedRectanglePlacementInput,
     ) -> dict[str, object]:
-        return handlers.create_sketch_rounded_rectangle.execute(
+        return handlers.sketcher.create_sketch_rounded_rectangle.execute(
             document_name=document_name,
             sketch_name=sketch_name,
             width=width,
