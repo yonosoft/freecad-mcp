@@ -18,9 +18,8 @@ from freecad_mcp.models import DocumentCollection, DocumentSummary
 
 def create_document(name: str, label: str | None) -> DocumentSummary:
     """Create a unique document and roll it back if initialization fails."""
-    import FreeCADGui as Gui  # type: ignore[import-not-found]
-
     import FreeCAD as App  # type: ignore[import-not-found]
+    import FreeCADGui as Gui  # type: ignore[import-not-found]
 
     created_name: str | None = None
     try:
@@ -49,9 +48,8 @@ def create_document(name: str, label: str | None) -> DocumentSummary:
 
 def list_documents() -> DocumentCollection:
     """Return all open documents ordered by stable internal name."""
-    import FreeCADGui as Gui
-
     import FreeCAD as App
+    import FreeCADGui as Gui
 
     try:
         documents = App.listDocuments()
@@ -66,9 +64,8 @@ def list_documents() -> DocumentCollection:
 
 def get_document(name: str) -> DocumentSummary:
     """Return one open document by exact internal name."""
-    import FreeCADGui as Gui
-
     import FreeCAD as App
+    import FreeCADGui as Gui
 
     try:
         document = App.listDocuments().get(name)
@@ -83,9 +80,8 @@ def get_document(name: str) -> DocumentSummary:
 
 def save_document(name: str, file_path: str | None) -> DocumentSummary:
     """Use FreeCAD's save or saveAs API and return resulting actual state."""
-    import FreeCADGui as Gui
-
     import FreeCAD as App
+    import FreeCADGui as Gui
 
     try:
         document = App.listDocuments().get(name)
@@ -113,9 +109,8 @@ def save_document(name: str, file_path: str | None) -> DocumentSummary:
 
 def recompute_document(document_name: str) -> DocumentSummary:
     """Recompute one open document and return its updated summary."""
-    import FreeCADGui as Gui
-
     import FreeCAD as App
+    import FreeCADGui as Gui
 
     try:
         document = App.listDocuments().get(document_name)

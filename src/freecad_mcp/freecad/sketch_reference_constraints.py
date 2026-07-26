@@ -196,11 +196,10 @@ def add_sketch_reference_constraints(
     constraints: tuple[SketchReferenceConstraintInput, ...],
 ) -> SketchReferenceConstraintAdditionResult:
     """Preflight the full batch, add it once, recompute, and verify atomically."""
+    import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
     import Sketcher  # type: ignore[import-not-found]
-
-    import FreeCAD as App  # type: ignore[import-not-found]
 
     document, sketch = sketch_external_geometry.find_document_and_sketch(
         App,

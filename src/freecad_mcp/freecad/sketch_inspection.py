@@ -97,9 +97,8 @@ _UNUSED_GEOMETRY_REFERENCE = -2000
 
 def get_sketch(document_name: str, sketch_name: str) -> SketchInspectionResult:
     """Return a controlled snapshot without solving, recomputing, or saving."""
-    import Part  # type: ignore[import-not-found]
-
     import FreeCAD as App  # type: ignore[import-not-found]
+    import Part  # type: ignore[import-not-found]
 
     try:
         document = App.listDocuments().get(document_name)

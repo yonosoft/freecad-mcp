@@ -104,11 +104,10 @@ def create_sketch_rectangle(
     request: SketchRectangleRequestInput,
 ) -> SketchRectangleCreationResult:
     """Append, constrain, recompute, and verify one rectangle before committing."""
+    import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
     import Sketcher  # type: ignore[import-not-found]
-
-    import FreeCAD as App  # type: ignore[import-not-found]
 
     document = _find_document(App, request.document_name)
     sketch = _find_sketch(document, request.sketch_name)

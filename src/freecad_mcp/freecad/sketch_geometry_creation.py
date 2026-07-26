@@ -40,9 +40,8 @@ def add_sketch_geometry(
     geometry: tuple[SketchGeometryInput, ...],
 ) -> SketchGeometryAdditionResult:
     """Append an ordered batch in one transaction without recomputing or saving."""
-    import Part  # type: ignore[import-not-found]
-
     import FreeCAD as App  # type: ignore[import-not-found]
+    import Part  # type: ignore[import-not-found]
 
     try:
         document = App.listDocuments().get(document_name)

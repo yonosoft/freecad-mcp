@@ -39,6 +39,9 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.isort]
+known-third-party = ["FreeCAD", "FreeCADGui", "Part", "Sketcher"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true

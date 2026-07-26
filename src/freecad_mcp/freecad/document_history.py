@@ -144,9 +144,8 @@ def _move_history(
 
 
 def _find_document(document_name: str) -> tuple[Any, Any, Any]:
-    import FreeCADGui as Gui  # type: ignore[import-not-found]
-
     import FreeCAD as App  # type: ignore[import-not-found]
+    import FreeCADGui as Gui  # type: ignore[import-not-found]
 
     try:
         document = App.listDocuments().get(document_name)

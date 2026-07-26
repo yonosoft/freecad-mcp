@@ -623,11 +623,10 @@ def _verify_other_document_histories(
 
 
 def _runtime_modules() -> tuple[Any, Any, Any, Any]:
+    import FreeCAD as App  # type: ignore[import-not-found]
     import FreeCADGui as Gui  # type: ignore[import-not-found]
     import Part  # type: ignore[import-not-found]
     import Sketcher  # type: ignore[import-not-found]
-
-    import FreeCAD as App  # type: ignore[import-not-found]
 
     return App, Gui, Part, Sketcher
 
