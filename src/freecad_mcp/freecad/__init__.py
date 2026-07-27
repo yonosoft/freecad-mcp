@@ -7,10 +7,16 @@ from freecad_mcp.freecad.document_history import (
     redo_document,
     undo_document,
 )
+from freecad_mcp.freecad.preferences import (
+    FreeCADStringPreferenceStore,
+    create_freecad_string_preference_store,
+)
 from freecad_mcp.freecad.qt_dispatcher import create_qt_main_thread_dispatcher
 
 __all__ = [
     "FreeCADDocumentAdapter",
+    "FreeCADStringPreferenceStore",
+    "create_freecad_string_preference_store",
     "create_qt_main_thread_dispatcher",
     "get_document_history",
     "redo_document",

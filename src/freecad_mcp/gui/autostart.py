@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-_PREFERENCES_PATH = "User parameter:BaseApp/Preferences/Mod/MCP"
+from freecad_mcp.visibility.persistence import MCP_PREFERENCES_PATH
+
 _START_ON_STARTUP_KEY = "StartServerOnStartup"
 _START_SCHEDULED = False
 
@@ -14,14 +15,14 @@ def is_start_on_startup_enabled() -> bool:
     param_get = getattr(App, "ParamGet", None)
     if param_get is None:
         return False
-    return bool(param_get(_PREFERENCES_PATH).GetBool(_START_ON_STARTUP_KEY, False))
+    return bool(param_get(MCP_PREFERENCES_PATH).GetBool(_START_ON_STARTUP_KEY, False))
 
 
 def set_start_on_startup_enabled(enabled: bool) -> None:
     """Persist whether the MCP server should start with FreeCAD."""
     import FreeCAD as App
 
-    App.ParamGet(_PREFERENCES_PATH).SetBool(_START_ON_STARTUP_KEY, enabled)
+    App.ParamGet(MCP_PREFERENCES_PATH).SetBool(_START_ON_STARTUP_KEY, enabled)
 
 
 def schedule_server_start() -> None:

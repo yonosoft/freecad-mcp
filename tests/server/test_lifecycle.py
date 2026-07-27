@@ -241,3 +241,39 @@ def test_shutdown_does_not_duplicate_an_explicit_stop_in_progress() -> None:
     assert stopped.ok is True
     assert nested_shutdowns[0].code == "server_stopping"
     assert runner.stop_calls == 1
+
+
+def test_lifecycle_callback_reports_each_real_transition_in_order() -> None:
+    states: list[LifecycleState] = []
+    lifecycle = LifecycleService(
+        ServerConfig(),
+        FakeRunnerFactory(),
+        state_callback=states.append,
+    )
+
+    lifecycle.start()
+    lifecycle.stop()
+
+    assert states == [
+        LifecycleState.STARTING,
+        LifecycleState.RUNNING,
+        LifecycleState.STOPPING,
+        LifecycleState.STOPPED,
+    ]
+
+
+def test_lifecycle_callback_failure_does_not_break_server_operations() -> None:
+    def fail(_state: LifecycleState) -> None:
+        raise RuntimeError("callback failed")
+
+    lifecycle = LifecycleService(
+        ServerConfig(),
+        FakeRunnerFactory(),
+        state_callback=fail,
+    )
+
+    started = lifecycle.start()
+    stopped = lifecycle.stop()
+
+    assert started.ok is True
+    assert stopped.ok is True

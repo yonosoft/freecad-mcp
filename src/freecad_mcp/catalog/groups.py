@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
 
@@ -19,6 +20,28 @@ class ToolGroup(StrEnum):
     TECHDRAW = "techdraw"
     FEM = "fem"
     ADVANCED_AUTOMATION = "advanced_automation"
+
+
+class ToolGroupKind(StrEnum):
+    """Stable visibility classification for a workbench group."""
+
+    INTERNAL = "internal"
+    STANDARD = "standard"
+    STANDARD_FUTURE = "standard_future"
+    ADVANCED = "advanced"
+
+
+@dataclass(frozen=True, slots=True)
+class ToolGroupMetadata:
+    """Visibility classification and dependency metadata for one group."""
+
+    kind: ToolGroupKind
+    dependencies: frozenset[ToolGroup]
+
+    @property
+    def is_standard(self) -> bool:
+        """Return whether this group participates in standard selection."""
+        return self.kind in (ToolGroupKind.STANDARD, ToolGroupKind.STANDARD_FUTURE)
 
 
 class ToolSection(StrEnum):
@@ -52,6 +75,34 @@ TOOL_GROUP_TITLES: Mapping[ToolGroup, str] = MappingProxyType(
     }
 )
 
+TOOL_GROUP_METADATA: Mapping[ToolGroup, ToolGroupMetadata] = MappingProxyType(
+    {
+        ToolGroup.CORE: ToolGroupMetadata(ToolGroupKind.INTERNAL, frozenset()),
+        ToolGroup.DOCUMENT: ToolGroupMetadata(ToolGroupKind.STANDARD, frozenset({ToolGroup.CORE})),
+        ToolGroup.PART_DESIGN: ToolGroupMetadata(
+            ToolGroupKind.STANDARD, frozenset({ToolGroup.CORE})
+        ),
+        ToolGroup.SKETCHER: ToolGroupMetadata(ToolGroupKind.STANDARD, frozenset({ToolGroup.CORE})),
+        ToolGroup.PART: ToolGroupMetadata(
+            ToolGroupKind.STANDARD_FUTURE, frozenset({ToolGroup.CORE})
+        ),
+        ToolGroup.DRAFT: ToolGroupMetadata(
+            ToolGroupKind.STANDARD_FUTURE, frozenset({ToolGroup.CORE})
+        ),
+        ToolGroup.TECHDRAW: ToolGroupMetadata(
+            ToolGroupKind.STANDARD_FUTURE, frozenset({ToolGroup.CORE})
+        ),
+        ToolGroup.FEM: ToolGroupMetadata(
+            ToolGroupKind.STANDARD_FUTURE, frozenset({ToolGroup.CORE})
+        ),
+        ToolGroup.ADVANCED_AUTOMATION: ToolGroupMetadata(
+            ToolGroupKind.ADVANCED, frozenset({ToolGroup.CORE})
+        ),
+    }
+)
+
+STANDARD_TOOL_GROUPS = tuple(group for group in ToolGroup if TOOL_GROUP_METADATA[group].is_standard)
+
 TOOL_SECTION_TITLES: Mapping[ToolSection, str] = MappingProxyType(
     {
         ToolSection.DOCUMENT_LIFECYCLE: "Document lifecycle",
@@ -72,8 +123,12 @@ TOOL_SECTION_TITLES: Mapping[ToolSection, str] = MappingProxyType(
 )
 
 __all__ = [
+    "STANDARD_TOOL_GROUPS",
+    "TOOL_GROUP_METADATA",
     "TOOL_GROUP_TITLES",
     "TOOL_SECTION_TITLES",
     "ToolGroup",
+    "ToolGroupKind",
+    "ToolGroupMetadata",
     "ToolSection",
 ]

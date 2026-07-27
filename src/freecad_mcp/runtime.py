@@ -72,25 +72,31 @@ from freecad_mcp.commands.sketch_constraint_state import (
     SetSketchConstraintVirtualSpaceHandler,
 )
 from freecad_mcp.commands.sketch_fillet import FilletSketchGeometryHandler
+from freecad_mcp.core.dispatch import MainThreadDispatcher
 from freecad_mcp.core.logging import get_logger
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter
+from freecad_mcp.freecad.preferences import create_freecad_string_preference_store
 from freecad_mcp.freecad.qt_dispatcher import create_qt_main_thread_dispatcher
 from freecad_mcp.mcp.runner import UvicornMCPRunner
 from freecad_mcp.server.config import ServerConfig
-from freecad_mcp.server.lifecycle import LifecycleService
+from freecad_mcp.server.lifecycle import LifecycleService, LifecycleState
+from freecad_mcp.visibility.controller import ToolVisibilityController
+from freecad_mcp.visibility.persistence import VisibilityPreferencesRepository
 
 _LOGGER = get_logger("runtime")
 
 
 @dataclass(slots=True, weakref_slot=True)
 class Runtime:
-    """Own the application service for one FreeCAD process."""
+    """Own the application and visibility services for one FreeCAD process."""
 
     application: Application
+    tool_visibility: ToolVisibilityController
 
     def shutdown(self) -> None:
         """Stop the in-process server during FreeCAD shutdown."""
         result = self.application.lifecycle.shutdown()
+        self.tool_visibility.shutdown()
         if not result.ok:
             _LOGGER.error("MCP shutdown failed: %s", result.to_dict())
 
@@ -106,10 +112,30 @@ def get_application() -> Application:
     return _runtime.application
 
 
+def get_tool_visibility_controller() -> ToolVisibilityController:
+    """Return the process-owned tool-visibility controller."""
+    global _runtime
+    if _runtime is None:
+        _runtime = _build_runtime()
+    return _runtime.tool_visibility
+
+
+def _post_lifecycle_state(
+    dispatcher: MainThreadDispatcher,
+    visibility: ToolVisibilityController,
+    state: LifecycleState,
+) -> None:
+    """Queue lifecycle publication without blocking a server-owned thread."""
+    dispatcher.post(lambda: visibility.on_server_state_changed(state.value))
+
+
 def _build_runtime() -> Runtime:
     config = ServerConfig()
     adapter = FreeCADDocumentAdapter()
     dispatcher = create_qt_main_thread_dispatcher()
+    visibility = ToolVisibilityController(
+        VisibilityPreferencesRepository(create_freecad_string_preference_store())
+    )
     handlers = HandlerGroups(
         document=DocumentHandlers(
             create=CreateDocumentHandler(adapter=adapter, dispatcher=dispatcher),
@@ -308,11 +334,16 @@ def _build_runtime() -> Runtime:
             ),
         ),
     )
+
+    def on_lifecycle_state_changed(state: LifecycleState) -> None:
+        _post_lifecycle_state(dispatcher, visibility, state)
+
     lifecycle = LifecycleService(
         config=config,
         runner_factory=lambda: UvicornMCPRunner(config=config, handlers=handlers),
+        state_callback=on_lifecycle_state_changed,
     )
-    runtime = Runtime(create_application(lifecycle, handlers))
+    runtime = Runtime(create_application(lifecycle, handlers), visibility)
     _connect_shutdown(runtime)
     return runtime
 

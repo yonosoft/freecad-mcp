@@ -75,6 +75,48 @@ def test_dispatcher_delegates_from_another_thread_boundary() -> None:
     assert executor.submissions == 1
 
 
+def test_dispatcher_post_executes_directly_on_target_thread() -> None:
+    executor = FakeExecutor(on_target_thread=True)
+    calls: list[str] = []
+
+    MainThreadDispatcher(executor).post(lambda: calls.append("direct"))
+
+    assert calls == ["direct"]
+    assert executor.submissions == 0
+
+
+def test_dispatcher_post_queues_without_waiting() -> None:
+    executor = QueuedExecutor()
+    calls: list[str] = []
+
+    MainThreadDispatcher(executor).post(lambda: calls.append("queued"))
+
+    assert calls == []
+    assert executor.future.done() is False
+    executor.execute_queued()
+    assert calls == ["queued"]
+
+
+def test_dispatcher_post_observes_and_logs_queued_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    executor = QueuedExecutor()
+
+    def fail() -> None:
+        raise ValueError("posted operation failed")
+
+    MainThreadDispatcher(executor).post(fail)
+    executor.execute_queued()
+
+    assert "Posted FreeCAD main-thread operation failed." in caplog.text
+    assert "posted operation failed" in caplog.text
+
+
+def test_dispatcher_post_converts_submission_failure() -> None:
+    with pytest.raises(DispatchError, match="queue unavailable"):
+        MainThreadDispatcher(FailingExecutor(False)).post(lambda: None)
+
+
 def test_dispatcher_propagates_operation_exceptions() -> None:
     executor = FakeExecutor(on_target_thread=False)
 

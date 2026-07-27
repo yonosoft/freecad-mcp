@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
 from threading import RLock
 
+from freecad_mcp.core.logging import get_logger
 from freecad_mcp.core.result import CommandResult
 from freecad_mcp.protocols import RunnerFactory as RunnerFactory
 from freecad_mcp.protocols import ServerRunner as ServerRunner
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import REGISTERED_TOOL_NAMES
+
+_LOGGER = get_logger("server.lifecycle")
 
 
 class LifecycleState(StrEnum):
@@ -25,9 +29,15 @@ class LifecycleState(StrEnum):
 class LifecycleService:
     """Own exactly one runner and expose structured lifecycle operations."""
 
-    def __init__(self, config: ServerConfig, runner_factory: RunnerFactory) -> None:
+    def __init__(
+        self,
+        config: ServerConfig,
+        runner_factory: RunnerFactory,
+        state_callback: Callable[[LifecycleState], None] | None = None,
+    ) -> None:
         self._config = config
         self._runner_factory = runner_factory
+        self._state_callback = state_callback
         self._lock = RLock()
         self._state = LifecycleState.STOPPED
         self._runner: ServerRunner | None = None
@@ -69,6 +79,7 @@ class LifecycleService:
                 )
             self._state = LifecycleState.STARTING
             self._last_error = None
+        self._notify_state(LifecycleState.STARTING)
 
         try:
             runner = self._runner_factory()
@@ -88,10 +99,16 @@ class LifecycleService:
         with self._lock:
             if self._runner is runner and self._state is LifecycleState.STARTING:
                 self._state = LifecycleState.RUNNING
-                return self._success("server_started", "The MCP server started.")
-            return self._failure(
-                "server_start_failed", "The MCP server exited before startup completed."
-            )
+                result = self._success("server_started", "The MCP server started.")
+                notify_running = True
+            else:
+                result = self._failure(
+                    "server_start_failed", "The MCP server exited before startup completed."
+                )
+                notify_running = False
+        if notify_running:
+            self._notify_state(LifecycleState.RUNNING)
+        return result
 
     def stop(self) -> CommandResult:
         """Gracefully stop the active runner and handle duplicate stops."""
@@ -107,6 +124,7 @@ class LifecycleService:
             runner = self._runner
             self._state = LifecycleState.STOPPING
 
+        self._notify_state(LifecycleState.STOPPING)
         return self._stop_owned_runner(runner)
 
     def shutdown(self) -> CommandResult:
@@ -114,13 +132,23 @@ class LifecycleService:
         with self._lock:
             runner = self._runner
             if runner is None:
+                changed = self._state is not LifecycleState.STOPPED
                 self._state = LifecycleState.STOPPED
                 self._last_error = None
-                return self._success("server_already_stopped", "The MCP server is stopped.")
-            if self._state is LifecycleState.STOPPING:
-                return self._success("server_stopping", "The MCP server is already stopping.")
-            self._state = LifecycleState.STOPPING
+                result = self._success("server_already_stopped", "The MCP server is stopped.")
+                if not changed:
+                    return result
+            else:
+                if self._state is LifecycleState.STOPPING:
+                    return self._success("server_stopping", "The MCP server is already stopping.")
+                self._state = LifecycleState.STOPPING
+                result = None
 
+        if runner is None:
+            self._notify_state(LifecycleState.STOPPED)
+            assert result is not None
+            return result
+        self._notify_state(LifecycleState.STOPPING)
         return self._stop_owned_runner(runner)
 
     def _stop_owned_runner(self, runner: ServerRunner) -> CommandResult:
@@ -134,14 +162,22 @@ class LifecycleService:
                     "type": type(exc).__name__,
                     "message": str(exc),
                 }
-            return self._failure("server_stop_failed", "The MCP server could not stop cleanly.")
+                result = self._failure(
+                    "server_stop_failed", "The MCP server could not stop cleanly."
+                )
+            self._notify_state(LifecycleState.ERROR)
+            return result
 
         with self._lock:
+            changed = self._state is not LifecycleState.STOPPED
             if self._runner is runner:
                 self._runner = None
             self._state = LifecycleState.STOPPED
             self._last_error = None
-            return self._success("server_stopped", "The MCP server stopped.")
+            result = self._success("server_stopped", "The MCP server stopped.")
+        if changed:
+            self._notify_state(LifecycleState.STOPPED)
+        return result
 
     def status(self) -> CommandResult:
         """Return the current state and endpoint configuration."""
@@ -175,7 +211,9 @@ class LifecycleService:
                     "type": type(cleanup_error).__name__,
                     "message": str(cleanup_error),
                 }
-            return self._failure("server_start_failed", "The MCP server could not start.")
+            result = self._failure("server_start_failed", "The MCP server could not start.")
+        self._notify_state(LifecycleState.ERROR)
+        return result
 
     def _on_runner_exit(self, runner: ServerRunner, error: BaseException | None) -> None:
         with self._lock:
@@ -184,16 +222,27 @@ class LifecycleService:
             self._runner = None
             if self._state is LifecycleState.STOPPING:
                 self._state = LifecycleState.STOPPED
-                return
+                state = LifecycleState.STOPPED
+            else:
+                self._state = LifecycleState.ERROR
+                self._last_error = {
+                    "stage": "runtime",
+                    "type": type(error).__name__ if error is not None else "UnexpectedExit",
+                    "message": (
+                        str(error) if error is not None else "Server runner exited unexpectedly."
+                    ),
+                }
+                state = LifecycleState.ERROR
+        self._notify_state(state)
 
-            self._state = LifecycleState.ERROR
-            self._last_error = {
-                "stage": "runtime",
-                "type": type(error).__name__ if error is not None else "UnexpectedExit",
-                "message": (
-                    str(error) if error is not None else "Server runner exited unexpectedly."
-                ),
-            }
+    def _notify_state(self, state: LifecycleState) -> None:
+        callback = self._state_callback
+        if callback is None:
+            return
+        try:
+            callback(state)
+        except Exception:
+            _LOGGER.exception("MCP lifecycle state callback failed.")
 
     def _data(self) -> dict[str, object]:
         data = {

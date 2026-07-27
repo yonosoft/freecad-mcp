@@ -103,6 +103,7 @@ def test_structural_aggregates_have_exact_coherent_package_layouts() -> None:
             "definitions.py",
             "groups.py",
             "registry.py",
+            "selection.py",
         },
         "models": {
             "__init__.py",
@@ -141,6 +142,7 @@ def test_structural_aggregates_have_exact_coherent_package_layouts() -> None:
             "__init__.py",
             "core.py",
             "document.py",
+            "preferences.py",
             "server.py",
             "sketcher.py",
         },

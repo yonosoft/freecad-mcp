@@ -12,6 +12,9 @@ from freecad_mcp.protocols.core import (
 from freecad_mcp.protocols.document import (
     DocumentAdapter as DocumentAdapter,
 )
+from freecad_mcp.protocols.preferences import (
+    StringPreferenceStore as StringPreferenceStore,
+)
 from freecad_mcp.protocols.server import (
     RunnerFactory as RunnerFactory,
 )
@@ -67,5 +70,6 @@ __all__ = (
     "SketchExternalGeometryAdapter",
     "SketchPolygonAdapter",
     "SketchTopologyEditingAdapter",
+    "StringPreferenceStore",
     "TaskExecutor",
 )
