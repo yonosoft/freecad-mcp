@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="64" height="64" viewBox="0 0 64 64">
+  <title>MCP Tool Visibility</title>
+  <desc>Compact FreeCAD-style settings gear for an icon-only toolbar menu.</desc>
+
+  <!-- Keep the SVG free of any dropdown triangle. Qt/FreeCAD draws that natively. -->
+  <g stroke-linejoin="round" stroke-linecap="round">
+    <!-- Main gear with a 4 px visual safety margin. -->
+    <polygon points="52.00,32.00 54.56,36.49 57.87,42.72 51.12,44.78 46.14,46.14 44.78,51.12 42.72,57.87 36.49,54.56 32.00,52.00 27.51,54.56 21.28,57.87 19.22,51.12 17.86,46.14 12.88,44.78 6.13,42.72 9.44,36.49 12.00,32.00 9.44,27.51 6.13,21.28 12.88,19.22 17.86,17.86 19.22,12.88 21.28,6.13 27.51,9.44 32.00,12.00 36.49,9.44 42.72,6.13 44.78,12.88 46.14,17.86 51.12,19.22 57.87,21.28 54.56,27.51"
+             fill="#d6d9dd"
+             stroke="#2f3338"
+             stroke-width="3.5"/>
+
+    <!-- Inner steel ring. -->
+    <circle cx="32" cy="32" r="14.5"
+            fill="#f0f2f4"
+            stroke="#6e747b"
+            stroke-width="3"/>
+
+    <!-- FreeCAD-style blue hub. -->
+    <circle cx="32" cy="32" r="8.5"
+            fill="#3b78b9"
+            stroke="#2f3338"
+            stroke-width="3"/>
+
+    <!-- Small red centre accent, still visible at 16 px. -->
+    <circle cx="32" cy="32" r="3.5"
+            fill="#c64040"
+            stroke="#2f3338"
+            stroke-width="1.8"/>
+
+    <!-- Minimal highlight for dark and light themes. -->
+    <path d="M20.5 23.5A15 15 0 0 1 29 18.2"
+          fill="none"
+          stroke="#ffffff"
+          stroke-width="2.2"
+          opacity="0.85"/>
+  </g>
+</svg>

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from freecad_mcp.application import Application
+from freecad_mcp.core.result import CommandResult
 from freecad_mcp.gui.autostart import (
+    get_autostart_controller,
     is_start_on_startup_enabled,
-    set_start_on_startup_enabled,
 )
 from freecad_mcp.gui.report import (
     write_starting_status,
@@ -21,11 +23,6 @@ COMMAND_STOP_SERVER = "MCP_StopServer"
 COMMAND_IDS = [
     COMMAND_START_SERVER,
     COMMAND_STOP_SERVER,
-]
-MENU_ENTRIES = [
-    *COMMAND_IDS,
-    "Separator",
-    COMMAND_START_SERVER_ON_STARTUP,
 ]
 _REGISTERED = False
 
@@ -46,12 +43,7 @@ class StartServerCommand:
         }
 
     def Activated(self) -> None:
-        application = get_application()
-        write_starting_status(application.report_status())
-        write_status(
-            application.start_server(),
-            is_start_on_startup_enabled(),
-        )
+        start_server(get_application())
 
     def IsActive(self) -> bool:
         return get_application().can_start_server()
@@ -68,12 +60,7 @@ class StopServerCommand:
         }
 
     def Activated(self) -> None:
-        application = get_application()
-        write_stopping_status(application.report_status())
-        write_status(
-            application.stop_server(),
-            is_start_on_startup_enabled(),
-        )
+        stop_server(get_application())
 
     def IsActive(self) -> bool:
         return get_application().can_stop_server()
@@ -84,14 +71,14 @@ class StartServerOnStartupCommand:
 
     def GetResources(self) -> dict[str, object]:
         return {
-            "MenuText": "Start on launch",
-            "ToolTip": "Start the local MCP server automatically when the application starts",
+            "MenuText": "Start Server on Launch",
+            "ToolTip": "Start the MCP server automatically when the application launches.",
             "CmdType": "NoTransaction",
             "Checkable": is_start_on_startup_enabled(),
         }
 
     def Activated(self, checked: int = 0) -> None:
-        set_start_on_startup_enabled(bool(checked))
+        get_autostart_controller().set_enabled(bool(checked))
 
     def IsActive(self) -> bool:
         return True
@@ -109,3 +96,33 @@ def register_commands() -> None:
     Gui.addCommand(COMMAND_STOP_SERVER, StopServerCommand())
     Gui.addCommand(COMMAND_START_SERVER_ON_STARTUP, StartServerOnStartupCommand())
     _REGISTERED = True
+
+
+def start_server(application: Application) -> CommandResult:
+    """Run the existing Start Server GUI workflow."""
+    write_starting_status(application.report_status())
+    result = application.start_server()
+    write_status(result, is_start_on_startup_enabled())
+    return result
+
+
+def stop_server(application: Application) -> CommandResult:
+    """Run the existing Stop Server GUI workflow."""
+    write_stopping_status(application.report_status())
+    result = application.stop_server()
+    write_status(result, is_start_on_startup_enabled())
+    return result
+
+
+__all__ = [
+    "COMMAND_IDS",
+    "COMMAND_START_SERVER",
+    "COMMAND_START_SERVER_ON_STARTUP",
+    "COMMAND_STOP_SERVER",
+    "StartServerCommand",
+    "StartServerOnStartupCommand",
+    "StopServerCommand",
+    "register_commands",
+    "start_server",
+    "stop_server",
+]

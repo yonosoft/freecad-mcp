@@ -47,13 +47,8 @@ def test_initgui_registers_workbench_commands_once(monkeypatch: Any) -> None:
         "MCP_StartServer",
         "MCP_StopServer",
     ]
-    menu_entries = [
-        *toolbar_commands,
-        "Separator",
-        "MCP_StartServerOnStartup",
-    ]
-    assert workbench.toolbars == [("MCP", toolbar_commands)]
-    assert workbench.menus == [("MCP", menu_entries)]
+    assert workbench.toolbars == []
+    assert workbench.menus == []
     assert list(commands) == [*toolbar_commands, "MCP_StartServerOnStartup"]
     assert "MCP_CreateDocument" not in commands
 
@@ -62,8 +57,66 @@ def test_initgui_registers_workbench_commands_once(monkeypatch: Any) -> None:
         assert Path(resources["Pixmap"]).is_file()
 
     startup_resources = commands["MCP_StartServerOnStartup"].GetResources()  # type: ignore[attr-defined]
-    assert startup_resources["MenuText"] == "Start on launch"
+    assert "Pixmap" not in startup_resources
+    assert startup_resources["MenuText"] == "Start Server on Launch"
+    assert (
+        startup_resources["ToolTip"]
+        == "Start the MCP server automatically when the application launches."
+    )
     assert startup_resources["Checkable"] is False
+
+
+def test_workbench_activation_and_deactivation_own_one_idempotent_gui_session(
+    monkeypatch: Any,
+) -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    addon_root = repository_root / "src"
+
+    gui_module = ModuleType("FreeCADGui")
+    gui_module.Workbench = WorkbenchStub  # type: ignore[attr-defined]
+    workbenches: dict[str, WorkbenchStub] = {}
+    gui_module.addWorkbench = lambda workbench: workbenches.__setitem__(  # type: ignore[attr-defined]
+        type(workbench).__name__, workbench
+    )
+    gui_module.listWorkbenches = lambda: workbenches.copy()  # type: ignore[attr-defined]
+    gui_module.addCommand = lambda _name, _command: None  # type: ignore[attr-defined]
+
+    app_module = ModuleType("FreeCAD")
+    app_module.Console = ConsoleStub()  # type: ignore[attr-defined]
+    app_module.getUserAppDataDir = lambda: str(repository_root / "missing-user-data")  # type: ignore[attr-defined]
+
+    class SessionStub:
+        def __init__(self) -> None:
+            self.cleanup_calls = 0
+
+        def cleanup(self) -> None:
+            self.cleanup_calls += 1
+
+    sessions: list[SessionStub] = []
+    gui_factory_module = ModuleType("freecad_mcp.gui.tool_visibility_gui")
+
+    def create_workbench_gui() -> SessionStub:
+        session = SessionStub()
+        sessions.append(session)
+        return session
+
+    gui_factory_module.create_workbench_gui = create_workbench_gui  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "FreeCADGui", gui_module)
+    monkeypatch.setitem(sys.modules, "FreeCAD", app_module)
+    monkeypatch.setitem(sys.modules, "freecad_mcp.gui.tool_visibility_gui", gui_factory_module)
+
+    runpy.run_path(str(addon_root / "InitGui.py"))
+    workbench = workbenches["MCPWorkbench"]
+
+    workbench.Activated()  # type: ignore[attr-defined]
+    workbench.Activated()  # type: ignore[attr-defined]
+    first = sessions[0]
+    workbench.Deactivated()  # type: ignore[attr-defined]
+    workbench.Deactivated()  # type: ignore[attr-defined]
+    workbench.Activated()  # type: ignore[attr-defined]
+
+    assert len(sessions) == 2
+    assert first.cleanup_calls == 1
 
 
 def test_initgui_loads_without_dunder_file(monkeypatch: Any) -> None:

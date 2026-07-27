@@ -45,9 +45,11 @@ def _format_status(result: CommandResult, start_on_launch: bool) -> str:
     launch = "On" if start_on_launch else "Off"
 
     if state == "running":
-        tools = data.get("tools")
+        tools = data.get("active_tools")
+        if tools is None:
+            tools = data.get("tools")
         tool_count = len(tools) if isinstance(tools, Sequence) and not isinstance(tools, str) else 0
-        return f"Running — {endpoint} — {tool_count} tools — Start on launch: {launch}"
+        return f"Running — {endpoint} — {tool_count} active tools — Start on launch: {launch}"
     if state == "stopped":
         return f"Stopped — Start on launch: {launch}"
     if state == "starting":

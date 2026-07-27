@@ -59,17 +59,21 @@ class MCPWorkbench(Gui.Workbench):
     ToolTip = "Typed local MCP tools and shared CAD commands"
 
     def Initialize(self) -> None:
-        from freecad_mcp.gui.commands import COMMAND_IDS, MENU_ENTRIES, register_commands
+        from freecad_mcp.gui.commands import register_commands
 
         register_commands()
-        self.appendToolbar(self.MenuText, COMMAND_IDS)
-        self.appendMenu(self.MenuText, MENU_ENTRIES)
 
     def Activated(self) -> None:
-        return None
+        from freecad_mcp.gui.tool_visibility_gui import create_workbench_gui
+
+        if getattr(self, "_mcp_gui_session", None) is None:
+            self._mcp_gui_session = create_workbench_gui()
 
     def Deactivated(self) -> None:
-        return None
+        session = getattr(self, "_mcp_gui_session", None)
+        if session is not None:
+            session.cleanup()
+            self._mcp_gui_session = None
 
     def GetClassName(self) -> str:
         return "Gui::PythonWorkbench"

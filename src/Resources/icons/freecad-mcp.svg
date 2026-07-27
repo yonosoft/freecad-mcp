@@ -1,6 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <rect x="6" y="6" width="52" height="52" rx="10" fill="#f2f2f2" stroke="#333" stroke-width="4"/>
-  <path d="M19 20h26v8H27v8h14v8H27v10h-8z" fill="#4b6cb7"/>
-  <circle cx="47" cy="47" r="7" fill="#2f855a" stroke="#333" stroke-width="2"/>
+  <defs>
+    <linearGradient id="hub" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#78aae6"/>
+      <stop offset="1" stop-color="#2f6db2"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7fbff"/>
+      <stop offset="1" stop-color="#cbd8e6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Compact MCP hub with a full 7 px transparent safety margin for workbench selectors. -->
+  <path d="M32 9 49 19v20L32 49 15 39V19z"
+        fill="url(#hub)" stroke="#252a30" stroke-width="3" stroke-linejoin="round"/>
+  <path d="m32 9 17 10-17 10-17-10z"
+        fill="#8cb8e9" stroke="#252a30" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M32 29v20M15 19l17 10 17-10"
+        fill="none" stroke="#252a30" stroke-width="2.2" stroke-linejoin="round"/>
+
+  <!-- Three protocol ports connected to the central module. -->
+  <path d="M15 28H8M49 28h7M32 49v7"
+        fill="none" stroke="#252a30" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="8" cy="28" r="5.5" fill="#e34b4b" stroke="#252a30" stroke-width="2.5"/>
+  <circle cx="56" cy="28" r="5.5" fill="#55a85c" stroke="#252a30" stroke-width="2.5"/>
+  <circle cx="32" cy="56" r="5.5" fill="#f0bd35" stroke="#252a30" stroke-width="2.5"/>
+
+  <!-- Simple connector mark, readable at 16 px without relying on text. -->
+  <rect x="25" y="29" width="14" height="10" rx="2.5" fill="url(#face)" stroke="#252a30" stroke-width="2"/>
+  <path d="M29 32v4M35 32v4" stroke="#2f6db2" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M28 39v3M36 39v3" stroke="#252a30" stroke-width="2" stroke-linecap="round"/>
 </svg>
