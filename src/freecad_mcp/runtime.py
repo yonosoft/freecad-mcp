@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from freecad_mcp.application import Application, create_application
@@ -124,9 +125,16 @@ def _post_lifecycle_state(
     dispatcher: MainThreadDispatcher,
     visibility: ToolVisibilityController,
     state: LifecycleState,
+    current_state: Callable[[], LifecycleState],
 ) -> None:
     """Queue lifecycle publication without blocking a server-owned thread."""
-    dispatcher.post(lambda: visibility.on_server_state_changed(state.value))
+
+    def publish_if_current() -> object:
+        if current_state() is not state:
+            return None
+        return visibility.on_server_state_changed(state.value)
+
+    dispatcher.post(publish_if_current)
 
 
 def _build_runtime() -> Runtime:
@@ -336,12 +344,22 @@ def _build_runtime() -> Runtime:
     )
 
     def on_lifecycle_state_changed(state: LifecycleState) -> None:
-        _post_lifecycle_state(dispatcher, visibility, state)
+        _post_lifecycle_state(
+            dispatcher,
+            visibility,
+            state,
+            lambda: lifecycle.state,
+        )
 
     lifecycle = LifecycleService(
         config=config,
-        runner_factory=lambda: UvicornMCPRunner(config=config, handlers=handlers),
+        runner_factory=lambda: UvicornMCPRunner(
+            config=config,
+            handlers=handlers,
+            visibility=visibility,
+        ),
         state_callback=on_lifecycle_state_changed,
+        active_tools_provider=lambda: visibility.snapshot().active_tool_names,
     )
     runtime = Runtime(create_application(lifecycle, handlers), visibility)
     _connect_shutdown(runtime)

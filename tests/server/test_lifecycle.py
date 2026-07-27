@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from freecad_mcp.catalog import REGISTERED_TOOL_NAMES, ToolGroup
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService, LifecycleState
+from freecad_mcp.visibility.controller import ToolVisibilityController
+from freecad_mcp.visibility.persistence import VisibilityPreferencesRepository
+from tests.support.preference_stubs import InMemoryStringPreferenceStore
 
 
 class FakeRunner:
@@ -65,6 +69,8 @@ def test_lifecycle_initial_status_is_stopped_and_structured() -> None:
     assert result.data["url"] == "http://127.0.0.1:8765/mcp"
     assert result.data["transport"] == "streamable_http"
     assert isinstance(result.data["tools"], list)
+    assert result.data["tools"] == list(REGISTERED_TOOL_NAMES)
+    assert result.data["active_tools"] == REGISTERED_TOOL_NAMES
     assert lifecycle.can_start() is True
     assert lifecycle.can_stop() is False
 
@@ -277,3 +283,28 @@ def test_lifecycle_callback_failure_does_not_break_server_operations() -> None:
 
     assert started.ok is True
     assert stopped.ok is True
+
+
+def test_status_keeps_complete_tools_and_tracks_immutable_active_projection() -> None:
+    controller = ToolVisibilityController(
+        VisibilityPreferencesRepository(InMemoryStringPreferenceStore())
+    )
+    lifecycle = LifecycleService(
+        ServerConfig(),
+        FakeRunnerFactory(),
+        active_tools_provider=lambda: controller.snapshot().active_tool_names,
+    )
+    controller.replace_enabled_standard_groups((ToolGroup.DOCUMENT,))
+    expected_stopped_active = controller.snapshot().active_tool_names
+
+    stopped = lifecycle.status()
+    lifecycle.start()
+    controller.replace_enabled_standard_groups((ToolGroup.SKETCHER,))
+    running = lifecycle.status()
+
+    assert stopped.data["tools"] == list(REGISTERED_TOOL_NAMES)
+    assert stopped.data["active_tools"] == expected_stopped_active
+    assert isinstance(stopped.data["active_tools"], tuple)
+    assert running.data["tools"] == list(REGISTERED_TOOL_NAMES)
+    assert running.data["active_tools"] == controller.snapshot().active_tool_names
+    assert "client_synchronized" not in running.data

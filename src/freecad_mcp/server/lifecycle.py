@@ -14,6 +14,7 @@ from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.tool_registry import REGISTERED_TOOL_NAMES
 
 _LOGGER = get_logger("server.lifecycle")
+ActiveToolsProvider = Callable[[], tuple[str, ...]]
 
 
 class LifecycleState(StrEnum):
@@ -34,10 +35,12 @@ class LifecycleService:
         config: ServerConfig,
         runner_factory: RunnerFactory,
         state_callback: Callable[[LifecycleState], None] | None = None,
+        active_tools_provider: ActiveToolsProvider | None = None,
     ) -> None:
         self._config = config
         self._runner_factory = runner_factory
         self._state_callback = state_callback
+        self._active_tools_provider = active_tools_provider or _complete_tool_names
         self._lock = RLock()
         self._state = LifecycleState.STOPPED
         self._runner: ServerRunner | None = None
@@ -245,10 +248,12 @@ class LifecycleService:
             _LOGGER.exception("MCP lifecycle state callback failed.")
 
     def _data(self) -> dict[str, object]:
+        active_tools = tuple(self._active_tools_provider())
         data = {
             "state": self._state.value,
             **self._config.as_dict(),
             "tools": list(REGISTERED_TOOL_NAMES),
+            "active_tools": active_tools,
             "recoverable": self._state is not LifecycleState.ERROR or self._runner is None,
         }
         if self._last_error is not None:
@@ -262,7 +267,12 @@ class LifecycleService:
         return CommandResult.failure(code=code, message=message, data=self._data())
 
 
+def _complete_tool_names() -> tuple[str, ...]:
+    return REGISTERED_TOOL_NAMES
+
+
 __all__ = [
+    "ActiveToolsProvider",
     "LifecycleService",
     "LifecycleState",
     "RunnerFactory",

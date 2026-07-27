@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from mcp.server.fastmcp import FastMCP
-
 from freecad_mcp.commands import HandlerGroups
 from freecad_mcp.mcp.creation_tools import register_creation_tools
 from freecad_mcp.mcp.document_history_tools import register_document_history_tools
@@ -51,13 +47,22 @@ from freecad_mcp.mcp.sketch_topology_editing_tools import (
 from freecad_mcp.mcp.sketch_whole_transform_tools import (
     register_sketch_whole_transform_tools,
 )
+from freecad_mcp.mcp.visibility_server import (
+    VisibilityAwareFastMCP,
+    VisibilitySnapshotProvider,
+)
 from freecad_mcp.server.config import ServerConfig
 
 
-def build_mcp_server(handlers: HandlerGroups, config: ServerConfig) -> FastMCP[Any]:
+def build_mcp_server(
+    handlers: HandlerGroups,
+    config: ServerConfig,
+    visibility: VisibilitySnapshotProvider | None = None,
+) -> VisibilityAwareFastMCP:
     """Build a local Streamable HTTP server with explicit typed tools."""
-    server: FastMCP[Any] = FastMCP(
+    server = VisibilityAwareFastMCP(
         name="MCP",
+        visibility=visibility,
         instructions=SERVER_INSTRUCTIONS,
         host=config.host,
         port=config.port,

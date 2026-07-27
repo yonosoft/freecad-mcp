@@ -8,6 +8,7 @@ from threading import Event, Lock, Thread
 from typing import Any
 
 from freecad_mcp.commands import HandlerGroups
+from freecad_mcp.mcp.visibility_server import VisibilitySnapshotProvider
 from freecad_mcp.server.config import ServerConfig
 
 
@@ -18,11 +19,13 @@ class UvicornMCPRunner:
         self,
         config: ServerConfig,
         handlers: HandlerGroups,
+        visibility: VisibilitySnapshotProvider | None = None,
         start_timeout_seconds: float = 10.0,
         stop_timeout_seconds: float = 5.0,
     ) -> None:
         self._config = config
         self._handlers = handlers
+        self._visibility = visibility
         self._start_timeout_seconds = start_timeout_seconds
         self._stop_timeout_seconds = stop_timeout_seconds
         self._lock = Lock()
@@ -84,7 +87,11 @@ class UvicornMCPRunner:
 
             from freecad_mcp.mcp.server import build_mcp_server
 
-            mcp_server = build_mcp_server(self._handlers, self._config)
+            mcp_server = build_mcp_server(
+                self._handlers,
+                self._config,
+                self._visibility,
+            )
             asgi_app = mcp_server.streamable_http_app()
             ready = self._ready
 

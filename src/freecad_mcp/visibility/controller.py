@@ -276,9 +276,6 @@ class ToolVisibilityController:
             raise TypeError("state must be a string")
         current = self.snapshot()
         status, action = _server_contract(state)
-        if state == "running" and (current.active_tool_names != current.complete_tool_names):
-            status = ServerApplyStatus.FAILED
-            action = ClientActionRequired.UNKNOWN
         if self._is_shutdown() or (
             current.server_apply_status is status and current.client_action_required is action
         ):
@@ -353,9 +350,12 @@ class ToolVisibilityController:
 
         server_status = current.server_apply_status
         client_action = current.client_action_required
-        if server_status is ServerApplyStatus.APPLIED:
-            server_status = ServerApplyStatus.FAILED
-            client_action = ClientActionRequired.UNKNOWN
+        requested_active_tool_names = active_tool_names(selection)
+        if (
+            server_status is ServerApplyStatus.APPLIED
+            and requested_active_tool_names != current.active_tool_names
+        ):
+            client_action = ClientActionRequired.RECONNECT
         replacement = self._snapshot_from_preferences(
             persistence.preferences,
             generation=current.generation + 1,

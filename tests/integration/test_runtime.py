@@ -9,6 +9,7 @@ from weakref import WeakMethod
 import pytest
 
 from freecad_mcp.application import Application
+from freecad_mcp.catalog import ToolGroup
 from freecad_mcp.commands import (
     AddExternalGeometryHandler,
     AddSketchConstraintsHandler,
@@ -67,7 +68,12 @@ from freecad_mcp.runtime import (
 )
 from freecad_mcp.server.config import ServerConfig
 from freecad_mcp.server.lifecycle import LifecycleService, LifecycleState
-from freecad_mcp.visibility.controller import ToolVisibilityController
+from freecad_mcp.visibility.controller import (
+    ClientActionRequired,
+    ServerApplyStatus,
+    ToolVisibilityController,
+)
+from freecad_mcp.visibility.persistence import VisibilityPreferencesRepository
 from tests.support.preference_stubs import InMemoryStringPreferenceStore
 
 T = TypeVar("T")
@@ -114,9 +120,32 @@ def test_build_runtime_wires_create_sketch_handler(
         lambda: preference_store,
     )
 
-    # Prevent LifecycleService from needing a real MCP runner.
-    # The runner_factory lambda is never called during _build_runtime.
-    monkeypatch.setattr("freecad_mcp.runtime.UvicornMCPRunner", object)
+    created_runners: list[object] = []
+
+    class RunnerStub:
+        def __init__(
+            self,
+            *,
+            config: ServerConfig,
+            handlers: object,
+            visibility: ToolVisibilityController,
+        ) -> None:
+            self.config = config
+            self.handlers = handlers
+            self.visibility = visibility
+            self._on_exit: Callable[[BaseException | None], None] | None = None
+            created_runners.append(self)
+
+        def start(self, on_exit: Callable[[BaseException | None], None]) -> None:
+            self._on_exit = on_exit
+
+        def stop(self) -> None:
+            callback = self._on_exit
+            self._on_exit = None
+            if callback is not None:
+                callback(None)
+
+    monkeypatch.setattr("freecad_mcp.runtime.UvicornMCPRunner", RunnerStub)
 
     # Prevent _connect_shutdown from importing PySide.
     def _noop_shutdown(runtime: Any) -> None:
@@ -184,6 +213,15 @@ def test_build_runtime_wires_create_sketch_handler(
     assert len(created_adapters) == 1
     assert dispatcher_factory_calls == 1
     assert isinstance(runtime.tool_visibility, ToolVisibilityController)
+    started = runtime.application.lifecycle.start()
+    assert started.ok is True
+    assert len(created_runners) == 1
+    assert cast(Any, created_runners[0]).visibility is runtime.tool_visibility
+    assert (
+        runtime.application.lifecycle.status().data["active_tools"]
+        == runtime.tool_visibility.snapshot().active_tool_names
+    )
+    runtime.application.lifecycle.stop()
     for group_name, expected_group_types in expected_handler_types.items():
         group = getattr(handlers, group_name)
         for name, expected_type in expected_group_types.items():
@@ -326,6 +364,7 @@ def _threaded_lifecycle_fixture() -> tuple[
     executor = MainThreadQueueExecutor()
     dispatcher = MainThreadDispatcher(executor, timeout_seconds=1.0)
     recorder = VisibilityStateRecorder()
+    lifecycle: LifecycleService
     lifecycle = LifecycleService(
         ServerConfig(),
         lambda: runner,
@@ -333,9 +372,36 @@ def _threaded_lifecycle_fixture() -> tuple[
             dispatcher,
             cast(ToolVisibilityController, recorder),
             state,
+            lambda: lifecycle.state,
         ),
     )
     return lifecycle, runner, executor, recorder
+
+
+def _visibility_lifecycle_fixture() -> tuple[
+    LifecycleService,
+    ThreadedExitRunner,
+    MainThreadQueueExecutor,
+    ToolVisibilityController,
+]:
+    runner = ThreadedExitRunner()
+    executor = MainThreadQueueExecutor()
+    dispatcher = MainThreadDispatcher(executor, timeout_seconds=1.0)
+    controller = ToolVisibilityController(
+        VisibilityPreferencesRepository(InMemoryStringPreferenceStore())
+    )
+    lifecycle: LifecycleService
+    lifecycle = LifecycleService(
+        ServerConfig(),
+        lambda: runner,
+        state_callback=lambda state: _post_lifecycle_state(
+            dispatcher,
+            controller,
+            state,
+            lambda: lifecycle.state,
+        ),
+    )
+    return lifecycle, runner, executor, controller
 
 
 def test_server_thread_exit_during_stop_queues_visibility_without_deadlock() -> None:
@@ -370,3 +436,65 @@ def test_unexpected_server_thread_exit_queues_error_without_blocking() -> None:
     executor.execute_queued()
 
     assert recorder.states == ["starting", "running", "error"]
+
+
+def test_stale_queued_stopped_is_discarded_after_restart_and_preserves_advice() -> None:
+    lifecycle, _, executor, controller = _visibility_lifecycle_fixture()
+    assert lifecycle.start().ok is True
+
+    assert lifecycle.stop().ok is True
+    assert lifecycle.status().data["state"] == LifecycleState.STOPPED.value
+    assert len(executor.queued) == 1
+
+    assert lifecycle.start().ok is True
+    running = controller.snapshot()
+    assert lifecycle.state is LifecycleState.RUNNING
+    assert running.server_apply_status is ServerApplyStatus.APPLIED
+    assert running.client_action_required is ClientActionRequired.NONE
+
+    changed = controller.disable_standard_group(ToolGroup.DOCUMENT)
+    advised = changed.snapshot
+    assert advised.server_apply_status is ServerApplyStatus.APPLIED
+    assert advised.client_action_required is ClientActionRequired.RECONNECT
+
+    executor.execute_queued()
+
+    assert lifecycle.state is LifecycleState.RUNNING
+    assert controller.snapshot() is advised
+
+
+def test_stale_queued_error_is_discarded_after_successful_recovery() -> None:
+    lifecycle, runner, executor, controller = _visibility_lifecycle_fixture()
+    assert lifecycle.start().ok is True
+
+    runner.exit_from_worker(RuntimeError("first run failed"))
+    assert lifecycle.status().data["state"] == LifecycleState.ERROR.value
+    assert len(executor.queued) == 1
+
+    assert lifecycle.start().ok is True
+    recovered = controller.snapshot()
+    assert lifecycle.state is LifecycleState.RUNNING
+    assert recovered.server_apply_status is ServerApplyStatus.APPLIED
+    assert recovered.client_action_required is ClientActionRequired.NONE
+
+    executor.execute_queued()
+
+    assert lifecycle.state is LifecycleState.RUNNING
+    assert controller.snapshot() is recovered
+
+
+def test_current_queued_error_applies_without_changing_visibility_generation() -> None:
+    lifecycle, runner, executor, controller = _visibility_lifecycle_fixture()
+    assert lifecycle.start().ok is True
+    running = controller.snapshot()
+
+    runner.exit_from_worker(RuntimeError("current run failed"))
+
+    assert lifecycle.state is LifecycleState.ERROR
+    assert controller.snapshot() is running
+    executor.execute_queued()
+
+    failed = controller.snapshot()
+    assert failed.server_apply_status is ServerApplyStatus.FAILED
+    assert failed.client_action_required is ClientActionRequired.UNKNOWN
+    assert failed.generation == running.generation

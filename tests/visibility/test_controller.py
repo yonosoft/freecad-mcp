@@ -20,7 +20,11 @@ from freecad_mcp.visibility.persistence import (
     VisibilityPreferencesRepository,
 )
 from tests.support.preference_stubs import InMemoryStringPreferenceStore
-from tests.visibility.test_serialization import ALL_JSON, CUSTOM_JSON
+from tests.visibility.test_serialization import (
+    ALL_JSON,
+    CUSTOM_JSON,
+    CUSTOM_WITH_FUTURE_JSON,
+)
 
 FUTURE_JSON = '{"schema_version":2,"future":"preserve exactly"}'
 
@@ -386,23 +390,47 @@ def test_server_state_contract_updates_without_generation_change() -> None:
 
     assert running.server_apply_status is ServerApplyStatus.APPLIED
     assert running.generation == 0
-    assert changed.snapshot.server_apply_status is ServerApplyStatus.FAILED
-    assert changed.snapshot.client_action_required is ClientActionRequired.UNKNOWN
+    assert changed.snapshot.server_apply_status is ServerApplyStatus.APPLIED
+    assert changed.snapshot.client_action_required is ClientActionRequired.RECONNECT
     assert errored.server_apply_status is ServerApplyStatus.FAILED
+    assert errored.client_action_required is ClientActionRequired.UNKNOWN
     assert errored.generation == 1
     assert stopped.server_apply_status is ServerApplyStatus.STOPPED
     assert stopped.client_action_required is ClientActionRequired.NONE
     assert stopped.generation == 1
 
 
-def test_running_server_does_not_claim_unimplemented_custom_filter_is_applied() -> None:
+def test_successful_start_applies_current_custom_projection_without_reconnect() -> None:
     controller, _ = _controller({TOOL_VISIBILITY_STATE_KEY: CUSTOM_JSON})
 
     running = controller.on_server_state_changed("running")
 
-    assert running.server_apply_status is ServerApplyStatus.FAILED
-    assert running.client_action_required is ClientActionRequired.UNKNOWN
+    assert running.server_apply_status is ServerApplyStatus.APPLIED
+    assert running.client_action_required is ClientActionRequired.NONE
     assert running.generation == 0
+
+
+def test_running_selection_only_change_with_same_active_names_does_not_request_reconnect() -> None:
+    controller, _ = _controller({TOOL_VISIBILITY_STATE_KEY: CUSTOM_WITH_FUTURE_JSON})
+    running = controller.on_server_state_changed("running")
+
+    changed = controller.enable_all()
+
+    assert changed.ok is True
+    assert changed.snapshot.generation == 1
+    assert changed.snapshot.selection_mode is SelectionMode.ALL
+    assert changed.snapshot.active_tool_names == running.active_tool_names
+    assert changed.snapshot.server_apply_status is ServerApplyStatus.APPLIED
+    assert changed.snapshot.client_action_required is ClientActionRequired.NONE
+
+
+def test_visibility_change_while_stopped_applies_without_reconnect_advice() -> None:
+    controller, _ = _controller()
+
+    changed = controller.disable_standard_group(ToolGroup.DOCUMENT)
+
+    assert changed.snapshot.server_apply_status is ServerApplyStatus.STOPPED
+    assert changed.snapshot.client_action_required is ClientActionRequired.NONE
 
 
 def test_visibility_queries_use_catalogue_contents_and_active_projection() -> None:
