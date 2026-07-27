@@ -277,6 +277,159 @@ The server must not expose arbitrary Python execution. Screenshots may be used
 as diagnostic checkpoints, but normal state exchange should use structured
 document, object, constraint, geometry, and error data.
 
+## MCP Tool Visibility
+
+### Overview
+
+The MCP workbench provides user-facing tool-visibility controls that filter
+which public tools the MCP server advertises through `tools/list` and allows
+through `tools/call`. All 59 tools remain internally registered regardless of
+the active visibility selection; filtering affects only the MCP transport layer.
+
+### GUI Controls
+
+The **MCP** menu appears before Window / Help in the FreeCAD menu bar. It
+contains:
+
+- **Start Server** — starts the embedded MCP server.
+- **Stop Server** — stops the embedded MCP server.
+- **Settings** submenu:
+
+  - **Start Server on Launch** — checkbox; toggles the `StartServerOnStartup`
+    preference. Does not start or stop the currently running server.
+  - **Enable All** — action; restores all current standard groups to enabled.
+  - **Document** — checkbox; toggles the Document tool group (10 tools).
+  - **Part Design** — checkbox; toggles the Part Design tool group (1 tool).
+  - **Sketcher** — checkbox; toggles the Sketcher tool group (48 tools).
+
+The same actions appear identically in the toolbar **cog** menu, which uses a
+native FreeCAD menu-button layout with a triangular dropdown indicator. The cog
+area and the triangle both open the same menu, and they do not overlap.
+
+### All and Custom Semantics
+
+The visibility preference stores a `kind` field of `all` or `custom`:
+
+- **All** means every current standard group (Document, Part Design, Sketcher)
+  is enabled. All 59 tools are advertised and callable.
+- **Custom** means a subset of standard groups is enabled. Only tools belonging
+  to the selected groups are advertised and callable.
+
+When the user manually enables every current standard group through individual
+checkboxes, the backend normalizes the selection to canonical All. Selecting
+the last missing group immediately triggers normalization.
+
+Enable All restores every current standard group in a single action. It does
+not start or stop the server and does not affect the Start Server on Launch
+preference.
+
+### Immediate Server-Side Filtering
+
+Every visibility change applies immediately to the running MCP server without
+requiring a server restart, FreeCAD restart, or server reconstruction. The next
+`tools/list` request reflects the current selection.
+
+Visibility changes do not alter open FreeCAD documents, objects, properties,
+transactions, undo/redo history, recompute state, modified flags, file paths,
+timestamps, or save state.
+
+### Disabled-Call Enforcement
+
+When a tool's group is disabled, the server rejects `tools/call` for that tool
+with a structured response:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "tool_disabled",
+    "message": "Tool 'create_body' is disabled by the current MCP tool visibility configuration.",
+    "details": {
+      "tool_name": "create_body",
+      "configuration_generation": <integer>
+    }
+  }
+}
+```
+
+`tool_disabled` takes priority over argument validation: a disabled tool called
+with deliberately malformed arguments still returns `tool_disabled`, not a
+validation error. No handler execution, Qt dispatch, document change, or
+transaction occurs.
+
+Unknown or unregistered tools continue to receive the standard SDK unknown-tool
+behaviour regardless of the current visibility selection.
+
+### MCP Client Refresh Boundary
+
+The server does **not** advertise `tools/listChanged` (the capability is
+`false`). MCP clients, including AiderDesk, do not receive automatic
+notification when the visibility configuration changes.
+
+**Observed AiderDesk behaviour (DeepSeek V4 Pro, Phase 4 acceptance):**
+
+| Action | Result |
+|--------|--------|
+| Reconnect-only (same conversation) | Stale — disabled tools remain visible in the model context. Server rejects calls with `tool_disabled`. |
+| Restart AiderDesk and start a new conversation | Fresh — exact current tool inventory appears. |
+
+AiderDesk does not refresh the tool inventory in an existing conversation,
+including after reconnecting the MCP connection. The tested reliable refresh
+procedure is to restart AiderDesk and start a new conversation. Restarting
+FreeCAD or the MCP server is not required. Whether a new conversation without
+restarting AiderDesk is sufficient remains unverified.
+
+Whether the model context discards stale schemas (and recovers tokens) after a
+refresh has not been verified. Model-context schema removal and any resulting
+token savings remain **unverified** and are not claimed.
+
+### Default State
+
+On a new installation with no visibility preference keys, the defaults are:
+
+- Standard visibility: **All** (all three current groups enabled).
+- Document: enabled.
+- Part Design: enabled.
+- Sketcher: enabled.
+- Start Server on Launch: disabled.
+- Server: stopped.
+
+Loading defaults does not write visibility preferences to disk.
+
+### Persistence
+
+Visibility preferences survive FreeCAD restarts and use the key
+`User parameter:BaseApp/Preferences/Mod/MCP/ToolVisibilityState` with a
+verified backup at `ToolVisibilityStateBackup`. The
+`StartServerOnStartup` boolean preference is stored in the same MCP preference
+group and is managed independently of visibility keys.
+
+An upgrade from a profile containing `StartServerOnStartup` but no visibility
+keys preserves the existing autostart value and defaults visibility to All.
+
+Live FreeCAD 1.1.3 acceptance verified normal All/Custom visibility
+round-trips and the Start Server on Launch round-trip using a disposable
+profile. The preference-key structure was also inspected directly.
+
+Malformed-primary recovery, backup restoration, unsupported future-schema
+protection, unknown-group preservation, and protected-state reset behaviour
+are covered by the permanent automated visibility test suite rather than by
+separate native GUI probes.
+
+### Acceptance Environment
+
+The Phase 4 acceptance campaign verified these behaviours on:
+
+- **FreeCAD:** 1.1.3 (build 20260725, hash `145529fe741292ff0b3977a01195bf0247425794`)
+- **OS:** Windows 11 build 26100 (x86_64)
+- **Python:** 3.11.14
+- **Qt/PySide:** 6.8.3
+- **MCP addon:** Phase 3 (commit `8ecc4d2`)
+- **AiderDesk:** DeepSeek V4 Pro
+
+Advanced Automation and Python execution remain deferred and are not selectable
+in the current GUI.
+
 ## Semantic Rectangle Profile
 
 Milestone 15A establishes the semantic-profile dependency direction without a
