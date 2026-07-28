@@ -459,7 +459,18 @@ geometry during duplicate detection. `add_sketch_constraints` never removes
 an equivalent `Coincident` automatically. Such a request is refused before
 mutation with `equivalent_coincident_constraint`; use
 `replace_sketch_constraint` to perform the explicit transactional
-Coincident-to-`tangent_points` swap.
+point-to-point Coincident-to-`tangent_points` swap or its reverse. This is the
+only supported cross-type geometric replacement, and it requires the identical
+complete endpoint pair; reversing both `(geometry, position)` operands is
+equivalent, while changing only a geometry or position is not.
+
+The verified asymmetric six-geometry two-fillet benchmark uses 15 constraints:
+two topology Coincident joins, four `tangent_points` joins, four axis
+orientations, one equal-radius relationship, one origin-datum Coincident, and
+three driving dimensions. Its exact ledger is 26 initial DoF minus
+`4×3 + 2×2 + 4×1 + 1 + 2 + 3×1`, reaching 0 DoF with clean diagnostics. The
+older Coincident-plus-whole-geometry-tangent construction remains historical
+regression evidence, not the recommended plan.
 
 FreeCAD chooses external versus internal circle tangency, and the side of a
 line, from the geometry's current placement. Place geometry near the intended
@@ -1258,7 +1269,7 @@ no-op is reported before dependency refusal; otherwise dimensional dependency
 returns guidance to use `update_sketch_constraint_value`, and every other
 dependency is refused rather than allowing solver-driven cascading movement.
 
-`replace_sketch_constraint` reuses the unchanged 17-variant
+`replace_sketch_constraint` reuses the unchanged 18-variant
 `add_sketch_constraints` union. FreeCAD 1.1.1 cannot safely insert into the
 deleted slot: the selected constraint is deleted and the replacement is
 appended atomically. Results therefore report both the requested pre-call index,
@@ -1267,7 +1278,16 @@ mapping ordered by old index. Exact semantic no-ops do not transact, exact
 duplicates of another surviving constraint are refused before mutation, and a
 redundant or conflicting solver result rolls back. Named, expression-backed,
 downstream-expression-sensitive, inactive, virtual-space, reference, and
-unsupported constraints are not replaced in Milestone 20.
+unsupported constraints are not replaced. Same-type replacement behavior is
+unchanged. The sole cross-type exception is point-to-point Coincident
+↔ `tangent_points` over two distinct supported internal geometry endpoints with
+the identical canonical endpoint pair. Origin, external, whole-geometry,
+unsupported-position, same-geometry, different-pair, and unrelated cross-type
+requests are refused before mutation. Duplicate detection excludes the target
+being replaced but still rejects a matching surviving constraint. Post-add
+verification compares geometric type and canonical references rather than the
+mutable native geometric `Value`; all counts, survivor states, solver
+diagnostics, construction, context, and history checks remain strict.
 
 `update_sketch_constraint_value` preserves constraint identity and supports
 active driving `distance`, `distance_x`, `distance_y`, `radius`, `diameter`, and

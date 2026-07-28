@@ -22,8 +22,8 @@ def test_rules_schema_is_valid_json_and_requires_core_sections() -> None:
         "Policy source: ../../.aider-desk/rules/freecad-sketch-constraints.yaml"
     )
     assert schema["properties"]["schema_version"] == {"const": 1}
-    assert dof_properties["minimum"]["maximum"] == 2
-    assert dof_properties["maximum"]["maximum"] == 2
+    assert dof_properties["minimum"]["maximum"] == 3
+    assert dof_properties["maximum"]["maximum"] == 3
     assert set(schema["required"]) == {
         "schema_version",
         "policy_id",

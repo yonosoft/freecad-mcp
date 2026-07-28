@@ -261,7 +261,9 @@ def test_editing_schemas_reject_boolean_numbers(
 def test_descriptions_lock_identity_units_history_and_no_save_policy() -> None:
     assert "same-type" in UPDATE_SKETCH_GEOMETRY_DESCRIPTION
     assert "dependent constraints" in UPDATE_SKETCH_GEOMETRY_DESCRIPTION
-    assert "17-variant" in REPLACE_SKETCH_CONSTRAINT_DESCRIPTION
+    assert "18-variant" in REPLACE_SKETCH_CONSTRAINT_DESCRIPTION
+    assert "identical endpoint pair" in REPLACE_SKETCH_CONSTRAINT_DESCRIPTION
+    assert "Coincident and tangent_points" in REPLACE_SKETCH_CONSTRAINT_DESCRIPTION
     assert "survivor remapping" in REPLACE_SKETCH_CONSTRAINT_DESCRIPTION
     assert "millimetres" in UPDATE_SKETCH_CONSTRAINT_VALUE_DESCRIPTION
     assert "degrees" in UPDATE_SKETCH_CONSTRAINT_VALUE_DESCRIPTION

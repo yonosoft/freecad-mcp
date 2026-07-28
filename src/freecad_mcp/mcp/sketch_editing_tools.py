@@ -30,9 +30,11 @@ UPDATE_SKETCH_GEOMETRY_DESCRIPTION = (
 )
 
 REPLACE_SKETCH_CONSTRAINT_DESCRIPTION = (
-    "Atomically replace one current constraint using the unchanged controlled 17-variant "
+    "Atomically replace one current constraint using the unchanged controlled 18-variant "
     "constraint union. Named, expression-sensitive, inactive, virtual, and reference constraints "
-    "are refused. Exact no-ops create no transaction, and duplicates are refused before mutation. "
+    "are refused. The only cross-type geometric replacement is point-to-point Coincident and "
+    "tangent_points over the identical endpoint pair. Exact no-ops create no transaction, and "
+    "duplicates are refused before mutation. "
     "FreeCAD appends the replacement after deleting the selected constraint, so the result returns "
     "the replacement index and complete ordered survivor remapping. A change creates one 'Replace "
     "sketch constraint' history step and never saves."

@@ -72,6 +72,8 @@ _Operation = Literal[
 ]
 _DIMENSIONAL_TYPES = {"distance", "distance_x", "distance_y", "radius", "diameter", "angle"}
 _NATIVE_DIMENSIONAL_TYPES = {"Distance", "DistanceX", "DistanceY", "Radius", "Diameter", "Angle"}
+_ENDPOINT_REPLACEMENT_TYPES = frozenset({"Coincident", "Tangent"})
+_ENDPOINT_POSITIONS = frozenset({1, 2})
 _ANGLE_TOLERANCE_DEGREES = math.degrees(TOPOLOGY_TOLERANCE)
 _COMMUTATIVE_PAIR_TYPES = {
     "Coincident",
@@ -361,6 +363,11 @@ def replace_sketch_constraint(
         ) from exc
 
     before_state = snapshot.base.constraints[constraint_index]
+    _require_supported_cross_type_replacement(
+        before_state,
+        replacement_state,
+        constraint_index,
+    )
     identity_changes = tuple(
         SketchIndexChange(index, index) for index in range(snapshot.sketch.constraint_count)
     )
@@ -907,7 +914,7 @@ def _verify_replacement(
     )
     if actual[:-1] != survivors:
         raise _error("replace_constraint", "verification", "constraint_survivor_mismatch")
-    if not _constraint_semantically_equal(actual[-1], replacement_state):
+    if not _replacement_semantically_equal(actual[-1], replacement_state):
         raise _error("replace_constraint", "verification", "replacement_semantic_mismatch")
     if _construction_state(sketch, inspected.geometry_count) != snapshot.base.construction:
         raise _error("replace_constraint", "verification", "construction_state_changed")
@@ -1126,6 +1133,8 @@ def _constraint_semantically_equal(first: tuple[Any, ...], second: tuple[Any, ..
         return False
     if _normalized_references(first) != _normalized_references(second):
         return False
+    if first[0] not in _NATIVE_DIMENSIONAL_TYPES:
+        return True
     native_tolerance = TOPOLOGY_TOLERANCE
     return math.isclose(
         float(first[7]),
@@ -1133,6 +1142,56 @@ def _constraint_semantically_equal(first: tuple[Any, ...], second: tuple[Any, ..
         rel_tol=0.0,
         abs_tol=native_tolerance,
     )
+
+
+def _replacement_semantically_equal(
+    actual: tuple[Any, ...],
+    requested: tuple[Any, ...],
+) -> bool:
+    """Compare replacement identity without treating geometric Value as semantic."""
+    return _constraint_semantically_equal(actual, requested)
+
+
+def _require_supported_cross_type_replacement(
+    before: tuple[Any, ...],
+    replacement: tuple[Any, ...],
+    constraint_index: int,
+) -> None:
+    """Admit only Coincident/Tangent swaps over one identical endpoint pair."""
+    if before[0] == replacement[0]:
+        return
+    if frozenset((before[0], replacement[0])) != _ENDPOINT_REPLACEMENT_TYPES:
+        raise SketchConstraintReplacementUnsafeError(
+            reason="replacement_semantic_mismatch",
+            constraint_index=constraint_index,
+        )
+    before_pair = _strict_endpoint_pair(before)
+    replacement_pair = _strict_endpoint_pair(replacement)
+    if before_pair is None or replacement_pair is None or before_pair != replacement_pair:
+        raise SketchConstraintReplacementUnsafeError(
+            reason="replacement_semantic_mismatch",
+            constraint_index=constraint_index,
+        )
+
+
+def _strict_endpoint_pair(
+    state: tuple[Any, ...],
+) -> tuple[tuple[int, int], tuple[int, int]] | None:
+    """Return one canonical internal endpoint pair for Coincident/Tangent."""
+    if state[0] not in _ENDPOINT_REPLACEMENT_TYPES or state[5] != -2000 or state[6] != 0:
+        return None
+    first = (cast(int, state[1]), cast(int, state[2]))
+    second = (cast(int, state[3]), cast(int, state[4]))
+    if (
+        first[0] < 0
+        or second[0] < 0
+        or first[1] not in _ENDPOINT_POSITIONS
+        or second[1] not in _ENDPOINT_POSITIONS
+        or first == second
+        or first[0] == second[0]
+    ):
+        return None
+    return (first, second) if first <= second else (second, first)
 
 
 def _normalized_references(state: tuple[Any, ...]) -> tuple[tuple[int, int], ...]:

@@ -7,6 +7,7 @@ import pytest
 
 from freecad_mcp.constraint_expression_language import parse_constraint_expression
 from freecad_mcp.exceptions import (
+    SketchConstraintCreationError,
     SketchConstraintReplacementUnsafeError,
     SketchConstraintStateUnsafeError,
     SketchConstraintValueUpdateUnsafeError,
@@ -23,6 +24,7 @@ from freecad_mcp.freecad import (
 from freecad_mcp.models import (
     ArcOfCircleGeometryUpdateInput,
     CircleGeometryUpdateInput,
+    CoincidentConstraintInput,
     DocumentSummary,
     HorizontalConstraintInput,
     LineSegmentGeometryUpdateInput,
@@ -30,6 +32,7 @@ from freecad_mcp.models import (
     SketchConstraintData,
     SketchConstraintEndpointReferenceInput,
     SketchConstraintExpressionDependency,
+    SketchConstraintPointReferenceInput,
     SketchConstraintValue,
     SketchInspectionResult,
     SketchLineGeometry,
@@ -59,13 +62,18 @@ def _line(index: int = 0) -> SketchLineGeometry:
     )
 
 
-def _solver(*, fresh: bool = True, redundant: tuple[int, ...] = ()) -> SketchSolverData:
+def _solver(
+    *,
+    fresh: bool = True,
+    conflicting: tuple[int, ...] = (),
+    redundant: tuple[int, ...] = (),
+) -> SketchSolverData:
     return SketchSolverData(
         available=True,
         fresh=fresh,
         degrees_of_freedom=2 if fresh else None,
         fully_constrained=False if fresh else None,
-        conflicting_constraint_indices=() if fresh else None,
+        conflicting_constraint_indices=conflicting if fresh else None,
         redundant_constraint_indices=redundant if fresh else None,
         partially_redundant_constraint_indices=() if fresh else None,
         malformed_constraint_indices=() if fresh else None,
@@ -359,6 +367,120 @@ def test_semantic_constraint_comparison_handles_commutative_references() -> None
 
     assert sketch_editing._constraint_semantically_equal(first, second)
     assert sketch_editing._duplicate_constraint_index((first, second), first, excluded=0) == 1
+    assert sketch_editing._duplicate_constraint_index((first,), first, excluded=0) is None
+
+
+@pytest.mark.parametrize(
+    ("before", "replacement"),
+    [
+        (
+            _state("Coincident", 0, second=1, first_pos=2, second_pos=1),
+            _state("Tangent", 0, second=1, first_pos=2, second_pos=1),
+        ),
+        (
+            _state("Coincident", 0, second=1, first_pos=2, second_pos=1),
+            _state("Tangent", 1, second=0, first_pos=1, second_pos=2),
+        ),
+        (
+            _state("Tangent", 0, second=1, first_pos=2, second_pos=1),
+            _state("Coincident", 0, second=1, first_pos=2, second_pos=1),
+        ),
+        (
+            _state("Tangent", 0, second=1, first_pos=2, second_pos=1),
+            _state("Coincident", 1, second=0, first_pos=1, second_pos=2),
+        ),
+    ],
+)
+def test_cross_type_endpoint_replacement_accepts_only_complete_pair_equivalence(
+    before: tuple[Any, ...],
+    replacement: tuple[Any, ...],
+) -> None:
+    sketch_editing._require_supported_cross_type_replacement(before, replacement, 4)
+
+
+@pytest.mark.parametrize(
+    ("before", "replacement"),
+    [
+        (
+            _state("Coincident", 0, second=1, first_pos=2, second_pos=1),
+            _state("Tangent", 0, second=1, first_pos=1, second_pos=2),
+        ),
+        (
+            _state("Coincident", 0, second=1, first_pos=2, second_pos=1),
+            _state("Tangent", 1, second=0, first_pos=2, second_pos=1),
+        ),
+        (
+            _state("Coincident", -1, second=1, first_pos=1, second_pos=1),
+            _state("Tangent", 0, second=1, first_pos=2, second_pos=1),
+        ),
+        (
+            _state("Coincident", -3, second=1, first_pos=1, second_pos=1),
+            _state("Tangent", 0, second=1, first_pos=2, second_pos=1),
+        ),
+        (
+            _state("Coincident", 0, second=1, first_pos=0, second_pos=1),
+            _state("Tangent", 0, second=1, first_pos=2, second_pos=1),
+        ),
+        (
+            _state("Coincident", 0, second=0, first_pos=1, second_pos=2),
+            _state("Tangent", 0, second=0, first_pos=1, second_pos=2),
+        ),
+        (
+            _state("Coincident", 0, second=1, first_pos=2, second_pos=1),
+            _state("Horizontal", 0),
+        ),
+    ],
+)
+def test_cross_type_endpoint_replacement_rejects_non_identical_or_unsafe_forms(
+    before: tuple[Any, ...],
+    replacement: tuple[Any, ...],
+) -> None:
+    with pytest.raises(
+        SketchConstraintReplacementUnsafeError,
+        match="replacement_semantic_mismatch",
+    ):
+        sketch_editing._require_supported_cross_type_replacement(before, replacement, 4)
+
+
+def test_replacement_verification_uses_geometric_identity_not_native_value() -> None:
+    requested = _state(
+        "Tangent",
+        0,
+        value=0.0,
+        second=1,
+        first_pos=2,
+        second_pos=1,
+    )
+    reversed_native = _state(
+        "Tangent",
+        1,
+        value=7.5,
+        second=0,
+        first_pos=1,
+        second_pos=2,
+    )
+    partial_endpoint_change = _state(
+        "Tangent",
+        0,
+        value=7.5,
+        second=1,
+        first_pos=1,
+        second_pos=2,
+    )
+
+    assert sketch_editing._replacement_semantically_equal(reversed_native, requested)
+    assert (
+        sketch_editing._duplicate_constraint_index(
+            (reversed_native,),
+            requested,
+            excluded=1,
+        )
+        == 0
+    )
+    assert not sketch_editing._replacement_semantically_equal(
+        partial_endpoint_change,
+        requested,
+    )
 
 
 @pytest.mark.parametrize(
@@ -1019,15 +1141,28 @@ def test_replacement_success_reports_append_index_and_survivor_mapping(
         (2, 1),
     ]
     assert sketch.deleted == [1]
+    assert sketch.Constraints[:2] == [states[0], states[2]]
     assert document.labels == [REPLACE_SKETCH_CONSTRAINT_TRANSACTION_NAME]
     assert document.commits == 1
 
 
-def test_replacement_transactionally_swaps_coincident_for_tangent_points(
+@pytest.mark.parametrize(
+    ("before_type", "replacement_type", "reverse_pair"),
+    [
+        ("coincident", "tangent_points", False),
+        ("coincident", "tangent_points", True),
+        ("tangent_points", "coincident", False),
+        ("tangent_points", "coincident", True),
+    ],
+)
+def test_replacement_transactionally_swaps_identical_endpoint_pair(
     monkeypatch: pytest.MonkeyPatch,
+    before_type: str,
+    replacement_type: str,
+    reverse_pair: bool,
 ) -> None:
-    before = _constraint(0, "coincident", None, driving=None)
-    after = _constraint(0, "tangent_points", None, driving=None)
+    before = _constraint(0, before_type, None, driving=None)
+    after = _constraint(0, replacement_type, None, driving=None)
     inspected_before = _inspection(
         geometry=(_line(0), _line(1)),
         constraints=(before,),
@@ -1036,22 +1171,22 @@ def test_replacement_transactionally_swaps_coincident_for_tangent_points(
         geometry=(_line(0), _line(1)),
         constraints=(after,),
     )
-    coincident_state = _state(
-        "Coincident",
+    before_state = _state(
+        "Coincident" if before_type == "coincident" else "Tangent",
         0,
         second=1,
         first_pos=2,
         second_pos=1,
     )
-    tangent_state = _state(
-        "Tangent",
-        0,
-        second=1,
-        first_pos=2,
-        second_pos=1,
+    replacement_state = _state(
+        "Coincident" if replacement_type == "coincident" else "Tangent",
+        1 if reverse_pair else 0,
+        second=0 if reverse_pair else 1,
+        first_pos=1 if reverse_pair else 2,
+        second_pos=2 if reverse_pair else 1,
     )
-    snapshot = _snapshot(inspected=inspected_before, states=(coincident_state,))
-    sketch = _Sketch([coincident_state])
+    snapshot = _snapshot(inspected=inspected_before, states=(before_state,))
+    sketch = _Sketch([before_state])
     document = _install(monkeypatch, snapshot, sketch, inspected_after)
     monkeypatch.setattr(
         sketch_removal,
@@ -1059,7 +1194,80 @@ def test_replacement_transactionally_swaps_coincident_for_tangent_points(
         lambda *_args: (),
     )
     monkeypatch.setattr(sketch_editing, "_validate_geometry_compatibility", lambda *_args: None)
-    monkeypatch.setattr(sketch_editing, "_build_constraint", lambda *_args: tangent_state)
+    monkeypatch.setattr(sketch_editing, "_build_constraint", lambda *_args: replacement_state)
+    monkeypatch.setattr(sketch_editing, "_one_constraint_state", lambda item: item)
+    first = SketchConstraintEndpointReferenceInput(
+        geometry_index=1 if reverse_pair else 0,
+        position=SketchPointPosition.START if reverse_pair else SketchPointPosition.END,
+    )
+    second = SketchConstraintEndpointReferenceInput(
+        geometry_index=0 if reverse_pair else 1,
+        position=SketchPointPosition.END if reverse_pair else SketchPointPosition.START,
+    )
+    replacement: Any
+    if replacement_type == "tangent_points":
+        replacement = TangentPointsConstraintInput(
+            type="tangent_points",
+            first=first,
+            second=second,
+        )
+    else:
+        replacement = CoincidentConstraintInput(
+            type="coincident",
+            first=SketchConstraintPointReferenceInput(
+                geometry_index=first.geometry_index,
+                position=first.position,
+            ),
+            second=SketchConstraintPointReferenceInput(
+                geometry_index=second.geometry_index,
+                position=second.position,
+            ),
+        )
+
+    result = sketch_editing.replace_sketch_constraint(
+        "Model",
+        "Sketch",
+        0,
+        replacement,
+    )
+
+    assert isinstance(result.replacement_constraint, SketchConstraintData)
+    assert result.replacement_constraint.type == replacement_type
+    assert result.replacement_constraint_index == 0
+    assert result.no_change is False
+    assert sketch.deleted == [0]
+    assert sketch.Constraints == [replacement_state]
+    assert document.labels == [REPLACE_SKETCH_CONSTRAINT_TRANSACTION_NAME]
+    assert document.commits == 1
+
+
+def test_cross_type_replacement_rejects_matching_duplicate_elsewhere(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    before_state = (
+        *_state("Coincident", 0, second=1, first_pos=2, second_pos=1)[:9],
+        True,
+        True,
+        False,
+    )
+    duplicate_state = _state("Tangent", 1, second=0, first_pos=1, second_pos=2)
+    inspected = _inspection(
+        geometry=(_line(0), _line(1)),
+        constraints=(
+            _constraint(0, "coincident", None, driving=None),
+            _constraint(1, "tangent_points", None, driving=None),
+        ),
+    )
+    snapshot = _snapshot(inspected=inspected, states=(before_state, duplicate_state))
+    sketch = _Sketch([before_state, duplicate_state])
+    document = _install(monkeypatch, snapshot, sketch, inspected)
+    monkeypatch.setattr(
+        sketch_removal,
+        "_public_constraint_expression_dependencies",
+        lambda *_args: (),
+    )
+    monkeypatch.setattr(sketch_editing, "_validate_geometry_compatibility", lambda *_args: None)
+    monkeypatch.setattr(sketch_editing, "_build_constraint", lambda *_args: duplicate_state)
     monkeypatch.setattr(sketch_editing, "_one_constraint_state", lambda item: item)
     replacement = TangentPointsConstraintInput(
         type="tangent_points",
@@ -1073,21 +1281,278 @@ def test_replacement_transactionally_swaps_coincident_for_tangent_points(
         ),
     )
 
-    result = sketch_editing.replace_sketch_constraint(
-        "Model",
-        "Sketch",
-        0,
-        replacement,
+    with pytest.raises(SketchConstraintReplacementUnsafeError) as caught:
+        sketch_editing.replace_sketch_constraint("Model", "Sketch", 0, replacement)
+
+    assert caught.value.reason == "duplicate_constraint"
+    assert caught.value.dependencies == ({"duplicate_constraint_index": 1},)
+    assert document.labels == []
+    assert sketch.deleted == []
+
+
+@pytest.mark.parametrize(
+    ("candidate_type", "reason"),
+    [
+        ("Circle", "invalid_position_reference"),
+        ("Point", "invalid_position_reference"),
+        ("Unsupported", "incompatible_geometry_type"),
+    ],
+)
+def test_cross_type_replacement_rejects_geometry_without_selected_endpoints(
+    monkeypatch: pytest.MonkeyPatch,
+    candidate_type: str,
+    reason: str,
+) -> None:
+    class _LineSegment:
+        pass
+
+    class _ArcOfCircle:
+        pass
+
+    class _Circle:
+        pass
+
+    class _Point:
+        pass
+
+    class _Unsupported:
+        pass
+
+    part = SimpleNamespace(
+        LineSegment=_LineSegment,
+        ArcOfCircle=_ArcOfCircle,
+        Circle=_Circle,
+        Point=_Point,
+    )
+    candidate_classes = {
+        "Circle": _Circle,
+        "Point": _Point,
+        "Unsupported": _Unsupported,
+    }
+    before_state = _state("Coincident", 0, second=1, first_pos=2, second_pos=1)
+    inspected = _inspection(
+        geometry=(_line(0), _line(1)),
+        constraints=(_constraint(0, "coincident", None, driving=None),),
+    )
+    snapshot = _snapshot(inspected=inspected, states=(before_state,))
+    snapshot.base.geometry = (candidate_classes[candidate_type](), _LineSegment())
+    sketch = _Sketch([before_state])
+    document = _install(monkeypatch, snapshot, sketch, inspected)
+    monkeypatch.setattr(
+        sketch_editing,
+        "_runtime_modules",
+        lambda: (_App, object(), part, object()),
+    )
+    monkeypatch.setattr(
+        sketch_removal,
+        "_public_constraint_expression_dependencies",
+        lambda *_args: (),
+    )
+    replacement = TangentPointsConstraintInput(
+        type="tangent_points",
+        first=SketchConstraintEndpointReferenceInput(
+            geometry_index=0,
+            position=SketchPointPosition.END,
+        ),
+        second=SketchConstraintEndpointReferenceInput(
+            geometry_index=1,
+            position=SketchPointPosition.START,
+        ),
     )
 
-    assert isinstance(result.replacement_constraint, SketchConstraintData)
-    assert result.replacement_constraint.type == "tangent_points"
-    assert result.replacement_constraint_index == 0
-    assert result.no_change is False
-    assert sketch.deleted == [0]
-    assert sketch.Constraints == [tangent_state]
-    assert document.labels == [REPLACE_SKETCH_CONSTRAINT_TRANSACTION_NAME]
-    assert document.commits == 1
+    with pytest.raises(SketchConstraintReplacementUnsafeError) as caught:
+        sketch_editing.replace_sketch_constraint("Model", "Sketch", 0, replacement)
+
+    assert caught.value.reason == reason
+    assert document.labels == []
+    assert sketch.deleted == []
+
+
+@pytest.mark.parametrize("failure_phase", ["constructor", "recompute"])
+def test_cross_type_replacement_native_failure_routes_through_exact_rollback(
+    monkeypatch: pytest.MonkeyPatch,
+    failure_phase: str,
+) -> None:
+    before_state = (
+        *_state("Coincident", 0, second=1, first_pos=2, second_pos=1)[:9],
+        True,
+        True,
+        False,
+    )
+    unrelated_state = (
+        *_state("Horizontal", 2)[:9],
+        True,
+        False,
+        True,
+    )
+    tangent_state = _state("Tangent", 0, second=1, first_pos=2, second_pos=1)
+    inspected = _inspection(
+        geometry=(_line(0), _line(1), _line(2)),
+        constraints=(
+            _constraint(0, "coincident", None, driving=None),
+            _constraint(
+                1,
+                "horizontal",
+                None,
+                active=False,
+                virtual=True,
+                driving=None,
+            ),
+        ),
+    )
+    snapshot = _snapshot(inspected=inspected, states=(before_state, unrelated_state))
+    sketch = _Sketch([before_state, unrelated_state])
+    document = _install(monkeypatch, snapshot, sketch, inspected)
+    monkeypatch.setattr(
+        sketch_removal,
+        "_public_constraint_expression_dependencies",
+        lambda *_args: (),
+    )
+    monkeypatch.setattr(sketch_editing, "_validate_geometry_compatibility", lambda *_args: None)
+    build_calls = 0
+
+    def _build(*_args: object) -> tuple[Any, ...]:
+        nonlocal build_calls
+        build_calls += 1
+        if failure_phase == "constructor" and build_calls == 2:
+            raise SketchConstraintCreationError(
+                index=0,
+                reason="native_constraint_constructor_failed",
+            )
+        return tangent_state
+
+    monkeypatch.setattr(sketch_editing, "_build_constraint", _build)
+    monkeypatch.setattr(sketch_editing, "_one_constraint_state", lambda item: item)
+    if failure_phase == "recompute":
+        monkeypatch.setattr(
+            sketch_removal,
+            "_recompute",
+            lambda *_args: (_ for _ in ()).throw(RuntimeError("injected recompute failure")),
+        )
+    rolled_back: list[tuple[tuple[Any, ...], ...]] = []
+
+    def _rollback(*_args: object, **_kwargs: object) -> None:
+        sketch.Constraints = list(snapshot.base.constraints)
+        rolled_back.append(tuple(sketch.Constraints))
+
+    monkeypatch.setattr(sketch_removal, "_rollback", _rollback)
+    replacement = TangentPointsConstraintInput(
+        type="tangent_points",
+        first=SketchConstraintEndpointReferenceInput(
+            geometry_index=0,
+            position=SketchPointPosition.END,
+        ),
+        second=SketchConstraintEndpointReferenceInput(
+            geometry_index=1,
+            position=SketchPointPosition.START,
+        ),
+    )
+
+    with pytest.raises(SketchControlledMutationError, match="freecad_api_failure"):
+        sketch_editing.replace_sketch_constraint("Model", "Sketch", 0, replacement)
+
+    assert rolled_back == [(before_state, unrelated_state)]
+    assert sketch.Constraints == [before_state, unrelated_state]
+    assert document.commits == 0
+
+
+@pytest.mark.parametrize(
+    ("failure_kind", "expected_reason"),
+    [
+        ("conflict", "solver_state_unhealthy"),
+        ("redundancy", "solver_state_unhealthy"),
+        ("semantic", "replacement_semantic_mismatch"),
+        ("inspection", "freecad_api_failure"),
+    ],
+)
+def test_cross_type_replacement_post_mutation_failure_routes_through_rollback(
+    monkeypatch: pytest.MonkeyPatch,
+    failure_kind: str,
+    expected_reason: str,
+) -> None:
+    before_state = _state("Coincident", 0, second=1, first_pos=2, second_pos=1)
+    tangent_state = _state(
+        "Tangent",
+        1,
+        value=8.0,
+        second=0,
+        first_pos=1,
+        second_pos=2,
+    )
+    partial_endpoint_state = _state(
+        "Tangent",
+        0,
+        value=8.0,
+        second=1,
+        first_pos=1,
+        second_pos=2,
+    )
+    inspected_before = _inspection(
+        geometry=(_line(0), _line(1)),
+        constraints=(_constraint(0, "coincident", None, driving=None),),
+    )
+    inspected_after = _inspection(
+        geometry=(_line(0), _line(1)),
+        constraints=(_constraint(0, "tangent_points", None, driving=None),),
+        solver=_solver(
+            conflicting=(0,) if failure_kind == "conflict" else (),
+            redundant=(0,) if failure_kind == "redundancy" else (),
+        ),
+    )
+    snapshot = _snapshot(inspected=inspected_before, states=(before_state,))
+    sketch = _Sketch([before_state])
+    verify_replacement = sketch_editing._verify_replacement
+    _install(monkeypatch, snapshot, sketch, inspected_after)
+    monkeypatch.setattr(
+        sketch_removal,
+        "_public_constraint_expression_dependencies",
+        lambda *_args: (),
+    )
+    monkeypatch.setattr(sketch_editing, "_validate_geometry_compatibility", lambda *_args: None)
+    monkeypatch.setattr(sketch_editing, "_build_constraint", lambda *_args: tangent_state)
+    monkeypatch.setattr(sketch_editing, "_one_constraint_state", lambda item: item)
+    monkeypatch.setattr(sketch_editing, "_constraint_state", lambda item: tuple(item.Constraints))
+    monkeypatch.setattr(
+        sketch_editing,
+        "_construction_state",
+        lambda *_args: snapshot.base.construction,
+    )
+    monkeypatch.setattr(sketch_editing, "_verify_replacement", verify_replacement)
+    if failure_kind == "semantic":
+
+        def _semantic_readback(*_args: object) -> tuple[SketchInspectionResult, DocumentSummary]:
+            sketch.Constraints[-1] = partial_endpoint_state
+            return inspected_after, snapshot.base.document_summary
+
+        monkeypatch.setattr(sketch_removal, "_controlled_readback", _semantic_readback)
+    elif failure_kind == "inspection":
+        monkeypatch.setattr(
+            sketch_removal,
+            "_controlled_readback",
+            lambda *_args: (_ for _ in ()).throw(RuntimeError("injected inspection failure")),
+        )
+    rolled_back: list[str] = []
+    monkeypatch.setattr(
+        sketch_removal,
+        "_rollback",
+        lambda *_args, **_kwargs: rolled_back.append("rollback"),
+    )
+    replacement = TangentPointsConstraintInput(
+        type="tangent_points",
+        first=SketchConstraintEndpointReferenceInput(
+            geometry_index=0,
+            position=SketchPointPosition.END,
+        ),
+        second=SketchConstraintEndpointReferenceInput(
+            geometry_index=1,
+            position=SketchPointPosition.START,
+        ),
+    )
+
+    with pytest.raises(SketchControlledMutationError, match=expected_reason):
+        sketch_editing.replace_sketch_constraint("Model", "Sketch", 0, replacement)
+
+    assert rolled_back == ["rollback"]
 
 
 @pytest.mark.parametrize(

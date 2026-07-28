@@ -26,11 +26,22 @@ prohibited_shortcuts:
   - independent_endpoint_coordinate_dimensioning
   - duplicate_radius_dimensions_when_equal_is_present
 acceptance:
+  total_constraints: 15
   final_dof: 0
   conflicting_constraints: 0
   redundant_constraints: 0
   partially_redundant_constraints: 0
   malformed_constraints: 0
+  constraint_ledger:
+    initial_dof: 26
+    topology_tangent_points: {count: 4, reduction_each: 3, total_reduction: 12}
+    topology_coincident: {count: 2, reduction_each: 2, total_reduction: 4}
+    orientation: {count: 4, reduction_each: 1, total_reduction: 4}
+    equal_radius: {count: 1, reduction_each: 1, total_reduction: 1}
+    origin_datum_coincident: {count: 1, reduction_each: 2, total_reduction: 2}
+    driving_dimensions: {count: 3, reduction_each: 1, total_reduction: 3}
+    total_reduction: 26
+    final_dof: 0
   parameter_edits:
     - {overall_width_mm: 100.0}
     - {overall_height_mm: 50.0}

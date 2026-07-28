@@ -88,8 +88,15 @@ def test_reference_asymmetric_plan_is_valid_and_reaches_zero_dof() -> None:
     plan = ConstraintPlan.model_validate_json(_FIXTURE.read_text(encoding="utf-8"))
 
     result = validate_constraint_plan(plan)
+    topology_types = [
+        step.constraint.type for step in plan.steps if step.step_id.startswith("topology.")
+    ]
+    reductions = [step.expected_dof_reduction.minimum for step in plan.steps]
 
-    assert len(plan.steps) == 19
+    assert len(plan.steps) == 15
+    assert topology_types.count("coincident") == 2
+    assert topology_types.count("tangent_points") == 4
+    assert sum(reductions) == 26
     assert result.valid is True
     assert result.expected_final_dof_minimum == 0
     assert result.expected_final_dof_maximum == 0
@@ -474,21 +481,21 @@ def test_malformed_nested_constraint_is_rejected_by_reused_strict_union() -> Non
         _validated(payload)
 
 
-def test_expected_dof_reduction_is_capped_at_two_in_model_and_schema() -> None:
+def test_expected_dof_reduction_is_capped_at_three_in_model_and_schema() -> None:
     payload = _payload()
     steps = payload["steps"]
     assert isinstance(steps, list)
     first_step = steps[0]
     assert isinstance(first_step, dict)
-    first_step["expected_dof_reduction"] = {"minimum": 0, "maximum": 3}
+    first_step["expected_dof_reduction"] = {"minimum": 0, "maximum": 4}
 
     with pytest.raises(ValidationError):
         _validated(payload)
 
     schema = ConstraintPlan.model_json_schema()
     dof_schema = schema["$defs"]["ExpectedDofReduction"]
-    assert dof_schema["properties"]["minimum"]["maximum"] == 2
-    assert dof_schema["properties"]["maximum"]["maximum"] == 2
+    assert dof_schema["properties"]["minimum"]["maximum"] == 3
+    assert dof_schema["properties"]["maximum"]["maximum"] == 3
 
 
 def test_plan_schema_is_closed_and_reuses_discriminated_constraint_union() -> None:

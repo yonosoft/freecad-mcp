@@ -93,8 +93,8 @@ class ConstraintDesignIntent(_ConstraintPlanningModel):
 class ExpectedDofReduction(_ConstraintPlanningModel):
     """Bounded expected reduction for one supported constraint operation."""
 
-    minimum: int = Field(strict=True, ge=0, le=2)
-    maximum: int = Field(strict=True, ge=0, le=2)
+    minimum: int = Field(strict=True, ge=0, le=3)
+    maximum: int = Field(strict=True, ge=0, le=3)
 
     @model_validator(mode="after")
     def _validate_bounds(self) -> ExpectedDofReduction:

@@ -2039,7 +2039,7 @@ MCP registration
 
 The transport schemas are explicit and closed. Geometry editing has a four-way
 same-type union without `construction`; replacement imports the existing
-17-variant constraint union directly; datum editing accepts one strict finite
+18-variant constraint union directly; datum editing accepts one strict finite
 number. The command layer owns validation and stable controlled error envelopes,
 while the FreeCAD layer owns native fingerprints, dependency inspection,
 transaction/rollback, and semantic comparison. No registration function calls
@@ -2087,6 +2087,33 @@ Named, expression-sensitive, inactive, virtual, reference, and unsupported
 constraints are refused because reconstructing their metadata is outside this
 milestone. Fresh solver conflict, redundancy, partial redundancy, malformed
 state, or unavailable verification rolls back the complete mutation.
+
+Same-type replacement retains that established behavior. Cross-type replacement
+has one narrow exception: a point-to-point native `Coincident` may replace, or
+be replaced by, a four-argument endpoint `Tangent` that inspects publicly as
+`tangent_points`. Both native records must contain exactly two non-negative
+internal geometry references with start/end positions, the geometries must be
+distinct and support endpoint selection, and the canonical pair of complete
+`(geometry, position)` references must match. Full pair reversal is equivalent;
+partial geometry or position changes are not. Origin, external, whole-geometry,
+same-geometry, unsupported-geometry, different-pair, duplicate-survivor, and
+all other cross-type requests are refused before mutation. Prospective duplicate
+detection excludes only the selected target.
+
+Native geometric `Value` can change when FreeCAD installs and solves an
+endpoint tangency, so replacement readback treats type plus canonical references
+as its geometric semantic identity. Dimensional replacement continues to verify
+the numeric value. Geometry and constraint counts, exact survivor order and
+state, construction, solver diagnostics, context, active/virtual flags,
+transaction history, and rollback verification remain unchanged and strict.
+
+The current asymmetric six-geometry benchmark freezes the verified 26-to-0 DoF
+ledger in 15 constraints: four `tangent_points` joins reduce three DoF each, two
+topology Coincident joins reduce two each, four orientations and one equal
+relationship reduce five in total, one origin-datum Coincident reduces two, and
+three driving dimensions reduce three. The earlier Coincident plus
+whole-geometry tangent arrangement is retained only as historical regression
+evidence, not as the recommended constraint plan.
 
 ### Transactions, rollback, and comparisons
 

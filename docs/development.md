@@ -1935,7 +1935,7 @@ isolation; and no edit-mode mutation.
 | Changed responsibility | Principal files | Focused evidence |
 | --- | --- | --- |
 | Strict geometry/value/index schemas | `models/`, `validation/` | finite values, Boolean/string/float index rejection, closed objects, four geometry variants |
-| Existing constraint language reuse | `models/`, `mcp/sketch_editing_tools.py` | replacement schema equals the unchanged 17-variant add union |
+| Existing constraint language reuse | `models/`, `mcp/sketch_editing_tools.py` | replacement schema equals the unchanged 18-variant add union |
 | Handler and Qt boundary | `commands/sketch_editing.py`, `application.py`, `protocols/`, `runtime.py` | dispatch, controlled refusal/error/no-op envelopes, composition tests |
 | Geometry identity and dependency policy | `freecad/sketch_editing.py` | same-type/no-op/dependency unit tests plus all four native geometry cases |
 | Datum identity and solver behavior | `freecad/sketch_editing.py` | six native dimensional types, unsupported/expression refusal, no-op, history, undo/redo |
@@ -2427,3 +2427,47 @@ removal, active/inactive state, and virtual-space state only where the installed
 FreeCAD build permits them. Naming is currently outside the non-dimensional
 constraint-name contract. Return `PASS`, `FAIL`, or `INCONCLUSIVE`; do not
 repair failures during acceptance.
+
+## CE-03D Atomic Endpoint-Relationship Replacement
+
+The only permitted cross-type `replace_sketch_constraint` operation is
+point-to-point Coincident ↔ `tangent_points` over the identical complete pair
+of internal geometry endpoints. A full first/second pair reversal is
+equivalent. Partial geometry or endpoint changes, origin and external
+references, whole-geometry positions, unsupported endpoint geometry,
+same-geometry references, a duplicate survivor, and every unrelated cross-type
+replacement are refused before mutation. Same-type replacement remains
+unchanged.
+
+FreeCAD still deletes the selected constraint and appends the replacement at
+the deterministic tail index; it does not preserve the deleted slot. The
+existing owned/caller-owned transaction boundary captures the original
+constraint and all active/virtual state, removes any partially created
+replacement on failure, restores the exact original ordered state, and verifies
+rollback after constructor, recompute, inspection, solver conflict, redundancy,
+or semantic failure. Post-add geometric verification uses native type plus the
+canonical endpoint pair because the solved native geometric `Value` is not
+stable semantic identity.
+
+The maintained asymmetric benchmark fixture is the accepted 15-constraint
+plan:
+
+- four `tangent_points` rounded joins at three DoF each;
+- two topology Coincident square-corner joins at two DoF each;
+- four horizontal/vertical orientation constraints;
+- one equal-radius constraint;
+- one origin-datum Coincident at two DoF;
+- width, height, and one radius as three driving dimensions.
+
+This freezes the exact `26 - 12 - 4 - 4 - 1 - 2 - 3 = 0` DoF ledger. The
+earlier Coincident plus whole-geometry tangent attempt is historical regression
+evidence only and must not be presented as the current recommended plan.
+
+Pure-Python acceptance must cover both directions and full pair reversal,
+different-pair and unsafe-reference refusal, duplicate handling with only the
+target excluded, unsupported geometry, constructor/recompute/inspection/solver
+rollback, active/virtual and unrelated-state restoration, append-index
+reporting, unchanged same-type behavior, refusal of all other cross-type
+replacement, the exact 59-tool order, and the exact 18-variant constraint
+union. Live endpoint acceptance remains deferred until human-controlled
+deployment and FreeCAD restart.
