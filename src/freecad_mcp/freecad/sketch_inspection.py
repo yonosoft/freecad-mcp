@@ -557,7 +557,12 @@ def _constraint_references(
     geometry: tuple[SketchGeometry, ...],
     external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[tuple[SketchConstraintReference, ...], bool]:
-    tangent = _tangent_references(constraint, geometry, external_geometry)
+    tangent = _tangent_references(
+        constraint,
+        constraint_index,
+        geometry,
+        external_geometry,
+    )
     if tangent is not None:
         return tangent
 
@@ -650,6 +655,7 @@ def _constraint_references(
 
 def _tangent_references(
     constraint: Any,
+    constraint_index: int,
     geometry: tuple[SketchGeometry, ...],
     external_geometry: tuple[SketchGeometry, ...] = (),
 ) -> tuple[tuple[SketchConstraintReference, ...], bool] | None:
@@ -665,14 +671,37 @@ def _tangent_references(
     except Exception:
         return (), True
 
-    if (
-        first_position != 0
-        or second_position != 0
-        or third != _UNUSED_GEOMETRY_REFERENCE
-        or third_position != 0
-        or first == second
-    ):
+    if third != _UNUSED_GEOMETRY_REFERENCE or third_position != 0 or first == second:
         return (), True
+
+    if first_position != 0 or second_position != 0:
+        if first < 0 or second < 0 or first_position not in {1, 2} or second_position not in {1, 2}:
+            return (), True
+        try:
+            first_reference = _geometry_point_reference(
+                first,
+                first_position,
+                constraint_index,
+                geometry,
+                external_geometry,
+            )
+            second_reference = _geometry_point_reference(
+                second,
+                second_position,
+                constraint_index,
+                geometry,
+                external_geometry,
+            )
+        except SketchConstraintMalformedError:
+            return (), True
+        if (
+            first_reference is None
+            or second_reference is None
+            or first_reference.position not in {"start", "end"}
+            or second_reference.position not in {"start", "end"}
+        ):
+            return (), True
+        return ((first_reference, second_reference), False)
 
     supported = (SketchLineGeometry, SketchCircleGeometry, SketchArcGeometry)
     first_geometry = _geometry_for_native_reference(
@@ -712,6 +741,10 @@ def _controlled_constraint_type(
         return "horizontal_points"
     if freecad_type == "Vertical" and len(references) == 2:
         return "vertical_points"
+    if freecad_type == "Tangent" and all(
+        reference.position in {"start", "end"} for reference in references
+    ):
+        return "tangent_points"
     return _SUPPORTED_CONSTRAINTS[freecad_type]
 
 

@@ -67,6 +67,7 @@ _SUPPORTED_SKETCH_CONSTRAINT_INPUT_TYPES = {
     "radius",
     "symmetric",
     "tangent",
+    "tangent_points",
     "vertical",
     "vertical_points",
 }

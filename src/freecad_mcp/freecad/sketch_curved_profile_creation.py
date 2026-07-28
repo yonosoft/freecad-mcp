@@ -56,7 +56,6 @@ from freecad_mcp.models import (
     SketchCurvedProfileJoin,
     SketchInspectionResult,
     SketchLineGeometry,
-    UnsupportedSketchConstraint,
 )
 
 T = TypeVar("T")
@@ -446,9 +445,7 @@ def _verify_constraint_semantics(
         raise _verification_error(kind, "constraint_semantic_readback_mismatch")
     for item, spec in zip(constraints, specs, strict=True):
         if spec.type == "Tangent":
-            if not (
-                isinstance(item, UnsupportedSketchConstraint) and item.freecad_type == "Tangent"
-            ):
+            if not (isinstance(item, SketchConstraintData) and item.type == "tangent_points"):
                 raise _verification_error(kind, "bounded_tangent_readback_mismatch")
             continue
         if not (

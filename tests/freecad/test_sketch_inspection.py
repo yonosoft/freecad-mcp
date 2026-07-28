@@ -817,6 +817,128 @@ def test_get_sketch_returns_supported_direct_tangent_pairs_in_native_order(
 
 
 @pytest.mark.parametrize(
+    ("first_pos", "second_pos", "first_name", "second_name"),
+    [
+        (1, 1, "start", "start"),
+        (1, 2, "start", "end"),
+        (2, 1, "end", "start"),
+        (2, 2, "end", "end"),
+    ],
+)
+def test_get_sketch_round_trips_all_tangent_points_endpoint_combinations(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    first_pos: int,
+    second_pos: int,
+    first_name: str,
+    second_name: str,
+) -> None:
+    sketch = SketchStub(
+        geometry=[
+            LineSegment(Vector(0.0, 0.0), Vector(10.0, 0.0)),
+            ArcOfCircle(
+                Vector(10.0, 5.0),
+                5.0,
+                Vector(10.0, 0.0),
+                Vector(15.0, 5.0),
+                -math.pi / 2,
+                0.0,
+            ),
+        ],
+        constraints=[
+            ConstraintStub(
+                "Tangent",
+                first=0,
+                first_pos=first_pos,
+                second=1,
+                second_pos=second_pos,
+            )
+        ],
+    )
+    _install_document(monkeypatch, [sketch])
+
+    serialized = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()
+    constraints = cast(list[dict[str, Any]], serialized["constraints"])
+    constraint = constraints[0]
+
+    assert constraint["type"] == "tangent_points"
+    assert constraint["references"] == [
+        {"kind": "geometry", "geometry_index": 0, "position": first_name},
+        {"kind": "geometry", "geometry_index": 1, "position": second_name},
+    ]
+
+
+@pytest.mark.parametrize("profile", ["slot", "rounded_rectangle"])
+def test_profile_endpoint_tangencies_read_back_as_supported_tangent_points(
+    monkeypatch: pytest.MonkeyPatch,
+    part_module: ModuleType,
+    profile: str,
+) -> None:
+    native_operands: tuple[tuple[int, int, int, int], ...]
+    if profile == "slot":
+        geometry: list[Any] = [
+            LineSegment(Vector(-10.0, 5.0), Vector(10.0, 5.0)),
+            ArcOfCircle(
+                Vector(10.0, 0.0),
+                5.0,
+                Vector(10.0, 5.0),
+                Vector(10.0, -5.0),
+                math.pi / 2,
+                3 * math.pi / 2,
+            ),
+            LineSegment(Vector(10.0, -5.0), Vector(-10.0, -5.0)),
+            ArcOfCircle(
+                Vector(-10.0, 0.0),
+                5.0,
+                Vector(-10.0, -5.0),
+                Vector(-10.0, 5.0),
+                3 * math.pi / 2,
+                5 * math.pi / 2,
+            ),
+        ]
+        native_operands = ((0, 1, 1, 2), (1, 1, 2, 2), (2, 1, 3, 2), (3, 1, 0, 2))
+    else:
+        geometry = []
+        for index in range(8):
+            if index % 2 == 0:
+                geometry.append(
+                    LineSegment(Vector(float(index), 0.0), Vector(float(index + 1), 0.0))
+                )
+            else:
+                geometry.append(
+                    ArcOfCircle(
+                        Vector(float(index), 1.0),
+                        1.0,
+                        Vector(float(index), 0.0),
+                        Vector(float(index + 1), 1.0),
+                        -math.pi / 2,
+                        0.0,
+                    )
+                )
+        native_operands = tuple((index, 2, (index + 1) % 8, 1) for index in range(8))
+    constraints = [
+        ConstraintStub(
+            "Tangent",
+            first=first,
+            first_pos=first_pos,
+            second=second,
+            second_pos=second_pos,
+        )
+        for first, first_pos, second, second_pos in native_operands
+    ]
+    sketch = SketchStub(geometry=geometry, constraints=constraints)
+    _install_document(monkeypatch, [sketch])
+
+    result = FreeCADDocumentAdapter().get_sketch("TestDoc", "BaseSketch").to_dict()
+    serialized_constraints = cast(list[dict[str, Any]], result["constraints"])
+
+    assert result["unsupported_constraint_count"] == 0
+    assert [item["type"] for item in serialized_constraints] == ["tangent_points"] * len(
+        native_operands
+    )
+
+
+@pytest.mark.parametrize(
     ("first", "first_pos", "second", "second_pos", "third", "third_pos"),
     [
         (0, 1, 1, 0, -2000, 0),

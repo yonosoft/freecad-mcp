@@ -1395,7 +1395,7 @@ registration loop, arbitrary property mutation, or raw constructor passthrough.
 
 The top-level schema requires exactly `document_name`, `sketch_name`, and a
 `constraints` array with 1 to 100 items. Both names use exact internal-name
-lookup. The strict nested discriminated union has 17 top-level variants and
+lookup. The strict nested discriminated union has 18 top-level variants and
 supports:
 
 ```text
@@ -1422,6 +1422,9 @@ symmetric
 
 tangent
   first, second: two distinct strict whole-geometry references
+
+tangent_points
+  first, second: explicit start/end references on distinct internal geometry
 
 distance
   line_length: geometry_index, value
@@ -1496,6 +1499,15 @@ from initial placement. For circular arcs, direct native tangency constrains
 the underlying support circle rather than requiring the contact point to lie in
 the visible parameter interval.
 
+Controlled point-to-point tangency is a distinct additive variant. It uses the
+native four-argument constructor
+`Tangent(first_geometry, first_position, second_geometry, second_position)`.
+Both operands are strict internal non-negative geometry references qualified
+only by `start` or `end`; centre, generic point, whole-geometry, external, and
+raw native references are excluded. Lines and circular arcs are accepted when
+the selected endpoint exists. The complete geometry/position operands are
+commutative only as whole pairs.
+
 For controlled symmetry, the FreeCAD layer selects one of the two verified
 native constructor forms: two points plus a third point for origin/geometry
 point symmetry, or two points plus a whole line for axis/line-segment symmetry.
@@ -1523,8 +1535,8 @@ position tokens, same-geometry pairs, origin-to-origin pairs, invalid native
 reference combinations, nonnumeric/non-finite values, nonpositive unsigned
 dimensions, identical symmetric points, a centre identical to either selected
 point, degenerate own-line symmetry, identical tangent geometries, tangent
-references with positions or additional fields, empty batches, and batches
-above 100.
+references with positions or additional fields, malformed tangent-point
+references, empty batches, and batches above 100.
 Before opening a transaction,
 the FreeCAD adapter resolves every current index and enforces:
 
@@ -1544,6 +1556,9 @@ the FreeCAD adapter resolves every current index and enforces:
 - tangent: both references resolve to line, circle, or circular arc; two lines,
   point/unsupported geometry, identical indices, and out-of-range indices fail
   before a transaction, while construction state has no effect;
+- tangent_points: both references resolve to valid line or circular-arc
+  endpoints on distinct internal geometry; an equivalent existing or
+  same-batch Coincident is refused before mutation rather than removed;
 - radius and diameter: `Part.Circle` or `Part.ArcOfCircle` only.
 
 Construction geometry is valid under the same rules. Standalone and attached
@@ -1613,13 +1628,14 @@ Public error codes are `validation_error`, `document_not_found`,
 `identical_symmetric_points`, `identical_symmetry_centre`, and
 `degenerate_symmetry_line`, plus `identical_point_references`,
 `point_on_object_self_target`, and `unsupported_point_on_object_target`, plus
-`identical_tangent_geometry`, `incompatible_tangent_geometry_pair`, and
-`unsupported_tangent_geometry`, plus
+`identical_tangent_geometry`, `incompatible_tangent_geometry_pair`,
+`unsupported_tangent_geometry`, and `equivalent_coincident_constraint`, plus
 transaction/index/count/rollback
 reasons. Raw FreeCAD exception text is never public.
 
 Version one creates only active driving dimensional constraints. Point-specific
-tangency, line-line tangency, block, internal alignment, angle-via-point,
+tangent forms other than `tangent_points`, whole-geometry line-line tangency,
+block, internal alignment, angle-via-point,
 B-spline-specific and
 arbitrary reference constraints; expressions, names, editing and deletion; and
 external/internal geometry references remain unsupported. Axis references are
@@ -1688,10 +1704,14 @@ breaking inspection of the remaining constraints.
 Supported native two-index `Tangent` records return `type: tangent` and exactly
 two non-negative controlled geometry references with `position: edge` in
 stored first/second order. Inspection admits only the public line-circle,
-line-arc, circle-circle, circle-arc, and arc-arc matrix. Point-specific,
-line-line, identical, out-of-range, position-qualified, and otherwise malformed
-tangent records become one controlled `unsupported` record without exposing
-native fields or interrupting inspection of later constraints.
+line-arc, circle-circle, circle-arc, and arc-arc matrix. Valid endpoint-position
+records return `type: tangent_points` with exactly two controlled internal
+`start`/`end` references in stored order. Mixed zero/non-zero positions,
+external endpoint references, same-geometry records, invalid endpoint
+positions, line-line whole-geometry records, out-of-range references, strict
+third-reference violations, and otherwise malformed tangent records become one
+controlled `unsupported` record without exposing native fields or interrupting
+inspection of later constraints.
 Degenerate, unsupported-target, or out-of-range records in the new point
 relationship forms likewise become one controlled `unsupported` record so the
 following native constraints remain inspectable.

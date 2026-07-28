@@ -8,12 +8,14 @@ import pytest
 from freecad_mcp.constraint_expression_language import parse_constraint_expression
 from freecad_mcp.exceptions import (
     SketchConstraintReplacementUnsafeError,
+    SketchConstraintStateUnsafeError,
     SketchConstraintValueUpdateUnsafeError,
     SketchControlledMutationError,
     SketchGeometryUpdateUnsafeError,
 )
 from freecad_mcp.freecad import (
     sketch_constraint_expressions,
+    sketch_constraint_state,
     sketch_editing,
     sketch_rectangle_creation,
     sketch_removal,
@@ -26,13 +28,16 @@ from freecad_mcp.models import (
     LineSegmentGeometryUpdateInput,
     PointGeometryUpdateInput,
     SketchConstraintData,
+    SketchConstraintEndpointReferenceInput,
     SketchConstraintExpressionDependency,
     SketchConstraintValue,
     SketchInspectionResult,
     SketchLineGeometry,
     SketchPoint2D,
     SketchPoint2DInput,
+    SketchPointPosition,
     SketchSolverData,
+    TangentPointsConstraintInput,
     UnsupportedSketchGeometry,
 )
 from freecad_mcp.transaction_names import (
@@ -128,13 +133,15 @@ def _state(
     second: int = -2000,
     *,
     name: str = "",
+    first_pos: int = 0,
+    second_pos: int = 0,
 ) -> tuple[Any, ...]:
     return (
         constraint_type,
         first,
-        0,
+        first_pos,
         second,
-        0,
+        second_pos,
         -2000,
         0,
         value,
@@ -234,6 +241,8 @@ class _Sketch:
         self.moves: list[tuple[int, int, object, bool]] = []
         self.datums: list[tuple[int, object]] = []
         self.deleted: list[int] = []
+        self.active_updates: list[tuple[int, bool]] = []
+        self.virtual_updates: list[tuple[int, bool]] = []
 
     def moveGeometry(self, index: int, position: int, target: object, relative: bool) -> None:
         self.moves.append((index, position, target, relative))
@@ -248,6 +257,12 @@ class _Sketch:
     def addConstraint(self, state: tuple[Any, ...]) -> int:
         self.Constraints.append(state)
         return len(self.Constraints) - 1
+
+    def setActive(self, index: int, active: bool) -> None:
+        self.active_updates.append((index, active))
+
+    def setVirtualSpace(self, index: int, virtual: bool) -> None:
+        self.virtual_updates.append((index, virtual))
 
 
 class _Document:
@@ -1006,6 +1021,184 @@ def test_replacement_success_reports_append_index_and_survivor_mapping(
     assert sketch.deleted == [1]
     assert document.labels == [REPLACE_SKETCH_CONSTRAINT_TRANSACTION_NAME]
     assert document.commits == 1
+
+
+def test_replacement_transactionally_swaps_coincident_for_tangent_points(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    before = _constraint(0, "coincident", None, driving=None)
+    after = _constraint(0, "tangent_points", None, driving=None)
+    inspected_before = _inspection(
+        geometry=(_line(0), _line(1)),
+        constraints=(before,),
+    )
+    inspected_after = _inspection(
+        geometry=(_line(0), _line(1)),
+        constraints=(after,),
+    )
+    coincident_state = _state(
+        "Coincident",
+        0,
+        second=1,
+        first_pos=2,
+        second_pos=1,
+    )
+    tangent_state = _state(
+        "Tangent",
+        0,
+        second=1,
+        first_pos=2,
+        second_pos=1,
+    )
+    snapshot = _snapshot(inspected=inspected_before, states=(coincident_state,))
+    sketch = _Sketch([coincident_state])
+    document = _install(monkeypatch, snapshot, sketch, inspected_after)
+    monkeypatch.setattr(
+        sketch_removal,
+        "_public_constraint_expression_dependencies",
+        lambda *_args: (),
+    )
+    monkeypatch.setattr(sketch_editing, "_validate_geometry_compatibility", lambda *_args: None)
+    monkeypatch.setattr(sketch_editing, "_build_constraint", lambda *_args: tangent_state)
+    monkeypatch.setattr(sketch_editing, "_one_constraint_state", lambda item: item)
+    replacement = TangentPointsConstraintInput(
+        type="tangent_points",
+        first=SketchConstraintEndpointReferenceInput(
+            geometry_index=0,
+            position=SketchPointPosition.END,
+        ),
+        second=SketchConstraintEndpointReferenceInput(
+            geometry_index=1,
+            position=SketchPointPosition.START,
+        ),
+    )
+
+    result = sketch_editing.replace_sketch_constraint(
+        "Model",
+        "Sketch",
+        0,
+        replacement,
+    )
+
+    assert isinstance(result.replacement_constraint, SketchConstraintData)
+    assert result.replacement_constraint.type == "tangent_points"
+    assert result.replacement_constraint_index == 0
+    assert result.no_change is False
+    assert sketch.deleted == [0]
+    assert sketch.Constraints == [tangent_state]
+    assert document.labels == [REPLACE_SKETCH_CONSTRAINT_TRANSACTION_NAME]
+    assert document.commits == 1
+
+
+@pytest.mark.parametrize(
+    ("operation", "requested", "before_active", "before_virtual"),
+    [
+        ("active", False, True, False),
+        ("virtual", True, True, False),
+    ],
+)
+def test_tangent_points_supports_generic_active_and_virtual_state_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+    requested: bool,
+    before_active: bool,
+    before_virtual: bool,
+) -> None:
+    before = _constraint(
+        0,
+        "tangent_points",
+        None,
+        active=before_active,
+        virtual=before_virtual,
+        driving=None,
+    )
+    after = _constraint(
+        0,
+        "tangent_points",
+        None,
+        active=requested if operation == "active" else before_active,
+        virtual=requested if operation == "virtual" else before_virtual,
+        driving=None,
+    )
+    inspected_before = _inspection(
+        geometry=(_line(0), _line(1)),
+        constraints=(before,),
+    )
+    inspected_after = _inspection(
+        geometry=(_line(0), _line(1)),
+        constraints=(after,),
+    )
+    tangent_state = _state(
+        "Tangent",
+        0,
+        second=1,
+        first_pos=2,
+        second_pos=1,
+    )
+    snapshot = _snapshot(inspected=inspected_before, states=(tangent_state,))
+    sketch = _Sketch([tangent_state])
+    document = _install(monkeypatch, snapshot, sketch, inspected_after)
+    monkeypatch.setattr(
+        sketch_constraint_state,
+        "_runtime_modules",
+        lambda: (_App, object(), object(), object()),
+    )
+    monkeypatch.setattr(
+        sketch_constraint_expressions,
+        "expression_dependents",
+        lambda *_args: (),
+    )
+    monkeypatch.setattr(
+        sketch_removal,
+        "_open_transaction",
+        lambda doc, _caller, label, _op: doc.openTransaction(label) or True,
+    )
+    monkeypatch.setattr(
+        sketch_constraint_state,
+        "_verify_constraint_state_unchanged_except_active",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        sketch_constraint_state,
+        "_verify_constraint_state_unchanged_except_virtual",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        sketch_constraint_state,
+        "_verify_other_document_histories",
+        lambda *_args: None,
+    )
+
+    if operation == "active":
+        result = sketch_constraint_state.set_sketch_constraint_active(
+            "Model",
+            "Sketch",
+            0,
+            requested,
+        )
+        assert sketch.active_updates == [(0, requested)]
+    else:
+        result = sketch_constraint_state.set_sketch_constraint_virtual_space(
+            "Model",
+            "Sketch",
+            0,
+            requested,
+        )
+        assert sketch.virtual_updates == [(0, requested)]
+
+    assert result.constraint_type == "tangent_points"
+    assert result.no_change is False
+    assert document.commits == 1
+
+
+def test_tangent_points_is_not_a_dimensional_driving_target() -> None:
+    constraint = _constraint(0, "tangent_points", None, driving=None)
+
+    with pytest.raises(
+        SketchConstraintStateUnsafeError,
+        match="non_dimensional_constraint",
+    ):
+        sketch_constraint_state._validate_driving_target(constraint, 0)
 
 
 def test_post_mutation_verification_failure_routes_through_rollback(

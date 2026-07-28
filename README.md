@@ -315,7 +315,7 @@ inspection support.
 constraints to an existing sketch. Its required top-level inputs are exactly
 `document_name`, `sketch_name`, and `constraints`; lookup uses exact internal
 names and never visible-label aliases. Each constraint is a strict typed union
-member with no additional fields. The top-level discriminator has exactly 17
+member with no additional fields. The top-level discriminator has exactly 18
 variants. Version one supports:
 
 - `horizontal` and `vertical` on line segments;
@@ -334,6 +334,8 @@ variants. Version one supports:
   either native sketch axis, another distinct geometry point, or a line segment;
 - `tangent` between two distinct whole geometries for line-circle, line-arc,
   circle-circle, circle-arc, and arc-arc pairs, in either heterogeneous order;
+- `tangent_points` between explicit `start`/`end` references on two distinct
+  internal lines or circular arcs;
 - `distance` modes `line_length`, `point_to_origin`, and `between_points`;
 - `distance_x` and `distance_y` modes `point_to_origin` and `between_points`;
 - `radius` and `diameter` on circles or circular arcs;
@@ -436,6 +438,28 @@ Construction state does not change compatibility. Same-geometry references,
 line-line, point geometry, unsupported curves, out-of-range indices, selected
 point references, sketch axes, origin references, and any branch or contact
 field are rejected before a transaction.
+
+Point-to-point tangency is a separate additive form and does not change
+whole-geometry `tangent`:
+
+```json
+{
+  "type": "tangent_points",
+  "first": {"geometry_index": 0, "position": "end"},
+  "second": {"geometry_index": 1, "position": "start"}
+}
+```
+
+It creates exactly
+`Sketcher.Constraint("Tangent", first_geometry, first_position,
+second_geometry, second_position)`. Only internal non-negative geometry
+indices and `start`/`end` positions are accepted. The complete endpoint
+references are commutative as a pair; positions never detach from their
+geometry during duplicate detection. `add_sketch_constraints` never removes
+an equivalent `Coincident` automatically. Such a request is refused before
+mutation with `equivalent_coincident_constraint`; use
+`replace_sketch_constraint` to perform the explicit transactional
+Coincident-to-`tangent_points` swap.
 
 FreeCAD chooses external versus internal circle tangency, and the side of a
 line, from the geometry's current placement. Place geometry near the intended
@@ -568,7 +592,8 @@ Success has this exact shape:
 ```
 
 Indices are temporary current-state indices. Only driving dimensional
-constraints are created. Point-specific tangency, line-line tangency, block,
+constraints are created. Point-specific tangent forms other than
+`tangent_points`, whole-geometry line-line tangency, block,
 internal alignment, angle-via-point, B-spline-specific and arbitrary reference
 constraints;
 constraint naming/expression assignment in the same creation batch and deletion; external/internal
@@ -581,10 +606,13 @@ and native point-position integers are never returned. Ordinary
 `point_on_object`, `horizontal_points`, and `vertical_points` without exposing
 their native constructor fields. Supported native direct `Tangent` records
 read back as `tangent` with exactly two non-negative geometry edge references
-in stored order; point-specific, line-line, degenerate, or malformed tangent
-records remain controlled `unsupported` entries. Existing unsupported
-constraints remain inspectable through `get_sketch`; redundancy and conflicts
-are assessed only after explicit recompute.
+in stored order. Valid four-argument endpoint `Tangent` records read back as
+`tangent_points` with exactly two non-negative `start`/`end` references. Mixed
+zero/non-zero positions, external endpoint references, same-geometry records,
+invalid point positions, strict third-reference violations, and otherwise
+malformed tangent records remain controlled `unsupported` entries. Existing
+unsupported constraints remain inspectable through `get_sketch`; redundancy
+and conflicts are assessed only after explicit recompute.
 
 These document, object, and sketch-inspection tools are MCP-only capabilities.
 They do not add workbench commands or toolbar icons. `get_object` performs exact

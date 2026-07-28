@@ -268,6 +268,9 @@ from freecad_mcp.models.sketch_constraints import (
     SketchConstraintData as SketchConstraintData,
 )
 from freecad_mcp.models.sketch_constraints import (
+    SketchConstraintEndpointReferenceInput as SketchConstraintEndpointReferenceInput,
+)
+from freecad_mcp.models.sketch_constraints import (
     SketchConstraintGeometryReferenceInput as SketchConstraintGeometryReferenceInput,
 )
 from freecad_mcp.models.sketch_constraints import (
@@ -332,6 +335,9 @@ from freecad_mcp.models.sketch_constraints import (
 )
 from freecad_mcp.models.sketch_constraints import (
     TangentConstraintInput as TangentConstraintInput,
+)
+from freecad_mcp.models.sketch_constraints import (
+    TangentPointsConstraintInput as TangentPointsConstraintInput,
 )
 from freecad_mcp.models.sketch_constraints import (
     UnsupportedSketchConstraint as UnsupportedSketchConstraint,

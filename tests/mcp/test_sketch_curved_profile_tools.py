@@ -260,9 +260,9 @@ def test_curved_profile_descriptions_lock_selection_dimensions_and_recovery() ->
         assert phrase in CREATE_SKETCH_ROUNDED_RECTANGLE_DESCRIPTION
 
 
-def test_constraint_union_remains_exactly_stable() -> None:
+def test_constraint_union_includes_additive_tangent_points_variant() -> None:
     server = _server()
     constraints = server._tool_manager.get_tool("add_sketch_constraints")
     assert constraints is not None
     variants = constraints.parameters["properties"]["constraints"]["items"]["oneOf"]
-    assert len(variants) == 17
+    assert len(variants) == 18

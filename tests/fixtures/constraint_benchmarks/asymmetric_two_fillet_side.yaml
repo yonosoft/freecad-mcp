@@ -1,0 +1,39 @@
+benchmark_id: asymmetric-two-fillet-side
+version: 1
+title: Rectangle-like profile with two fillets on one short side
+geometry:
+  estimated_initial_dof: 26
+  elements:
+    - {index: 0, type: line_segment, role: bottom}
+    - {index: 1, type: arc_of_circle, role: lower_right_fillet}
+    - {index: 2, type: line_segment, role: right}
+    - {index: 3, type: arc_of_circle, role: upper_right_fillet}
+    - {index: 4, type: line_segment, role: top}
+    - {index: 5, type: line_segment, role: left}
+design_intent:
+  datum: lower_left_square_corner_at_origin
+  overall_width_mm: 80.0
+  overall_height_mm: 40.0
+  fillet_radius_mm: 8.0
+  relationships:
+    - closed_profile
+    - axis_aligned_straight_edges
+    - tangent_fillet_transitions
+    - equal_fillet_radii
+prohibited_shortcuts:
+  - fixed_geometry
+  - block_constraint
+  - independent_endpoint_coordinate_dimensioning
+  - duplicate_radius_dimensions_when_equal_is_present
+acceptance:
+  final_dof: 0
+  conflicting_constraints: 0
+  redundant_constraints: 0
+  partially_redundant_constraints: 0
+  malformed_constraints: 0
+  parameter_edits:
+    - {overall_width_mm: 100.0}
+    - {overall_height_mm: 50.0}
+    - {fillet_radius_mm: 12.0}
+    - {overall_width_mm: 100.0, overall_height_mm: 50.0, fillet_radius_mm: 12.0}
+reference_plan: asymmetric_two_fillet_side_plan.json

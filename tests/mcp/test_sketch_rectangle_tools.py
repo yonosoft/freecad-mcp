@@ -142,7 +142,7 @@ def test_rectangle_tool_rejects_extra_top_level_fields(extra: dict[str, object])
         )
 
 
-def test_rectangle_schema_does_not_change_seventeen_constraint_variants() -> None:
+def test_rectangle_schema_sees_additive_constraint_variant() -> None:
     handlers, _ = make_handlers()
     server = build_mcp_server(handlers, ServerConfig())
     constraint_tool = server._tool_manager.get_tool("add_sketch_constraints")
@@ -150,4 +150,4 @@ def test_rectangle_schema_does_not_change_seventeen_constraint_variants() -> Non
     assert constraint_tool is not None
     schema = constraint_tool.parameters
     items = schema["properties"]["constraints"]["items"]
-    assert len(items["oneOf"]) == 17
+    assert len(items["oneOf"]) == 18

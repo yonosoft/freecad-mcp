@@ -44,6 +44,7 @@ from freecad_mcp.models import (
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
     TangentConstraintInput,
+    TangentPointsConstraintInput,
     VerticalConstraintInput,
     VerticalPointsConstraintInput,
 )
@@ -127,6 +128,14 @@ VALID_CASES: list[tuple[dict[str, object], type[object]]] = [
             "second": {"geometry_index": 1},
         },
         TangentConstraintInput,
+    ),
+    (
+        {
+            "type": "tangent_points",
+            "first": _point(0, "end"),
+            "second": _point(1, "start"),
+        },
+        TangentPointsConstraintInput,
     ),
     (
         {
@@ -238,6 +247,69 @@ def test_all_supported_constraint_forms_are_strictly_parsed(
     assert isinstance(result, tuple)
     assert len(result) == 1
     assert isinstance(result[0], expected_type)
+
+
+@pytest.mark.parametrize(
+    ("payload", "reason"),
+    [
+        (
+            {
+                "type": "tangent_points",
+                "first": {"geometry_index": 0},
+                "second": _point(1, "start"),
+            },
+            "invalid_point_reference",
+        ),
+        (
+            {
+                "type": "tangent_points",
+                "first": _point(0, "center"),
+                "second": _point(1, "start"),
+            },
+            "invalid_position_reference",
+        ),
+        (
+            {
+                "type": "tangent_points",
+                "first": _point(0, "point"),
+                "second": _point(1, "start"),
+            },
+            "invalid_position_reference",
+        ),
+        (
+            {
+                "type": "tangent_points",
+                "first": {"geometry_index": -3, "position": "end"},
+                "second": _point(1, "start"),
+            },
+            "invalid_geometry_reference",
+        ),
+        (
+            {
+                "type": "tangent_points",
+                "first": {"geometry_index": 0, "position": "end", "extra": True},
+                "second": _point(1, "start"),
+            },
+            "invalid_point_reference",
+        ),
+        (
+            {
+                "type": "tangent_points",
+                "first": _point(0, "start"),
+                "second": _point(0, "end"),
+            },
+            "identical_tangent_geometry",
+        ),
+    ],
+)
+def test_tangent_points_rejects_non_endpoint_or_non_internal_operands(
+    payload: dict[str, object],
+    reason: str,
+) -> None:
+    result = validate_add_sketch_constraints_request("Bracket", "Sketch", [payload])
+
+    assert isinstance(result, CommandResult)
+    assert result.data["reason"] == reason
 
 
 def test_constraint_batch_accepts_exact_maximum_and_preserves_order() -> None:

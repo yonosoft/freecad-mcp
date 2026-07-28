@@ -115,6 +115,26 @@ def test_graph_resolves_same_and_cross_sketch_sources_deterministically() -> Non
     )
 
 
+def test_tangent_points_naming_remains_outside_scalar_constraint_contract() -> None:
+    tangent_points = SketchConstraintData(
+        index=0,
+        type="tangent_points",
+        name=None,
+        active=True,
+        virtual_space=False,
+        driving=None,
+        references=(),
+        value=None,
+    )
+    inspected = _inspection("Sketch", (tangent_points,))
+
+    with pytest.raises(
+        SketchConstraintExpressionError,
+        match="supported_scalar_constraint_required",
+    ):
+        sketch_constraint_expressions._supported_constraint(inspected, 0)
+
+
 @pytest.mark.parametrize(
     ("expression", "code"),
     [

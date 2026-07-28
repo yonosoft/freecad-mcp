@@ -10,11 +10,13 @@ from freecad_mcp.models import (
     HorizontalConstraintInput,
     HorizontalPointsConstraintInput,
     PointOnObjectConstraintInput,
+    SketchConstraintEndpointReferenceInput,
     SketchConstraintGeometryReferenceInput,
     SketchHorizontalAxisReferenceInput,
     SketchOriginReferenceInput,
     SymmetricConstraintInput,
     TangentConstraintInput,
+    TangentPointsConstraintInput,
     VerticalPointsConstraintInput,
 )
 from freecad_mcp.server.config import ServerConfig
@@ -26,7 +28,7 @@ DESCRIPTION = (
     "internal document and sketch name. Supports horizontal, vertical, parallel, "
     "perpendicular, equal, coincident, point_on_object, horizontal_points, "
     "vertical_points, distance, distance_x, distance_y, radius, diameter, angle, "
-    "symmetric, and tangent in request order. "
+    "symmetric, tangent, and tangent_points in request order. "
     "Symmetric accepts two controlled geometry points about the origin, a native "
     "sketch axis, another controlled geometry point, or a line segment. Coincident accepts "
     "the controlled sketch origin reference. Use point_on_object when a selected "
@@ -41,7 +43,10 @@ DESCRIPTION = (
     "arc_of_circle-arc_of_circle pairs in either heterogeneous order, including "
     "construction geometry. It does not join selected endpoints and must not "
     "substitute for coincidence, point_on_object, parallel, perpendicular, or "
-    "collinearity; line-line tangent is excluded. Place geometry near the intended "
+    "collinearity; line-line tangent is excluded. Use tangent_points to join two "
+    "explicit start/end references and enforce tangency at that shared point; it "
+    "never removes an existing Coincident constraint automatically. Place geometry "
+    "near the intended "
     "tangent solution before adding it. After recompute, inspect the actual tangent "
     "branch and solver diagnostics. Arc tangency uses the underlying circle, so do "
     "not assume contact lies on the visible bounded arc until inspection confirms it. "
@@ -123,10 +128,11 @@ def test_add_sketch_constraints_schema_locks_all_types_modes_and_strict_models()
         "radius",
         "symmetric",
         "tangent",
+        "tangent_points",
         "vertical",
         "vertical_points",
     ]
-    assert len(items["oneOf"]) == 17
+    assert len(items["oneOf"]) == 18
     object_definitions = [
         definition for definition in definitions.values() if definition.get("type") == "object"
     ]
@@ -221,6 +227,26 @@ def test_add_sketch_constraints_schema_locks_all_types_modes_and_strict_models()
     }
     assert tangent["additionalProperties"] is False
 
+    tangent_points = definitions["TangentPointsConstraintInput"]
+    assert tangent_points["required"] == ["type", "first", "second"]
+    assert tangent_points["properties"] == {
+        "type": {"const": "tangent_points", "title": "Type", "type": "string"},
+        "first": {"$ref": "#/$defs/SketchConstraintEndpointReferenceInput"},
+        "second": {"$ref": "#/$defs/SketchConstraintEndpointReferenceInput"},
+    }
+    endpoint = definitions["SketchConstraintEndpointReferenceInput"]
+    assert endpoint["required"] == ["geometry_index", "position"]
+    assert endpoint["properties"] == {
+        "geometry_index": {"minimum": 0, "title": "Geometry Index", "type": "integer"},
+        "position": {
+            "enum": ["start", "end"],
+            "title": "Position",
+            "type": "string",
+        },
+    }
+    assert tangent_points["additionalProperties"] is False
+    assert endpoint["additionalProperties"] is False
+
 
 def test_add_sketch_constraints_remains_exactly_tool_twelve() -> None:
     handlers, _ = make_handlers()
@@ -287,6 +313,11 @@ def test_add_sketch_constraints_delegates_typed_inputs_and_serializes_response()
                             "first": {"geometry_index": 0},
                             "second": {"geometry_index": 1},
                         },
+                        {
+                            "type": "tangent_points",
+                            "first": {"geometry_index": 0, "position": "end"},
+                            "second": {"geometry_index": 1, "position": "start"},
+                        },
                     ],
                 },
             )
@@ -309,13 +340,15 @@ def test_add_sketch_constraints_delegates_typed_inputs_and_serializes_response()
     assert isinstance(constraints[7], SymmetricConstraintInput)
     assert isinstance(constraints[7].about, SketchOriginReferenceInput)
     assert isinstance(constraints[8], TangentConstraintInput)
+    assert isinstance(constraints[9], TangentPointsConstraintInput)
+    assert isinstance(constraints[9].first, SketchConstraintEndpointReferenceInput)
     assert call_result[1] == {
         "ok": True,
         "code": "sketch_constraints_added",
         "document_name": "TestDocument",
         "sketch_name": "BaseSketch",
-        "added_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8],
-        "added_count": 9,
-        "constraint_count": 9,
+        "added_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        "added_count": 10,
+        "constraint_count": 10,
         "message": "Sketch constraints added.",
     }

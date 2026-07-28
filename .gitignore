@@ -35,11 +35,13 @@ Thumbs.db
 *.swp
 *.swo
 
-# Ignore Aider files, but keep the project research rule
+# Ignore Aider files, but keep durable project rules
 .aider*
 !.aider-desk/
 .aider-desk/*
 !.aider-desk/rules/
 .aider-desk/rules/*
+!.aider-desk/rules/FREECAD_ENGINEER.md
 !.aider-desk/rules/SEARCH.md
+!.aider-desk/rules/freecad-sketch-constraints.yaml
 /.uv-cache/

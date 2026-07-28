@@ -17,11 +17,13 @@ from freecad_mcp.exceptions import (
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter
 from freecad_mcp.models import (
     PointOnObjectConstraintInput,
+    SketchConstraintEndpointReferenceInput,
     SketchConstraintGeometryReferenceInput,
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
     SketchPointPosition,
     TangentConstraintInput,
+    TangentPointsConstraintInput,
 )
 from freecad_mcp.validation import validate_add_sketch_constraints_request
 
@@ -99,9 +101,17 @@ class ConstraintStub:
                 self.First, self.FirstPos, self.Second, self.SecondPos = map(int, args)
             else:
                 raise TypeError("unsupported point-alignment constructor")
-        elif constraint_type in {"Parallel", "Perpendicular", "Equal", "Tangent"}:
+        elif constraint_type in {"Parallel", "Perpendicular", "Equal"}:
             self.First = int(args[0])
             self.Second = int(args[1])
+        elif constraint_type == "Tangent":
+            if len(args) == 2:
+                self.First = int(args[0])
+                self.Second = int(args[1])
+            elif len(args) == 4:
+                self.First, self.FirstPos, self.Second, self.SecondPos = map(int, args)
+            else:
+                raise TypeError("unsupported tangent constructor")
         elif constraint_type == "Coincident":
             self.First, self.FirstPos, self.Second, self.SecondPos = map(int, args)
         elif constraint_type == "PointOnObject":
@@ -951,6 +961,147 @@ def test_tangent_uses_exact_whole_geometry_constructor_for_every_supported_order
         constraint.ThirdPos,
     ) == ("Tangent", first, 0, second, 0, -2000, 0)
     assert sketch._construction == [True, False, False, False, True]
+
+
+@pytest.mark.parametrize(
+    ("first_position", "second_position", "expected_first", "expected_second"),
+    [
+        ("start", "start", 1, 1),
+        ("start", "end", 1, 2),
+        ("end", "start", 2, 1),
+        ("end", "end", 2, 2),
+    ],
+)
+def test_tangent_points_uses_exact_four_argument_endpoint_constructor(
+    monkeypatch: pytest.MonkeyPatch,
+    first_position: str,
+    second_position: str,
+    expected_first: int,
+    expected_second: int,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+
+    result = FreeCADDocumentAdapter().add_sketch_constraints(
+        "Bracket",
+        "Sketch",
+        _parsed(
+            [
+                {
+                    "type": "tangent_points",
+                    "first": {"geometry_index": 0, "position": first_position},
+                    "second": {"geometry_index": 4, "position": second_position},
+                }
+            ]
+        ),
+    )
+
+    assert result.added_indices == (0,)
+    constraint = sketch._constraints[0]
+    assert (
+        constraint.Type,
+        constraint.First,
+        constraint.FirstPos,
+        constraint.Second,
+        constraint.SecondPos,
+        constraint.Third,
+        constraint.ThirdPos,
+    ) == ("Tangent", 0, expected_first, 4, expected_second, -2000, 0)
+
+
+def test_tangent_points_defensively_rejects_non_endpoint_geometry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    constraint = TangentPointsConstraintInput(
+        type="tangent_points",
+        first=SketchConstraintEndpointReferenceInput(
+            geometry_index=0,
+            position=SketchPointPosition.END,
+        ),
+        second=SketchConstraintEndpointReferenceInput(
+            geometry_index=3,
+            position=SketchPointPosition.START,
+        ),
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints(
+            "Bracket",
+            "Sketch",
+            (constraint,),
+        )
+
+    assert raised.value.reason == "invalid_position_reference"
+    assert document.open_calls == []
+    assert sketch.ConstraintCount == 0
+
+
+@pytest.mark.parametrize("existing_first", [True, False])
+def test_tangent_points_refuses_equivalent_existing_coincident_before_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+    existing_first: bool,
+) -> None:
+    operands = (0, 2, 4, 1) if existing_first else (4, 1, 0, 2)
+    existing = ConstraintStub("Coincident", *operands)
+    sketch = SketchStub(_geometry(), constraints=[existing])
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints(
+            "Bracket",
+            "Sketch",
+            _parsed(
+                [
+                    {
+                        "type": "tangent_points",
+                        "first": {"geometry_index": 0, "position": "end"},
+                        "second": {"geometry_index": 4, "position": "start"},
+                    }
+                ]
+            ),
+        )
+
+    assert raised.value.reason == "equivalent_coincident_constraint"
+    assert document.open_calls == []
+    assert document.abort_calls == 0
+    assert sketch.ConstraintCount == 1
+    assert sketch.del_calls == []
+
+
+@pytest.mark.parametrize("coincident_first", [True, False])
+def test_tangent_points_refuses_equivalent_coincident_in_same_batch(
+    monkeypatch: pytest.MonkeyPatch,
+    coincident_first: bool,
+) -> None:
+    sketch = SketchStub(_geometry())
+    document = DocumentStub(sketch)
+    _install_modules(monkeypatch, {"Bracket": document})
+    coincident: dict[str, object] = {
+        "type": "coincident",
+        "first": {"geometry_index": 0, "position": "end"},
+        "second": {"geometry_index": 4, "position": "start"},
+    }
+    tangent_points: dict[str, object] = {
+        "type": "tangent_points",
+        "first": {"geometry_index": 4, "position": "start"},
+        "second": {"geometry_index": 0, "position": "end"},
+    }
+    batch = _parsed(
+        [coincident, tangent_points] if coincident_first else [tangent_points, coincident]
+    )
+
+    with pytest.raises(SketchConstraintCreationError) as raised:
+        FreeCADDocumentAdapter().add_sketch_constraints("Bracket", "Sketch", batch)
+
+    assert raised.value.index == (1 if coincident_first else 0)
+    assert raised.value.reason == "equivalent_coincident_constraint"
+    assert document.open_calls == []
+    assert sketch.ConstraintCount == 0
 
 
 def test_mixed_tangent_batch_preserves_order_indices_and_one_to_one_creation(

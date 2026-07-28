@@ -33,6 +33,7 @@ from freecad_mcp.models import (
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
     TangentConstraintInput,
+    TangentPointsConstraintInput,
     VerticalPointsConstraintInput,
 )
 from freecad_mcp.validation.common import (
@@ -332,6 +333,16 @@ def _malformed_reference_reason(item: object) -> str | None:
             if isinstance(reference, Mapping) and set(reference) != {"geometry_index"}:
                 return "invalid_geometry_reference"
         return None
+    if constraint_type == "tangent_points":
+        for field in ("first", "second"):
+            reference = item.get(field)
+            if not isinstance(reference, Mapping):
+                continue
+            if not {"geometry_index", "position"}.issubset(reference):
+                return "invalid_point_reference"
+            if set(reference) != {"geometry_index", "position"}:
+                return "invalid_point_reference"
+        return None
 
     allowed_references: set[str] = set()
     if constraint_type == "coincident":
@@ -394,7 +405,7 @@ def _validate_constraint_semantics(
     ):
         pair = (item.first.geometry_index, item.second.geometry_index)
     elif (
-        isinstance(item, TangentConstraintInput)
+        isinstance(item, (TangentConstraintInput, TangentPointsConstraintInput))
         and item.first.geometry_index == item.second.geometry_index
     ):
         return CommandResult.failure(
@@ -557,7 +568,7 @@ def validate_replace_sketch_constraint_request(
     constraint_index: object,
     replacement: object,
 ) -> tuple[int, SketchConstraintInput] | CommandResult:
-    """Validate one index and one existing controlled 17-way constraint input."""
+    """Validate one index and one controlled 18-way constraint input."""
     index = _validate_strict_mutation_index(constraint_index, field="constraint_index")
     if isinstance(index, CommandResult):
         reference_error = validate_object_reference(document_name, sketch_name)

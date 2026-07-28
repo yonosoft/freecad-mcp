@@ -86,7 +86,14 @@ def test_structural_modules_do_not_import_implementation_layers() -> None:
         "freecad_mcp.runtime",
         "freecad_mcp.server",
     }
-    for package in ("catalog", "models", "protocols", "exceptions", "validation"):
+    for package in (
+        "catalog",
+        "models",
+        "protocols",
+        "exceptions",
+        "validation",
+        "constraint_planning",
+    ):
         for relative_path in _layer_paths(package):
             violations = {
                 module
@@ -105,9 +112,14 @@ def test_structural_aggregates_have_exact_coherent_package_layouts() -> None:
             "registry.py",
             "selection.py",
         },
+        "constraint_planning": {
+            "__init__.py",
+            "validator.py",
+        },
         "models": {
             "__init__.py",
             "common.py",
+            "constraint_planning.py",
             "document.py",
             "part_design.py",
             "sketch_constraint_results.py",

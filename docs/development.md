@@ -2402,3 +2402,28 @@ Finish with `git diff --check`, a complete architecture/mapping/transaction/
 error-leakage review, and `git status --short --branch`. Local verification does
 not authorize a restart, edits to `freecad-test`, acceptance execution, commit,
 push, or milestone closure.
+
+## CE-03B Point-to-Point Tangent Native Acceptance
+
+Run this acceptance only after a human-controlled deployment and FreeCAD
+restart. Through the deployed public MCP endpoint, create a clean asymmetric
+six-geometry two-fillet profile and constrain it to zero degrees of freedom
+with exactly 15 constraints:
+
+- two ordinary `coincident` square-corner joins;
+- four `tangent_points` rounded joins;
+- four horizontal/vertical orientation constraints;
+- one equal-radius constraint;
+- one origin datum;
+- width, height, and one radius as the three driving dimensions.
+
+Record the exact public requests and responses. Verify supported
+`tangent_points` readback with the original start/end references, clean solver
+diagnostics, exact constraint count, no automatic save, and expected undo/redo
+history. Confirm that adding `tangent_points` over an equivalent Coincident is
+refused without mutation, then prove the explicit
+`replace_sketch_constraint` Coincident-to-`tangent_points` workflow. Exercise
+removal, active/inactive state, and virtual-space state only where the installed
+FreeCAD build permits them. Naming is currently outside the non-dimensional
+constraint-name contract. Return `PASS`, `FAIL`, or `INCONCLUSIVE`; do not
+repair failures during acceptance.

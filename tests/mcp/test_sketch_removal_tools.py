@@ -90,14 +90,14 @@ def test_construction_tool_has_required_strict_boolean_desired_state() -> None:
     assert schema["properties"]["construction"]["type"] == "boolean"
 
 
-def test_add_sketch_constraints_still_exposes_exactly_seventeen_variants() -> None:
+def test_add_sketch_constraints_exposes_exactly_eighteen_variants() -> None:
     tool = _server()._tool_manager.get_tool(ADD_SKETCH_CONSTRAINTS_TOOL)
     assert tool is not None
     schema = cast(dict[str, Any], tool.parameters)
     items = schema["properties"]["constraints"]["items"]
 
-    assert len(items["oneOf"]) == 17
-    assert len(items["discriminator"]["mapping"]) == 17
+    assert len(items["oneOf"]) == 18
+    assert len(items["discriminator"]["mapping"]) == 18
 
 
 def test_all_three_tools_delegate_canonical_typed_values_once() -> None:

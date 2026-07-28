@@ -37,6 +37,7 @@ from freecad_mcp.models import (
     SketchAxisReferenceInput,
     SketchCoincidentReferenceInput,
     SketchConstraintAdditionResult,
+    SketchConstraintEndpointReferenceInput,
     SketchConstraintGeometryReferenceInput,
     SketchConstraintInput,
     SketchConstraintPointReferenceInput,
@@ -46,6 +47,7 @@ from freecad_mcp.models import (
     SketchVerticalAxisReferenceInput,
     SymmetricConstraintInput,
     TangentConstraintInput,
+    TangentPointsConstraintInput,
     VerticalConstraintInput,
     VerticalPointsConstraintInput,
 )
@@ -101,6 +103,7 @@ def add_sketch_constraints(
 
     original_constraint_count = _constraint_count(sketch)
     original_constraints = _constraint_state(sketch)
+    _reject_equivalent_coincident_constraints(constraints, original_constraints)
     original_geometry = raw_geometry
     original_construction = _construction_state(sketch, len(original_geometry))
     original_geometry_signature = _geometry_signature(
@@ -288,6 +291,8 @@ def _validate_geometry_compatibility(
             _validate_symmetric_compatibility(item, geometry, part, index)
         elif isinstance(item, TangentConstraintInput):
             _validate_tangent_compatibility(item, geometry, part, index)
+        elif isinstance(item, TangentPointsConstraintInput):
+            _validate_tangent_points_compatibility(item, geometry, part, index)
         elif isinstance(item, DistanceLineLengthConstraintInput):
             _require_line(geometry, item.geometry_index, part, index)
         elif isinstance(item, DistancePointToOriginConstraintInput):
@@ -414,6 +419,14 @@ def _build_constraint(item: SketchConstraintInput, sketcher: Any, index: int) ->
                 item.first.geometry_index,
                 item.second.geometry_index,
             )
+        if isinstance(item, TangentPointsConstraintInput):
+            return sketcher.Constraint(
+                "Tangent",
+                item.first.geometry_index,
+                _point_position(item.first),
+                item.second.geometry_index,
+                _point_position(item.second),
+            )
         if isinstance(item, DistanceLineLengthConstraintInput):
             return sketcher.Constraint("Distance", item.geometry_index, item.value)
         if isinstance(item, DistancePointToOriginConstraintInput):
@@ -489,7 +502,9 @@ def _build_constraint(item: SketchConstraintInput, sketcher: Any, index: int) ->
     raise SketchConstraintCreationError(index=index, reason="unsupported_constraint_type")
 
 
-def _point_position(reference: SketchConstraintPointReferenceInput) -> int:
+def _point_position(
+    reference: SketchConstraintPointReferenceInput | SketchConstraintEndpointReferenceInput,
+) -> int:
     return _POINT_POSITIONS[reference.position]
 
 
@@ -590,6 +605,57 @@ def _validate_tangent_compatibility(
         )
 
 
+def _validate_tangent_points_compatibility(
+    item: TangentPointsConstraintInput,
+    geometry: tuple[Any, ...],
+    part: Any,
+    index: int,
+) -> None:
+    if item.first.geometry_index == item.second.geometry_index:
+        raise SketchConstraintCreationError(index=index, reason="identical_tangent_geometry")
+    _require_point(geometry, item.first, part, index)
+    _require_point(geometry, item.second, part, index)
+
+
+def _reject_equivalent_coincident_constraints(
+    constraints: tuple[SketchConstraintInput, ...],
+    existing: tuple[_ConstraintState, ...],
+) -> None:
+    coincident_endpoints = {
+        frozenset(((state[1], state[2]), (state[3], state[4])))
+        for state in existing
+        if state[0] == "Coincident" and state[5] == _UNUSED_GEOMETRY_REFERENCE and state[6] == 0
+    }
+    for item in constraints:
+        if isinstance(item, CoincidentConstraintInput):
+            first = _internal_point_reference(item.first)
+            second = _internal_point_reference(item.second)
+            if first is not None and second is not None:
+                coincident_endpoints.add(frozenset((first, second)))
+    for index, item in enumerate(constraints):
+        if not isinstance(item, TangentPointsConstraintInput):
+            continue
+        tangent_endpoints = frozenset(
+            (
+                (item.first.geometry_index, _point_position(item.first)),
+                (item.second.geometry_index, _point_position(item.second)),
+            )
+        )
+        if tangent_endpoints in coincident_endpoints:
+            raise SketchConstraintCreationError(
+                index=index,
+                reason="equivalent_coincident_constraint",
+            )
+
+
+def _internal_point_reference(
+    reference: SketchCoincidentReferenceInput,
+) -> tuple[int, int] | None:
+    if not isinstance(reference, SketchConstraintPointReferenceInput):
+        return None
+    return reference.geometry_index, _point_position(reference)
+
+
 def _require_line(geometry: tuple[Any, ...], geometry_index: int, part: Any, index: int) -> None:
     candidate = _geometry_at(geometry, geometry_index, index)
     if not _part_instance(candidate, part, "LineSegment"):
@@ -616,7 +682,7 @@ def _require_point_on_object_target(
 
 def _require_point(
     geometry: tuple[Any, ...],
-    reference: SketchConstraintPointReferenceInput,
+    reference: SketchConstraintPointReferenceInput | SketchConstraintEndpointReferenceInput,
     part: Any,
     index: int,
 ) -> None:

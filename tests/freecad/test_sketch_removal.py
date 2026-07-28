@@ -28,13 +28,21 @@ from freecad_mcp.transaction_names import (
 )
 
 
-def _state(first: int, second: int = -2000, third: int = -2000) -> tuple[Any, ...]:
+def _state(
+    first: int,
+    second: int = -2000,
+    third: int = -2000,
+    *,
+    constraint_type: str = "Horizontal",
+    first_pos: int = 0,
+    second_pos: int = 0,
+) -> tuple[Any, ...]:
     return (
-        "Horizontal",
+        constraint_type,
         first,
-        0,
+        first_pos,
         second,
-        0,
+        second_pos,
         third,
         0,
         0.0,
@@ -54,8 +62,18 @@ def _line(index: int, construction: bool = False) -> SketchLineGeometry:
     )
 
 
-def _constraint(index: int) -> SketchConstraintData:
-    return SketchConstraintData(index, "horizontal", None, True, False, True, (), None)
+def _constraint(index: int, constraint_type: str = "horizontal") -> SketchConstraintData:
+    driving = None if constraint_type == "tangent_points" else True
+    return SketchConstraintData(
+        index,
+        constraint_type,
+        None,
+        True,
+        False,
+        driving,
+        (),
+        None,
+    )
 
 
 def _solver() -> SketchSolverData:
@@ -66,6 +84,7 @@ def _inspection(
     geometry_count: int,
     constraint_count: int,
     construction: tuple[bool, ...] | None = None,
+    constraint_type: str = "horizontal",
 ) -> SketchInspectionResult:
     flags = construction or (False,) * geometry_count
     return SketchInspectionResult(
@@ -80,7 +99,7 @@ def _inspection(
         external_geometry_count=0,
         constraint_count=constraint_count,
         geometry=tuple(_line(index, flags[index]) for index in range(geometry_count)),
-        constraints=tuple(_constraint(index) for index in range(constraint_count)),
+        constraints=tuple(_constraint(index, constraint_type) for index in range(constraint_count)),
         solver=_solver(),
     )
 
@@ -167,10 +186,16 @@ def _install_harness(
     sketch: _Sketch,
     *,
     caller_owned: bool = False,
+    constraint_type: str = "horizontal",
 ) -> tuple[_Document, Any]:
     document = _Document(sketch, caller_owned=caller_owned)
     summary = DocumentSummary("Model", "Model", None, True, False, 2)
-    before = _inspection(len(sketch.Geometry), len(sketch.Constraints), tuple(sketch.construction))
+    before = _inspection(
+        len(sketch.Geometry),
+        len(sketch.Constraints),
+        tuple(sketch.construction),
+        constraint_type,
+    )
     base = SimpleNamespace(
         geometry=tuple(sketch.Geometry),
         construction=tuple(sketch.construction),
@@ -232,6 +257,7 @@ def _install_harness(
                 len(sketch.Geometry),
                 len(sketch.Constraints),
                 tuple(sketch.construction),
+                constraint_type,
             ),
             summary,
         )
@@ -369,6 +395,32 @@ def test_constraint_removal_uses_descending_native_order_and_one_transaction(
         (0, 0),
         (2, 1),
     ]
+
+
+def test_tangent_points_constraint_is_removable_by_current_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tangent_state = _state(
+        0,
+        1,
+        constraint_type="Tangent",
+        first_pos=2,
+        second_pos=1,
+    )
+    sketch = _Sketch(["g0", "g1"], [tangent_state])
+    document, _ = _install_harness(
+        monkeypatch,
+        sketch,
+        constraint_type="tangent_points",
+    )
+
+    result = sketch_removal.remove_sketch_constraints("Model", "Sketch", (0,))
+
+    removed = result.removed_constraints[0]
+    assert isinstance(removed, SketchConstraintData)
+    assert removed.type == "tangent_points"
+    assert sketch.constraint_deletions == [0]
+    assert document.commits == 1
 
 
 def test_controlled_expression_dependency_replaces_only_matching_raw_record() -> None:

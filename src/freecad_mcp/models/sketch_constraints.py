@@ -40,6 +40,13 @@ class SketchConstraintPointReferenceInput(_SketchConstraintInputModel):
     position: SketchPointPosition
 
 
+class SketchConstraintEndpointReferenceInput(_SketchConstraintInputModel):
+    """Non-negative internal geometry and one start/end point selector."""
+
+    geometry_index: int = Field(strict=True, ge=0)
+    position: Literal[SketchPointPosition.START, SketchPointPosition.END]
+
+
 class SketchConstraintGeometryReferenceInput(_SketchConstraintInputModel):
     """Non-negative current sketch geometry reference without a point selector."""
 
@@ -172,6 +179,14 @@ class TangentConstraintInput(_SketchConstraintInputModel):
     type: Literal["tangent"]
     first: SketchConstraintGeometryReferenceInput
     second: SketchConstraintGeometryReferenceInput
+
+
+class TangentPointsConstraintInput(_SketchConstraintInputModel):
+    """Join two distinct internal endpoints with point-to-point tangency."""
+
+    type: Literal["tangent_points"]
+    first: SketchConstraintEndpointReferenceInput
+    second: SketchConstraintEndpointReferenceInput
 
 
 class DistanceLineLengthConstraintInput(_SketchConstraintInputModel):
@@ -313,6 +328,7 @@ SketchConstraintInput = Annotated[
     | PointOnObjectConstraintInput
     | SymmetricConstraintInput
     | TangentConstraintInput
+    | TangentPointsConstraintInput
     | DistanceConstraintInput
     | DistanceXConstraintInput
     | DistanceYConstraintInput
