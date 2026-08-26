@@ -1785,6 +1785,16 @@ Green-theorem area, orientation, containment, and final classification. The
 broad analysis, profile validation, and open-vertex projection functions all
 consume the same computed analysis; public tools do not call one another.
 
+Endpoint topology is constructed before pairwise intersection classification.
+Line/round and round/round near-tangencies use the same millimetre tolerance as
+endpoint clustering, and a contact is accepted as ordinary continuity only
+when both contact positions resolve to the same topology vertex. Arc traversal
+starts from the inspected endpoint and preserves the native parameter-axis
+orientation, including negative-axis arcs. Rejected `tangent_touch` and
+`self_intersection` findings include normalized contact parameters, endpoint or
+interior positions, nearest-endpoint distances, topology-vertex resolution,
+and the shared-endpoint rejection reason.
+
 Construction and external geometry are visible as controlled counts but do not
 participate unless explicitly requested. An optional non-empty, unique list of
 non-negative internal geometry indices narrows the profile and opening tools;

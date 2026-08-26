@@ -224,6 +224,7 @@ def _inspect_geometry_item(
             end=_point_from_vector(item.EndPoint, index),
             start_angle_degrees=math.degrees(_geometry_number(item.FirstParameter, index)),
             end_angle_degrees=math.degrees(_geometry_number(item.LastParameter, index)),
+            clockwise=_arc_clockwise(item, index),
         )
     if _part_instance(item, part, "Point"):
         return SketchPointGeometry(
@@ -1262,6 +1263,13 @@ def _point_from_vector(value: Any, geometry_index: int) -> SketchPoint2D:
         raise
     except Exception as exc:
         raise SketchGeometryMalformedError(index=geometry_index, reason="point_unreadable") from exc
+
+
+def _arc_clockwise(item: Any, geometry_index: int) -> bool:
+    axis = getattr(item, "Axis", None)
+    if axis is None:
+        return False
+    return _geometry_number(axis.z, geometry_index) < 0.0
 
 
 def _radius(value: Any, geometry_index: int) -> float:

@@ -377,6 +377,7 @@ def _build_core(
     _detect_intersections(
         edge_tuple,
         edge_vertices,
+        tuple(vertices),
         disjoint,
         findings,
         bad_geometry,
@@ -519,15 +520,26 @@ def _line_edge(item: SketchLineGeometry, external: bool) -> _Edge:
 
 
 def _arc_edge(item: SketchArcGeometry, external: bool) -> _Edge:
+    center = item.center
+    # Native parameters are relative to the circle basis and follow its axis.
+    # Anchor traversal to the inspected endpoint in sketch coordinates instead.
+    start_angle = math.atan2(item.start.y - center.y, item.start.x - center.x)
+    parameter_span = math.radians(item.end_angle_degrees - item.start_angle_degrees)
+    sweep = abs(parameter_span) % math.tau
+    if sweep <= _arc_angular_tolerance(item.radius) and abs(parameter_span) > sweep:
+        sweep = math.tau
+    direction = -1.0 if item.clockwise else 1.0
+    if parameter_span < 0.0:
+        direction *= -1.0
     return _Edge(
         item.index,
         "arc",
         start=item.start,
         end=item.end,
-        center=item.center,
+        center=center,
         radius=item.radius,
-        start_angle=math.radians(item.start_angle_degrees),
-        end_angle=math.radians(item.end_angle_degrees),
+        start_angle=start_angle,
+        end_angle=start_angle + direction * sweep,
         external=external,
     )
 
@@ -708,24 +720,26 @@ def _detect_near_openings(vertices: list[_Vertex], findings: list[dict[str, obje
 def _detect_intersections(
     edges: tuple[_Edge, ...],
     edge_vertices: dict[int, tuple[int, int] | None],
+    vertices: tuple[_Vertex, ...],
     disjoint: _DisjointSet,
     findings: list[dict[str, object]],
     bad_geometry: set[int],
 ) -> None:
-    reported: set[tuple[str, int, int]] = set()
+    reported: dict[tuple[str, int, int], dict[str, object]] = {}
     for first, second in combinations(edges, 2):
         intersections = _curve_intersections(first, second)
         for point, tangent in intersections:
             first_endpoint = _endpoint_match(first, point)
             second_endpoint = _endpoint_match(second, point)
-            if first_endpoint is not None and second_endpoint is not None:
-                first_vertices = edge_vertices.get(first.index)
-                second_vertices = edge_vertices.get(second.index)
-                if first_vertices is not None and second_vertices is not None:
-                    first_vertex = first_vertices[0 if first_endpoint == "start" else 1]
-                    second_vertex = second_vertices[0 if second_endpoint == "start" else 1]
-                    if first_vertex == second_vertex:
-                        continue
+            resolved_vertex, rejection_reason = _shared_endpoint_resolution(
+                first,
+                second,
+                first_endpoint,
+                second_endpoint,
+                edge_vertices,
+            )
+            if resolved_vertex is not None:
+                continue
             disjoint.union(first.index, second.index)
             # Endpoint-on-interior contacts are represented as topology junctions
             # and become branch findings through degree counting.
@@ -733,12 +747,10 @@ def _detect_intersections(
                 continue
             code = "tangent_touch" if tangent else "self_intersection"
             key = (code, first.index, second.index)
-            if key in reported:
-                continue
-            reported.add(key)
             bad_geometry.update((first.index, second.index))
-            findings.append(
-                _finding(
+            finding = reported.get(key)
+            if finding is None:
+                finding = _finding(
                     "warning" if tangent else "error",
                     code,
                     (
@@ -748,7 +760,136 @@ def _detect_intersections(
                     ),
                     (first.index, second.index),
                 )
+                finding["contacts"] = []
+                reported[key] = finding
+                findings.append(finding)
+            contacts = finding["contacts"]
+            assert isinstance(contacts, list)
+            contacts.append(
+                _contact_diagnostic(
+                    point,
+                    first,
+                    second,
+                    first_endpoint,
+                    second_endpoint,
+                    edge_vertices,
+                    vertices,
+                    rejection_reason,
+                )
             )
+
+
+def _shared_endpoint_resolution(
+    first: _Edge,
+    second: _Edge,
+    first_endpoint: Literal["start", "end"] | None,
+    second_endpoint: Literal["start", "end"] | None,
+    edge_vertices: dict[int, tuple[int, int] | None],
+) -> tuple[int | None, str | None]:
+    if first_endpoint is None or second_endpoint is None:
+        return None, "one_or_both_contacts_are_interior"
+    first_vertex = _endpoint_vertex(first, first_endpoint, edge_vertices)
+    second_vertex = _endpoint_vertex(second, second_endpoint, edge_vertices)
+    if first_vertex is None or second_vertex is None:
+        return None, "endpoint_topology_is_unavailable"
+    if first_vertex != second_vertex:
+        return None, "endpoint_topology_vertices_differ"
+    return first_vertex, None
+
+
+def _endpoint_vertex(
+    edge: _Edge,
+    position: Literal["start", "end"] | None,
+    edge_vertices: dict[int, tuple[int, int] | None],
+) -> int | None:
+    if position is None:
+        return None
+    pair = edge_vertices.get(edge.index)
+    if pair is None:
+        return None
+    return pair[0 if position == "start" else 1]
+
+
+def _contact_diagnostic(
+    point: SketchPoint2D,
+    first: _Edge,
+    second: _Edge,
+    first_endpoint: Literal["start", "end"] | None,
+    second_endpoint: Literal["start", "end"] | None,
+    edge_vertices: dict[int, tuple[int, int] | None],
+    vertices: tuple[_Vertex, ...],
+    rejection_reason: str | None,
+) -> dict[str, object]:
+    resolved_vertex, _ = _shared_endpoint_resolution(
+        first,
+        second,
+        first_endpoint,
+        second_endpoint,
+        edge_vertices,
+    )
+    return {
+        "contact_coordinates": {"x": point.x, "y": point.y},
+        "first_geometry": _contact_on_geometry(first, point, first_endpoint, edge_vertices),
+        "second_geometry": _contact_on_geometry(second, point, second_endpoint, edge_vertices),
+        "resolved_topology_vertex_number": resolved_vertex,
+        "resolved_topology_vertex": (
+            None
+            if resolved_vertex is None
+            else {
+                "x": vertices[resolved_vertex].x,
+                "y": vertices[resolved_vertex].y,
+            }
+        ),
+        "shared_endpoint_rejection_reason": rejection_reason,
+    }
+
+
+def _contact_on_geometry(
+    edge: _Edge,
+    point: SketchPoint2D,
+    endpoint: Literal["start", "end"] | None,
+    edge_vertices: dict[int, tuple[int, int] | None],
+) -> dict[str, object]:
+    nearest_endpoint_distance = None
+    if edge.kind != "circle":
+        nearest_endpoint_distance = min(
+            _distance(point, _required_point(edge.start)),
+            _distance(point, _required_point(edge.end)),
+        )
+    return {
+        "geometry_index": edge.index,
+        "parameter": _contact_parameter(edge, point, endpoint),
+        "position": endpoint or "interior",
+        "nearest_endpoint_distance": nearest_endpoint_distance,
+        "topology_vertex_number": _endpoint_vertex(edge, endpoint, edge_vertices),
+    }
+
+
+def _contact_parameter(
+    edge: _Edge,
+    point: SketchPoint2D,
+    endpoint: Literal["start", "end"] | None,
+) -> float:
+    if endpoint == "start":
+        return 0.0
+    if endpoint == "end":
+        return 1.0
+    if edge.kind == "line":
+        start = _required_point(edge.start)
+        end = _required_point(edge.end)
+        dx = end.x - start.x
+        dy = end.y - start.y
+        length_squared = dx * dx + dy * dy
+        if length_squared <= TOPOLOGY_TOLERANCE**2:
+            return 0.0
+        return ((point.x - start.x) * dx + (point.y - start.y) * dy) / length_squared
+    center = _required_point(edge.center)
+    angle = math.atan2(point.y - center.y, point.x - center.x)
+    if edge.kind == "circle":
+        return _normalize_angle(angle) / math.tau
+    sweep = _arc_signed_sweep(edge)
+    delta = _directed_angle_delta(_required_angle(edge.start_angle), angle, sweep)
+    return delta / max(abs(sweep), _arc_angular_tolerance(_required_radius(edge)))
 
 
 def _curve_intersections(first: _Edge, second: _Edge) -> tuple[tuple[SketchPoint2D, bool], ...]:
@@ -775,9 +916,10 @@ def _line_line_intersection(first: _Edge, second: _Edge) -> SketchPoint2D | None
         return None
     t = _cross(q_minus_p, s) / denominator
     u = _cross(q_minus_p, r) / denominator
-    parameter_tolerance = TOPOLOGY_TOLERANCE / max(math.hypot(*r), 1.0)
-    if -parameter_tolerance <= t <= 1.0 + parameter_tolerance and (
-        -parameter_tolerance <= u <= 1.0 + parameter_tolerance
+    first_parameter_tolerance = TOPOLOGY_TOLERANCE / max(math.hypot(*r), TOPOLOGY_TOLERANCE)
+    second_parameter_tolerance = TOPOLOGY_TOLERANCE / max(math.hypot(*s), TOPOLOGY_TOLERANCE)
+    if -first_parameter_tolerance <= t <= 1.0 + first_parameter_tolerance and (
+        -second_parameter_tolerance <= u <= 1.0 + second_parameter_tolerance
     ):
         return SketchPoint2D(p.x + t * r[0], p.y + t * r[1])
     return None
@@ -794,27 +936,39 @@ def _line_round_intersections(
     dy = end.y - start.y
     fx = start.x - center.x
     fy = start.y - center.y
-    a = dx * dx + dy * dy
-    if a <= TOPOLOGY_TOLERANCE**2:
+    length_squared = dx * dx + dy * dy
+    if length_squared <= TOPOLOGY_TOLERANCE**2:
         return ()
-    b = 2.0 * (fx * dx + fy * dy)
-    c = fx * fx + fy * fy - radius * radius
-    discriminant = b * b - 4.0 * a * c
-    scale = max(a * radius * radius, 1.0)
-    if discriminant < -TOPOLOGY_TOLERANCE * scale:
+    length = math.sqrt(length_squared)
+    parameter_tolerance = TOPOLOGY_TOLERANCE / length
+    projection = -(fx * dx + fy * dy) / length_squared
+    closest = SketchPoint2D(start.x + projection * dx, start.y + projection * dy)
+    center_distance = _distance(closest, center)
+    radial_gap = center_distance - radius
+    # Compare the physical line-to-circle gap in millimetres. Applying the
+    # linear tolerance to the quartic-unit discriminant creates scale-dependent
+    # roots far outside the endpoint tolerance for solver-sized residuals.
+    if radial_gap > TOPOLOGY_TOLERANCE:
         return ()
-    tangent = abs(discriminant) <= TOPOLOGY_TOLERANCE * scale
-    root = math.sqrt(max(0.0, discriminant))
-    parameters = ((-b - root) / (2.0 * a), (-b + root) / (2.0 * a))
+    if abs(radial_gap) <= TOPOLOGY_TOLERANCE:
+        if not -parameter_tolerance <= projection <= 1.0 + parameter_tolerance:
+            return ()
+        if rounded.kind == "arc" and not _point_on_arc(closest, rounded):
+            return ()
+        return ((closest, True),)
+
+    half_chord = math.sqrt(max(0.0, radius * radius - center_distance * center_distance))
+    parameter_offset = half_chord / length
+    parameters = (projection - parameter_offset, projection + parameter_offset)
     result: list[tuple[SketchPoint2D, bool]] = []
     for parameter in parameters:
-        if not -TOPOLOGY_TOLERANCE <= parameter <= 1.0 + TOPOLOGY_TOLERANCE:
+        if not -parameter_tolerance <= parameter <= 1.0 + parameter_tolerance:
             continue
         point = SketchPoint2D(start.x + parameter * dx, start.y + parameter * dy)
         if rounded.kind == "arc" and not _point_on_arc(point, rounded):
             continue
         if not any(_distance(point, previous[0]) <= TOPOLOGY_TOLERANCE for previous in result):
-            result.append((point, tangent))
+            result.append((point, False))
     return tuple(result)
 
 
@@ -828,20 +982,25 @@ def _round_round_intersections(
     distance = _distance(first_center, second_center)
     if distance <= TOPOLOGY_TOLERANCE:
         return ()
-    if distance > first_radius + second_radius + TOPOLOGY_TOLERANCE:
+    radius_sum = first_radius + second_radius
+    radius_difference = abs(first_radius - second_radius)
+    if distance > radius_sum + TOPOLOGY_TOLERANCE:
         return ()
-    if distance < abs(first_radius - second_radius) - TOPOLOGY_TOLERANCE:
+    if distance < radius_difference - TOPOLOGY_TOLERANCE:
         return ()
+    tangent = (
+        abs(distance - radius_sum) <= TOPOLOGY_TOLERANCE
+        or abs(distance - radius_difference) <= TOPOLOGY_TOLERANCE
+    )
     a = (first_radius**2 - second_radius**2 + distance**2) / (2.0 * distance)
     h_squared = first_radius**2 - a**2
-    if h_squared < -TOPOLOGY_TOLERANCE:
+    if h_squared < 0.0 and not tangent:
         return ()
-    h = math.sqrt(max(0.0, h_squared))
+    h = 0.0 if tangent else math.sqrt(max(0.0, h_squared))
     ux = (second_center.x - first_center.x) / distance
     uy = (second_center.y - first_center.y) / distance
     base_x = first_center.x + a * ux
     base_y = first_center.y + a * uy
-    tangent = h <= TOPOLOGY_TOLERANCE
     candidates = (
         SketchPoint2D(base_x + h * -uy, base_y + h * ux),
         SketchPoint2D(base_x - h * -uy, base_y - h * ux),
@@ -881,7 +1040,11 @@ def _duplicate(first: _Edge, second: _Edge, tolerance: float) -> bool:
     return (
         _distance(_required_point(first.start), _required_point(second.start)) <= tolerance
         and _distance(_required_point(first.end), _required_point(second.end)) <= tolerance
-        and abs(_arc_sweep(first) - _arc_sweep(second)) <= tolerance
+        and abs(_arc_sweep(first) - _arc_sweep(second))
+        <= max(
+            _arc_angular_tolerance(_required_radius(first), tolerance),
+            _arc_angular_tolerance(_required_radius(second), tolerance),
+        )
     )
 
 
@@ -892,9 +1055,13 @@ def _overlap(first: _Edge, second: _Edge) -> bool:
         c = _required_point(second.start)
         d = _required_point(second.end)
         direction = (b.x - a.x, b.y - a.y)
-        if abs(_cross(direction, (c.x - a.x, c.y - a.y))) > TOPOLOGY_TOLERANCE:
+        direction_length = math.hypot(*direction)
+        if direction_length <= TOPOLOGY_TOLERANCE:
             return False
-        if abs(_cross(direction, (d.x - a.x, d.y - a.y))) > TOPOLOGY_TOLERANCE:
+        cross_tolerance = TOPOLOGY_TOLERANCE * direction_length
+        if abs(_cross(direction, (c.x - a.x, c.y - a.y))) > cross_tolerance:
+            return False
+        if abs(_cross(direction, (d.x - a.x, d.y - a.y))) > cross_tolerance:
             return False
         use_x = abs(direction[0]) >= abs(direction[1])
         first_interval = sorted((a.x, b.x) if use_x else (a.y, b.y))
@@ -910,9 +1077,11 @@ def _overlap(first: _Edge, second: _Edge) -> bool:
             or abs(_required_radius(first) - _required_radius(second)) > TOPOLOGY_TOLERANCE
         ):
             return False
-        first_mid = _arc_point(first, _required_angle(first.start_angle) + _arc_sweep(first) / 2)
+        first_mid = _arc_point(
+            first, _required_angle(first.start_angle) + _arc_signed_sweep(first) / 2
+        )
         second_mid = _arc_point(
-            second, _required_angle(second.start_angle) + _arc_sweep(second) / 2
+            second, _required_angle(second.start_angle) + _arc_signed_sweep(second) / 2
         )
         return _point_on_arc(first_mid, second) or _point_on_arc(second_mid, first)
     return False
@@ -934,7 +1103,8 @@ def _point_on_edge_interior(point: SketchPoint2D, edge: _Edge) -> bool:
         parameter = (
             (point.x - start.x) * direction[0] + (point.y - start.y) * direction[1]
         ) / length_squared
-        return TOPOLOGY_TOLERANCE < parameter < 1.0 - TOPOLOGY_TOLERANCE
+        parameter_tolerance = TOPOLOGY_TOLERANCE / math.sqrt(length_squared)
+        return parameter_tolerance < parameter < 1.0 - parameter_tolerance
     if edge.kind == "arc" and _point_on_arc(point, edge):
         return (
             min(
@@ -1048,7 +1218,7 @@ def _arc_area_contribution(edge: _Edge) -> float:
     center = _required_point(edge.center)
     radius = _required_radius(edge)
     start = _required_angle(edge.start_angle)
-    end = start + _arc_sweep(edge)
+    end = start + _arc_signed_sweep(edge)
     return 0.5 * (
         radius * center.x * (math.sin(end) - math.sin(start))
         - radius * center.y * (math.cos(end) - math.cos(start))
@@ -1356,18 +1526,29 @@ def _point_on_arc(point: SketchPoint2D, edge: _Edge) -> bool:
 
 
 def _angle_on_arc(angle: float, edge: _Edge) -> bool:
-    start = _normalize_angle(_required_angle(edge.start_angle))
-    delta = (_normalize_angle(angle) - start) % math.tau
-    return delta <= _arc_sweep(edge) + TOPOLOGY_TOLERANCE
+    sweep = _arc_signed_sweep(edge)
+    delta = _directed_angle_delta(_required_angle(edge.start_angle), angle, sweep)
+    return delta <= abs(sweep) + _arc_angular_tolerance(_required_radius(edge))
 
 
 def _arc_sweep(edge: _Edge) -> float:
+    return abs(_arc_signed_sweep(edge))
+
+
+def _arc_signed_sweep(edge: _Edge) -> float:
     start = _required_angle(edge.start_angle)
     end = _required_angle(edge.end_angle)
-    sweep = (end - start) % math.tau
-    if sweep <= TOPOLOGY_TOLERANCE and abs(end - start) > TOPOLOGY_TOLERANCE:
-        return math.tau
-    return sweep
+    return end - start
+
+
+def _directed_angle_delta(start: float, angle: float, sweep: float) -> float:
+    if sweep >= 0.0:
+        return (_normalize_angle(angle) - _normalize_angle(start)) % math.tau
+    return (_normalize_angle(start) - _normalize_angle(angle)) % math.tau
+
+
+def _arc_angular_tolerance(radius: float, linear_tolerance: float = TOPOLOGY_TOLERANCE) -> float:
+    return min(math.pi, linear_tolerance / max(radius, linear_tolerance))
 
 
 def _arc_point(edge: _Edge, angle: float) -> SketchPoint2D:

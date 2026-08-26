@@ -57,6 +57,8 @@ def _arc(
     radius: float,
     start_degrees: float,
     end_degrees: float,
+    *,
+    clockwise: bool = False,
 ) -> SketchArcGeometry:
     start_radians = math.radians(start_degrees)
     end_radians = math.radians(end_degrees)
@@ -75,6 +77,7 @@ def _arc(
         ),
         start_angle_degrees=start_degrees,
         end_angle_degrees=end_degrees,
+        clockwise=clockwise,
     )
 
 
@@ -145,6 +148,11 @@ def _validation(
 def _codes(result: dict[str, object]) -> set[str]:
     findings = cast(list[dict[str, object]], result["findings"])
     return {str(item["code"]) for item in findings}
+
+
+def _finding_by_code(result: dict[str, object], code: str) -> dict[str, object]:
+    findings = cast(list[dict[str, object]], result["findings"])
+    return next(item for item in findings if item["code"] == code)
 
 
 def _rectangle(offset: int = 0, inset: float = 0.0) -> tuple[SketchLineGeometry, ...]:
@@ -336,6 +344,129 @@ def test_line_and_arc_profile_uses_exact_arc_area() -> None:
     assert result["profiles"][0]["signed_area"] == pytest.approx(math.pi / 2)  # type: ignore[index]
 
 
+def test_line_then_arc_tangent_at_shared_endpoint_is_valid() -> None:
+    result = _validation(
+        _sketch(
+            _line(0, (0, 0), (10, 0)),
+            _arc(1, (10, 1), 1, -90, 0),
+            _line(2, (11, 1), (11, 10)),
+            _line(3, (11, 10), (0, 10)),
+            _line(4, (0, 10), (0, 0)),
+        )
+    )
+
+    assert result["valid"] is True
+    assert result["classification"] == "single_closed_profile"
+    assert "tangent_touch" not in _codes(result)
+
+
+def test_arc_then_line_tangent_at_shared_endpoint_is_valid() -> None:
+    result = _validation(
+        _sketch(
+            _arc(0, (10, 1), 1, -90, 0),
+            _line(1, (0, 0), (10, 0)),
+            _line(2, (11, 1), (11, 10)),
+            _line(3, (11, 10), (0, 10)),
+            _line(4, (0, 10), (0, 0)),
+        )
+    )
+
+    assert result["valid"] is True
+    assert result["classification"] == "single_closed_profile"
+    assert "tangent_touch" not in _codes(result)
+
+
+def test_two_arcs_tangent_at_shared_endpoints_are_valid() -> None:
+    result = _validation(
+        _sketch(
+            _arc(0, (0, 0), 2, 0, 180),
+            _arc(1, (0, 0), 2, 180, 360),
+        )
+    )
+
+    assert result["valid"] is True
+    assert result["classification"] == "single_closed_profile"
+    assert "tangent_touch" not in _codes(result)
+
+
+def test_near_coincident_line_arc_endpoints_inside_tolerance_are_valid() -> None:
+    residual = TOPOLOGY_TOLERANCE / 2
+    result = _validation(
+        _sketch(
+            _line(0, (0, residual), (10, residual)),
+            _arc(1, (10, 1), 1, -90, 0),
+            _line(2, (11, 1), (11, 10)),
+            _line(3, (11, 10), (0, 10)),
+            _line(4, (0, 10), (0, residual)),
+        )
+    )
+
+    assert result["valid"] is True
+    assert result["classification"] == "single_closed_profile"
+    assert "tangent_touch" not in _codes(result)
+
+
+def test_six_element_rounded_profile_with_solver_residual_is_valid() -> None:
+    residual = 1.0e-12
+    result = _validation(
+        _sketch(
+            _line(0, (-100, -50), (-100, 50)),
+            _line(1, (-100, 50), (95, 50)),
+            _line(2, (95, -50 + residual), (-100, -50 + residual)),
+            _line(3, (100, 45), (100, -45)),
+            _arc(4, (95, 45), 5, 0, 90),
+            _arc(5, (95, -45), 5, 270, 360),
+            fully_constrained=True,
+        )
+    )
+
+    assert result["valid"] is True
+    assert result["classification"] == "single_closed_profile"
+    assert result["profile_count"] == 1
+    assert "tangent_touch" not in _codes(result)
+
+
+def test_reversed_arc_parameterisation_has_the_same_topology() -> None:
+    reversed_arc = SketchArcGeometry(
+        index=0,
+        construction=False,
+        center=_point(0, 0),
+        radius=1,
+        start=_point(-1, 0),
+        end=_point(0, 1),
+        start_angle_degrees=0,
+        end_angle_degrees=90,
+        clockwise=True,
+    )
+    result = _validation(
+        _sketch(
+            reversed_arc,
+            _line(1, (0, 1), (0, 0)),
+            _line(2, (0, 0), (-1, 0)),
+            _line(3, (1, -0.5), (2, -0.5)),
+            _line(4, (2, -0.5), (2, 0.5)),
+            _line(5, (2, 0.5), (1, 0.5)),
+            _line(6, (1, 0.5), (1, -0.5)),
+        )
+    )
+    forward_result = _validation(
+        _sketch(
+            _arc(0, (0, 0), 1, 90, 180),
+            _line(1, (-1, 0), (0, 0)),
+            _line(2, (0, 0), (0, 1)),
+            _line(3, (1, -0.5), (2, -0.5)),
+            _line(4, (2, -0.5), (2, 0.5)),
+            _line(5, (2, 0.5), (1, 0.5)),
+            _line(6, (1, 0.5), (1, -0.5)),
+        )
+    )
+
+    assert result["valid"] is True
+    assert result["classification"] == forward_result["classification"]
+    assert result["profile_count"] == forward_result["profile_count"] == 2
+    assert "tangent_touch" not in _codes(result)
+
+
 def test_line_arc_crossing_away_from_endpoints_is_invalid() -> None:
     result = _validation(
         _sketch(
@@ -353,6 +484,43 @@ def test_arc_arc_crossing_and_tangent_touch_are_distinguished() -> None:
     tangent = _validation(_sketch(_circle(0, (0, 0), 1), _circle(1, (2, 0), 1)))
     assert "tangent_touch" in _codes(tangent)
     assert tangent["classification"] == "ambiguous_profile"
+
+
+def test_interior_tangent_touch_includes_contact_diagnostics() -> None:
+    result = _validation(
+        _sketch(
+            _line(0, (-5, 0), (5, 0)),
+            _line(1, (5, 0), (5, 10)),
+            _line(2, (5, 10), (-5, 10)),
+            _line(3, (-5, 10), (-5, 0)),
+            _circle(4, (0, 1), 1),
+        )
+    )
+
+    finding = _finding_by_code(result, "tangent_touch")
+    assert finding["geometry_indices"] == [0, 4]
+    contacts = cast(list[dict[str, object]], finding["contacts"])
+    assert len(contacts) == 1
+    contact = contacts[0]
+    assert contact["contact_coordinates"] == pytest.approx({"x": 0.0, "y": 0.0})
+    assert contact["resolved_topology_vertex_number"] is None
+    assert contact["shared_endpoint_rejection_reason"] == "one_or_both_contacts_are_interior"
+    first = cast(dict[str, object], contact["first_geometry"])
+    second = cast(dict[str, object], contact["second_geometry"])
+    assert first == {
+        "geometry_index": 0,
+        "parameter": pytest.approx(0.5),
+        "position": "interior",
+        "nearest_endpoint_distance": pytest.approx(5.0),
+        "topology_vertex_number": None,
+    }
+    assert second == {
+        "geometry_index": 4,
+        "parameter": pytest.approx(0.75),
+        "position": "interior",
+        "nearest_endpoint_distance": None,
+        "topology_vertex_number": None,
+    }
 
 
 def test_construction_is_excluded_by_default_and_can_be_included() -> None:

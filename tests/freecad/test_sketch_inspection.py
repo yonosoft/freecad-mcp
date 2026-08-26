@@ -16,7 +16,8 @@ from freecad_mcp.exceptions import (
     SketchTypeMismatchError,
 )
 from freecad_mcp.freecad.document import FreeCADDocumentAdapter
-from freecad_mcp.models import SketchAnalysisRequestInput
+from freecad_mcp.freecad.sketch_inspection import _inspect_geometry_item
+from freecad_mcp.models import SketchAnalysisRequestInput, SketchArcGeometry
 from tests.support.freecad_stubs import (
     AppDocumentStub,
     DocumentObjectStub,
@@ -54,6 +55,7 @@ class ArcOfCircle:
         end: Vector,
         first_parameter: float,
         last_parameter: float,
+        axis: Vector | None = None,
     ) -> None:
         self.Center = center
         self.Radius = radius
@@ -61,6 +63,7 @@ class ArcOfCircle:
         self.EndPoint = end
         self.FirstParameter = first_parameter
         self.LastParameter = last_parameter
+        self.Axis = Vector(0.0, 0.0, 1.0) if axis is None else axis
 
 
 class Point:
@@ -200,6 +203,28 @@ def _install_document(monkeypatch: pytest.MonkeyPatch, objects: list[Any]) -> Ap
         active_name="TestDoc",
     )
     return document
+
+
+def test_arc_inspection_preserves_negative_axis_parameter_orientation(
+    part_module: ModuleType,
+) -> None:
+    geometry = ArcOfCircle(
+        Vector(0.0, 0.0),
+        2.0,
+        Vector(-2.0, 0.0),
+        Vector(0.0, 2.0),
+        0.0,
+        math.pi / 2,
+        axis=Vector(0.0, 0.0, -1.0),
+    )
+
+    result = _inspect_geometry_item(geometry, 3, False, part_module)
+
+    assert isinstance(result, SketchArcGeometry)
+    assert result.start == result.start.__class__(-2.0, 0.0)
+    assert result.end == result.end.__class__(0.0, 2.0)
+    assert result.clockwise is True
+    assert "clockwise" not in result.to_dict()
 
 
 def test_get_sketch_serializes_supported_and_unsupported_items(

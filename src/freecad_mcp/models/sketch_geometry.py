@@ -240,7 +240,7 @@ class SketchCircleGeometry:
 
 @dataclass(frozen=True, slots=True)
 class SketchArcGeometry:
-    """Controlled circular-arc geometry with native parameter angles."""
+    """Controlled circular-arc geometry with native parameter orientation."""
 
     index: int
     construction: bool
@@ -250,6 +250,7 @@ class SketchArcGeometry:
     end: SketchPoint2D
     start_angle_degrees: float
     end_angle_degrees: float
+    clockwise: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return {
