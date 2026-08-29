@@ -122,7 +122,7 @@ and tests.
 
 ## Current capabilities
 
-The repository currently exposes exactly **59 typed MCP tools** through an
+The repository currently exposes exactly **60 typed MCP tools** through an
 embedded FreeCAD workbench named **MCP**.
 
 The tools cover these controlled areas:
@@ -152,6 +152,8 @@ The tools cover these controlled areas:
 - controlled driving/reference, active/inactive, and virtual-space constraint
   state;
 - read-only constraint diagnostics with structured candidate repair actions.
+- compact native remaining-DoF diagnostics that identify affected sketch
+  geometry without entering edit mode or changing GUI selection.
 
 All public operations use strict schemas, deterministic validation, structured
 results, and controlled errors. The complete current wire-order list is the

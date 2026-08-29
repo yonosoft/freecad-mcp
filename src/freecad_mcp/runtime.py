@@ -22,6 +22,7 @@ from freecad_mcp.commands import (
     CreateSketchRegularPolygonHandler,
     CreateSketchRoundedRectangleHandler,
     CreateSketchSlotHandler,
+    DiagnoseSketchDoFHandler,
     DocumentHandlers,
     ExtendSketchGeometryHandler,
     GetDocumentHandler,
@@ -165,6 +166,10 @@ def _build_runtime() -> Runtime:
             get_sketch=GetSketchHandler(adapter=adapter, dispatcher=dispatcher),
             analyze_sketch=AnalyzeSketchHandler(adapter=adapter, dispatcher=dispatcher),
             analyze_sketch_constraints=AnalyzeSketchConstraintsHandler(
+                adapter=adapter,
+                dispatcher=dispatcher,
+            ),
+            diagnose_sketch_dof=DiagnoseSketchDoFHandler(
                 adapter=adapter,
                 dispatcher=dispatcher,
             ),

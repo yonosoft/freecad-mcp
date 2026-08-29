@@ -388,6 +388,12 @@ from freecad_mcp.models.sketch_diagnostics import (
     SketchDiagnosticsRequestInput as SketchDiagnosticsRequestInput,
 )
 from freecad_mcp.models.sketch_diagnostics import (
+    SketchDoFDiagnosticsResult as SketchDoFDiagnosticsResult,
+)
+from freecad_mcp.models.sketch_diagnostics import (
+    SketchDoFGeometry as SketchDoFGeometry,
+)
+from freecad_mcp.models.sketch_diagnostics import (
     SketchOpenVerticesResult as SketchOpenVerticesResult,
 )
 from freecad_mcp.models.sketch_diagnostics import (
@@ -894,6 +900,8 @@ __all__ = (
     "SketchDiagnosticIssueCode",
     "SketchDiagnosticSeverity",
     "SketchDiagnosticsRequestInput",
+    "SketchDoFDiagnosticsResult",
+    "SketchDoFGeometry",
     "SketchEllipseGeometry",
     "SketchEquilateralTriangleRequestInput",
     "SketchFilletResult",

@@ -81,14 +81,14 @@ def _local_link_target(raw_target: str) -> str:
 
 
 def test_authoritative_registry_is_exact_unique_and_stable() -> None:
-    assert len(REGISTERED_TOOL_NAMES) == 59
-    assert len(set(REGISTERED_TOOL_NAMES)) == 59
+    assert len(REGISTERED_TOOL_NAMES) == 60
+    assert len(set(REGISTERED_TOOL_NAMES)) == 60
     assert REGISTERED_TOOL_NAMES[-5:] == (
-        "translate_sketch",
         "rotate_sketch",
         "scale_sketch",
         "mirror_sketch",
         "analyze_sketch_constraints",
+        "diagnose_sketch_dof",
     )
 
 
@@ -100,8 +100,8 @@ def test_explicit_registrations_match_the_authoritative_registry() -> None:
     }
     declared_constants = _declared_tool_constants()
 
-    assert len(declared_constants) == 59
-    assert len(set(declared_constants)) == 59
+    assert len(declared_constants) == 60
+    assert len(set(declared_constants)) == 60
     assert set(declared_constants) == set(constant_values)
     assert {constant_values[name] for name in declared_constants} == set(REGISTERED_TOOL_NAMES)
 
@@ -129,9 +129,9 @@ def test_public_documentation_matches_the_registry() -> None:
     architecture = (REPOSITORY_ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
     inventory = INVENTORY_PATH.read_text(encoding="utf-8")
 
-    assert "59 typed MCP tools" in readme
-    assert "exactly 59 public tools" in architecture
-    assert "exactly 59 public tools" in inventory
+    assert "60 typed MCP tools" in readme
+    assert "exactly 60 public tools" in architecture
+    assert "exactly 60 public tools" in inventory
     assert _documented_inventory() == REGISTERED_TOOL_NAMES
 
 
@@ -238,9 +238,9 @@ def test_multiple_server_builds_yield_identical_58_tool_lists() -> None:
     first_names = tuple(tool.name for tool in asyncio.run(first_server.list_tools()))
     second_names = tuple(tool.name for tool in asyncio.run(second_server.list_tools()))
 
-    assert len(first_names) == 59
+    assert len(first_names) == 60
     assert first_names == second_names
-    assert len(set(first_names)) == 59
+    assert len(set(first_names)) == 60
 
 
 def test_whole_sketch_tools_are_discoverable() -> None:

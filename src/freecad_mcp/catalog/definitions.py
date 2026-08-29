@@ -391,11 +391,19 @@ TOOL_DEFINITIONS = (
         59,
     ),
     _tool(
+        "diagnose_sketch_dof",
+        "Diagnose sketch degrees of freedom",
+        ToolGroup.SKETCHER,
+        ToolSection.ANALYSIS_AND_VALIDATION,
+        45,
+        60,
+    ),
+    _tool(
         "trim_sketch_geometry",
         "Trim sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.TOPOLOGY_EDITING,
-        45,
+        46,
         41,
     ),
     _tool(
@@ -403,7 +411,7 @@ TOOL_DEFINITIONS = (
         "Extend sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.TOPOLOGY_EDITING,
-        46,
+        47,
         43,
     ),
     _tool(
@@ -411,7 +419,7 @@ TOOL_DEFINITIONS = (
         "Split sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.TOPOLOGY_EDITING,
-        47,
+        48,
         42,
     ),
     _tool(
@@ -419,7 +427,7 @@ TOOL_DEFINITIONS = (
         "Chamfer sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.TOPOLOGY_EDITING,
-        48,
+        49,
         44,
     ),
     _tool(
@@ -427,7 +435,7 @@ TOOL_DEFINITIONS = (
         "Fillet sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.TOPOLOGY_EDITING,
-        49,
+        50,
         45,
     ),
     _tool(
@@ -435,7 +443,7 @@ TOOL_DEFINITIONS = (
         "Translate sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.SELECTED_GEOMETRY_TRANSFORMS_AND_ARRAYS,
-        50,
+        51,
         47,
     ),
     _tool(
@@ -443,7 +451,7 @@ TOOL_DEFINITIONS = (
         "Rotate sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.SELECTED_GEOMETRY_TRANSFORMS_AND_ARRAYS,
-        51,
+        52,
         48,
     ),
     _tool(
@@ -451,7 +459,7 @@ TOOL_DEFINITIONS = (
         "Scale sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.SELECTED_GEOMETRY_TRANSFORMS_AND_ARRAYS,
-        52,
+        53,
         49,
     ),
     _tool(
@@ -459,7 +467,7 @@ TOOL_DEFINITIONS = (
         "Mirror sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.SELECTED_GEOMETRY_TRANSFORMS_AND_ARRAYS,
-        53,
+        54,
         46,
     ),
     _tool(
@@ -467,7 +475,7 @@ TOOL_DEFINITIONS = (
         "Create rectangular array of sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.SELECTED_GEOMETRY_TRANSFORMS_AND_ARRAYS,
-        54,
+        55,
         50,
     ),
     _tool(
@@ -475,7 +483,7 @@ TOOL_DEFINITIONS = (
         "Create polar array of sketch geometry",
         ToolGroup.SKETCHER,
         ToolSection.SELECTED_GEOMETRY_TRANSFORMS_AND_ARRAYS,
-        55,
+        56,
         51,
     ),
     _tool(
@@ -483,7 +491,7 @@ TOOL_DEFINITIONS = (
         "Translate whole sketch",
         ToolGroup.SKETCHER,
         ToolSection.WHOLE_SKETCH_TRANSFORMS,
-        56,
+        57,
         55,
     ),
     _tool(
@@ -491,7 +499,7 @@ TOOL_DEFINITIONS = (
         "Rotate whole sketch",
         ToolGroup.SKETCHER,
         ToolSection.WHOLE_SKETCH_TRANSFORMS,
-        57,
+        58,
         56,
     ),
     _tool(
@@ -499,7 +507,7 @@ TOOL_DEFINITIONS = (
         "Scale whole sketch",
         ToolGroup.SKETCHER,
         ToolSection.WHOLE_SKETCH_TRANSFORMS,
-        58,
+        59,
         57,
     ),
     _tool(
@@ -507,7 +515,7 @@ TOOL_DEFINITIONS = (
         "Mirror whole sketch",
         ToolGroup.SKETCHER,
         ToolSection.WHOLE_SKETCH_TRANSFORMS,
-        59,
+        60,
         58,
     ),
 )

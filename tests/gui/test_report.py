@@ -20,7 +20,7 @@ def _result(state: str, *, active_count: int = 0) -> CommandResult:
         {
             "state": state,
             "url": "http://127.0.0.1:8765/mcp",
-            "tools": [f"registered_{index}" for index in range(59)],
+            "tools": [f"registered_{index}" for index in range(60)],
             "active_tools": tuple(f"active_{index}" for index in range(active_count)),
         },
     )

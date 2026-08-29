@@ -66,11 +66,11 @@ def _listed_names(server: VisibilityAwareFastMCP) -> tuple[str, ...]:
         ((), 0),
         ((ToolGroup.DOCUMENT,), 10),
         ((ToolGroup.PART_DESIGN,), 1),
-        ((ToolGroup.SKETCHER,), 48),
+        ((ToolGroup.SKETCHER,), 49),
         ((ToolGroup.DOCUMENT, ToolGroup.PART_DESIGN), 11),
-        ((ToolGroup.PART_DESIGN, ToolGroup.SKETCHER), 49),
-        ((ToolGroup.DOCUMENT, ToolGroup.SKETCHER), 58),
-        (CURRENT_GROUPS, 59),
+        ((ToolGroup.PART_DESIGN, ToolGroup.SKETCHER), 50),
+        ((ToolGroup.DOCUMENT, ToolGroup.SKETCHER), 59),
+        (CURRENT_GROUPS, 60),
     ],
 )
 def test_listing_projects_each_current_group_combination_in_legacy_order(
@@ -108,7 +108,7 @@ def test_all_listing_is_structure_equivalent_to_complete_public_sdk_view() -> No
     listed = asyncio.run(server.list_tools())
 
     assert tuple(tool.name for tool in complete) == REGISTERED_TOOL_NAMES
-    assert len(complete) == 59
+    assert len(complete) == 60
     assert [tool.model_dump(mode="json", by_alias=True, exclude_none=False) for tool in listed] == [
         tool.model_dump(mode="json", by_alias=True, exclude_none=False) for tool in complete
     ]

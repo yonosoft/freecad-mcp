@@ -18,6 +18,7 @@ from freecad_mcp.freecad import (
     sketch_creation,
     sketch_dependencies,
     sketch_diagnostics,
+    sketch_dof_diagnostics,
     sketch_editing,
     sketch_external_geometry,
     sketch_fillet,
@@ -92,6 +93,7 @@ from freecad_mcp.models import (
     SketchConstraintValueUpdateResult,
     SketchCreationResult,
     SketchDependencyInspectionResult,
+    SketchDoFDiagnosticsResult,
     SketchGeometryAdditionResult,
     SketchGeometryConstructionResult,
     SketchGeometryInput,
@@ -221,6 +223,14 @@ class FreeCADDocumentAdapter:
     ) -> SketchConstraintDiagnosticsResult:
         """Return structured constraint diagnostics without document mutation."""
         return sketch_diagnostics.analyze_constraints(document_name, sketch_name)
+
+    def diagnose_sketch_dof(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchDoFDiagnosticsResult:
+        """Return native remaining-DoF geometry without mutation or GUI state."""
+        return sketch_dof_diagnostics.diagnose_sketch_dof(document_name, sketch_name)
 
     def add_sketch_geometry(
         self,

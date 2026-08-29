@@ -73,6 +73,7 @@ EXPECTED_LOGICAL_TOOL_NAMES = (
     "validate_sketch_profile",
     "list_sketch_open_vertices",
     "analyze_sketch_constraints",
+    "diagnose_sketch_dof",
     "trim_sketch_geometry",
     "extend_sketch_geometry",
     "split_sketch_geometry",
@@ -150,6 +151,7 @@ EXPECTED_LEGACY_TOOL_NAMES = (
     "scale_sketch",
     "mirror_sketch",
     "analyze_sketch_constraints",
+    "diagnose_sketch_dof",
 )
 
 EXPECTED_TITLES = (
@@ -197,6 +199,7 @@ EXPECTED_TITLES = (
     "Validate sketch profile",
     "List open sketch vertices",
     "Analyse sketch constraints",
+    "Diagnose sketch degrees of freedom",
     "Trim sketch geometry",
     "Extend sketch geometry",
     "Split sketch geometry",
@@ -214,7 +217,7 @@ EXPECTED_TITLES = (
     "Mirror whole sketch",
 )
 
-EXPECTED_GROUPS = (ToolGroup.DOCUMENT,) * 10 + (ToolGroup.PART_DESIGN,) + (ToolGroup.SKETCHER,) * 48
+EXPECTED_GROUPS = (ToolGroup.DOCUMENT,) * 10 + (ToolGroup.PART_DESIGN,) + (ToolGroup.SKETCHER,) * 49
 
 EXPECTED_SECTIONS = (
     (ToolSection.DOCUMENT_LIFECYCLE,) * 7
@@ -225,7 +228,7 @@ EXPECTED_SECTIONS = (
     + (ToolSection.GEOMETRY_STATE_AND_EDITING,) * 3
     + (ToolSection.EXTERNAL_GEOMETRY,) * 3
     + (ToolSection.CONSTRAINTS,) * 12
-    + (ToolSection.ANALYSIS_AND_VALIDATION,) * 4
+    + (ToolSection.ANALYSIS_AND_VALIDATION,) * 5
     + (ToolSection.TOPOLOGY_EDITING,) * 5
     + (ToolSection.SELECTED_GEOMETRY_TRANSFORMS_AND_ARRAYS,) * 6
     + (ToolSection.WHOLE_SKETCH_TRANSFORMS,) * 4
@@ -305,8 +308,8 @@ def test_logical_order_derivation_ignores_physical_definition_order() -> None:
     assert catalog_registry._names_in_logical_order(TOOL_DEFINITIONS) == LOGICAL_TOOL_NAMES
 
 
-def test_definition_lookup_is_read_only_and_resolves_all_59_definitions() -> None:
-    assert len(TOOL_DEFINITION_BY_NAME) == 59
+def test_definition_lookup_is_read_only_and_resolves_all_60_definitions() -> None:
+    assert len(TOOL_DEFINITION_BY_NAME) == 60
     assert all(
         TOOL_DEFINITION_BY_NAME[definition.name] is definition for definition in TOOL_DEFINITIONS
     )
@@ -320,10 +323,10 @@ def test_definition_lookup_is_read_only_and_resolves_all_59_definitions() -> Non
 def test_catalogue_has_exactly_one_complete_definition_per_public_tool() -> None:
     names = tuple(definition.name for definition in TOOL_DEFINITIONS)
 
-    assert len(TOOL_DEFINITIONS) == 59
-    assert len(set(names)) == 59
+    assert len(TOOL_DEFINITIONS) == 60
+    assert len(set(names)) == 60
     assert set(names) == set(REGISTERED_TOOL_NAMES)
-    assert len(TOOL_DEFINITION_BY_NAME) == 59
+    assert len(TOOL_DEFINITION_BY_NAME) == 60
     assert tuple(TOOL_DEFINITION_BY_NAME[name] for name in names) == TOOL_DEFINITIONS
 
 
@@ -341,7 +344,7 @@ def test_catalogue_metadata_has_one_group_and_section_per_tool() -> None:
 
 
 def test_logical_order_is_exact_unique_and_contiguous() -> None:
-    assert tuple(definition.logical_order for definition in TOOL_DEFINITIONS) == tuple(range(1, 60))
+    assert tuple(definition.logical_order for definition in TOOL_DEFINITIONS) == tuple(range(1, 61))
     assert LOGICAL_TOOL_NAMES == EXPECTED_LOGICAL_TOOL_NAMES
     assert tuple(definition.title for definition in TOOL_DEFINITIONS) == EXPECTED_TITLES
 
@@ -349,15 +352,15 @@ def test_logical_order_is_exact_unique_and_contiguous() -> None:
 def test_legacy_wire_order_is_exact_unique_and_contiguous() -> None:
     legacy_orders = tuple(definition.legacy_wire_order for definition in TOOL_DEFINITIONS)
 
-    assert len(set(legacy_orders)) == 59
-    assert set(legacy_orders) == set(range(1, 60))
+    assert len(set(legacy_orders)) == 60
+    assert set(legacy_orders) == set(range(1, 61))
     assert REGISTERED_TOOL_NAMES == EXPECTED_LEGACY_TOOL_NAMES
 
 
 def test_registered_definition_resolution_preserves_visibility_and_wire_order() -> None:
     resolved = definitions_for_registered_names()
 
-    assert len(resolved) == 59
+    assert len(resolved) == 60
     assert tuple(definition.name for definition in resolved) == REGISTERED_TOOL_NAMES
 
 
@@ -367,7 +370,7 @@ def test_runtime_registration_exposes_all_catalogued_tools_in_legacy_order() -> 
     runtime_names = tuple(tool.name for tool in asyncio.run(server.list_tools()))
 
     assert runtime_names == REGISTERED_TOOL_NAMES
-    assert len(runtime_names) == 59
+    assert len(runtime_names) == 60
     assert set(runtime_names) == set(LOGICAL_TOOL_NAMES)
 
 
@@ -385,7 +388,7 @@ def test_future_empty_groups_have_no_tools_and_do_not_affect_runtime_visibility(
         not any(definition.group is group for definition in TOOL_DEFINITIONS)
         for group in empty_groups
     )
-    assert len(definitions_for_registered_names()) == 59
+    assert len(definitions_for_registered_names()) == 60
 
 
 def test_source_tree_contains_one_authoritative_tool_definition_catalogue() -> None:

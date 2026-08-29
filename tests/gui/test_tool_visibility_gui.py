@@ -86,7 +86,7 @@ class ApplicationStub:
             {
                 "state": self.state,
                 "url": "http://127.0.0.1:8765/mcp",
-                "tools": [f"tool_{index}" for index in range(59)],
+                "tools": [f"tool_{index}" for index in range(60)],
                 "active_tools": self.active_tools_provider(),
             },
         )

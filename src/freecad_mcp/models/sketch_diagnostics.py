@@ -48,6 +48,37 @@ class SketchDiagnosticsRequestInput(_SketchGeometryInputModel):
     sketch_name: str = Field(strict=True)
 
 
+@dataclass(frozen=True, slots=True)
+class SketchDoFGeometry:
+    """One current-state geometry index reported by FreeCAD's solver."""
+
+    geometry_index: int
+    type: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {"geometry_index": self.geometry_index, "type": self.type}
+
+
+@dataclass(frozen=True, slots=True)
+class SketchDoFDiagnosticsResult:
+    """Compact native remaining-DoF diagnosis for one sketch."""
+
+    document_name: str
+    sketch_name: str
+    fully_constrained: bool
+    degrees_of_freedom: int
+    unconstrained_geometry: tuple[SketchDoFGeometry, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "document_name": self.document_name,
+            "sketch_name": self.sketch_name,
+            "fully_constrained": self.fully_constrained,
+            "degrees_of_freedom": self.degrees_of_freedom,
+            "unconstrained_geometry": [item.to_dict() for item in self.unconstrained_geometry],
+        }
+
+
 class SketchProfileAnalysisRequestInput(_SketchGeometryInputModel):
     """Strict shared request for profile validation and open-vertex listing.
 

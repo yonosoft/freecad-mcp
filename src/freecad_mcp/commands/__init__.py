@@ -42,6 +42,7 @@ from freecad_mcp.commands.sketch_curved_profiles import (
 )
 from freecad_mcp.commands.sketch_diagnostics import (
     AnalyzeSketchConstraintsHandler,
+    DiagnoseSketchDoFHandler,
 )
 from freecad_mcp.commands.sketch_editing import (
     ReplaceSketchConstraintHandler,
@@ -122,6 +123,7 @@ class SketcherHandlers:
     get_sketch: GetSketchHandler
     analyze_sketch: AnalyzeSketchHandler
     analyze_sketch_constraints: AnalyzeSketchConstraintsHandler
+    diagnose_sketch_dof: DiagnoseSketchDoFHandler
     validate_sketch_profile: ValidateSketchProfileHandler
     list_sketch_open_vertices: ListSketchOpenVerticesHandler
     add_sketch_geometry: AddSketchGeometryHandler
@@ -196,6 +198,7 @@ __all__ = [
     "CreateSketchRegularPolygonHandler",
     "CreateSketchRoundedRectangleHandler",
     "CreateSketchSlotHandler",
+    "DiagnoseSketchDoFHandler",
     "DocumentHandlers",
     "ExtendSketchGeometryHandler",
     "FilletSketchGeometryHandler",

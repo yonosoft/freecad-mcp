@@ -43,6 +43,11 @@ placement extraction; and `freecad.body_creation` and
 Atomic geometry addition belongs to `freecad.sketch_geometry_creation`, while
 read-only sketch state belongs to `freecad.sketch_inspection`. Both remain
 separate from sketch creation and behind the same public adapter facade.
+Compact remaining-DoF inspection belongs to
+`freecad.sketch_dof_diagnostics`; it translates FreeCAD's native dependent-
+parameter geometry IDs without recompute, edit mode, GUI selection, or solver
+reimplementation. Its evidence and deliberately narrow output boundary are
+recorded in [Sketch DoF diagnostics](sketch-dof-diagnostics.md).
 Controlled external-reference enumeration and mutation belong to
 `freecad.sketch_external_geometry`; read-only attachment, expression,
 constraint, consumer, broken, and cross-document dependency extraction belongs
@@ -259,7 +264,7 @@ No registration loop is used.
 Registration modules depend on handlers and the catalogue, never on the
 concrete FreeCAD adapter.
 
-`freecad_mcp.catalog.definitions` is the single authoritative 59-definition
+`freecad_mcp.catalog.definitions` is the single authoritative 60-definition
 catalogue. It records stable identifiers, titles, primary groups, sections,
 logical positions, and legacy wire positions in human-readable logical order.
 `freecad_mcp.catalog.registry` derives both `LOGICAL_TOOL_NAMES` and the
@@ -269,7 +274,7 @@ use the legacy order, so reported capabilities cannot drift from the
 registered set. Catalogue groups do not filter visibility, and future empty
 groups have no runtime effect.
 
-The registry currently exposes exactly 59 public tools. The maintained
+The registry currently exposes exactly 60 public tools. The maintained
 [public tool inventory](public-tool-inventory.md) records their exact names and
 order without duplicating registration definitions in architecture prose.
 
@@ -283,7 +288,7 @@ document, object, constraint, geometry, and error data.
 
 The MCP workbench provides user-facing tool-visibility controls that filter
 which public tools the MCP server advertises through `tools/list` and allows
-through `tools/call`. All 59 tools remain internally registered regardless of
+through `tools/call`. All 60 tools remain internally registered regardless of
 the active visibility selection; filtering affects only the MCP transport layer.
 
 ### GUI Controls
@@ -300,7 +305,7 @@ contains:
   - **Enable All** — action; restores all current standard groups to enabled.
   - **Document** — checkbox; toggles the Document tool group (10 tools).
   - **Part Design** — checkbox; toggles the Part Design tool group (1 tool).
-  - **Sketcher** — checkbox; toggles the Sketcher tool group (48 tools).
+  - **Sketcher** — checkbox; toggles the Sketcher tool group (49 tools).
 
 The same actions appear identically in the toolbar **cog** menu, which uses a
 native FreeCAD menu-button layout with a triangular dropdown indicator. The cog
@@ -311,7 +316,7 @@ area and the triangle both open the same menu, and they do not overlap.
 The visibility preference stores a `kind` field of `all` or `custom`:
 
 - **All** means every current standard group (Document, Part Design, Sketcher)
-  is enabled. All 59 tools are advertised and callable.
+  is enabled. All 60 tools are advertised and callable.
 - **Custom** means a subset of standard groups is enabled. Only tools belonging
   to the selected groups are advertised and callable.
 

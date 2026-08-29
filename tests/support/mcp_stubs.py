@@ -23,6 +23,7 @@ from freecad_mcp.commands import (
     CreateSketchRegularPolygonHandler,
     CreateSketchRoundedRectangleHandler,
     CreateSketchSlotHandler,
+    DiagnoseSketchDoFHandler,
     DocumentHandlers,
     ExtendSketchGeometryHandler,
     FilletSketchGeometryHandler,
@@ -104,6 +105,8 @@ from freecad_mcp.models import (
     SketchCreationResult,
     SketchDependencyInspectionResult,
     SketchDiagnosticClassification,
+    SketchDoFDiagnosticsResult,
+    SketchDoFGeometry,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchGeometryUpdateInput,
@@ -174,6 +177,7 @@ class AdapterStub:
         self.get_sketch_calls: list[tuple[str, str]] = []
         self.analyze_sketch_calls: list[SketchAnalysisRequestInput] = []
         self.analyze_constraints_calls: list[tuple[str, str]] = []
+        self.diagnose_sketch_dof_calls: list[tuple[str, str]] = []
         self.validate_sketch_profile_calls: list[SketchProfileAnalysisRequestInput] = []
         self.list_sketch_open_vertices_calls: list[SketchProfileAnalysisRequestInput] = []
         self.add_sketch_geometry_calls: list[tuple[str, str, tuple[SketchGeometryInput, ...]]] = []
@@ -439,6 +443,20 @@ class AdapterStub:
                 active=True,
                 object_count=0,
             ),
+        )
+
+    def diagnose_sketch_dof(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchDoFDiagnosticsResult:
+        self.diagnose_sketch_dof_calls.append((document_name, sketch_name))
+        return SketchDoFDiagnosticsResult(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            fully_constrained=False,
+            degrees_of_freedom=1,
+            unconstrained_geometry=(SketchDoFGeometry(geometry_index=2, type="circle"),),
         )
 
     def validate_sketch_profile(
@@ -1230,6 +1248,7 @@ def make_handlers(adapter: AdapterStub | None = None) -> tuple[HandlerGroups, Ad
                 analyze_sketch_constraints=AnalyzeSketchConstraintsHandler(
                     actual_adapter, dispatcher
                 ),
+                diagnose_sketch_dof=DiagnoseSketchDoFHandler(actual_adapter, dispatcher),
                 validate_sketch_profile=ValidateSketchProfileHandler(actual_adapter, dispatcher),
                 list_sketch_open_vertices=ListSketchOpenVerticesHandler(
                     actual_adapter,

@@ -76,7 +76,7 @@ def test_current_and_future_standard_group_counts_are_exact() -> None:
 
     assert counts[ToolGroup.DOCUMENT] == 10
     assert counts[ToolGroup.PART_DESIGN] == 1
-    assert counts[ToolGroup.SKETCHER] == 48
+    assert counts[ToolGroup.SKETCHER] == 49
     assert all(
         counts[group] == 0
         for group in (
@@ -97,7 +97,7 @@ def test_current_and_future_standard_group_counts_are_exact() -> None:
         (
             groups,
             sum(
-                {ToolGroup.DOCUMENT: 10, ToolGroup.PART_DESIGN: 1, ToolGroup.SKETCHER: 48}[g]
+                {ToolGroup.DOCUMENT: 10, ToolGroup.PART_DESIGN: 1, ToolGroup.SKETCHER: 49}[g]
                 for g in groups
             ),
         )
@@ -182,8 +182,8 @@ def test_simulated_future_standard_tool_is_followed_only_by_all_or_explicit_cust
         title="Future Part tool",
         group=ToolGroup.PART,
         section=TOOL_DEFINITIONS[0].section,
-        logical_order=60,
-        legacy_wire_order=60,
+        logical_order=61,
+        legacy_wire_order=61,
     )
     definitions = (*TOOL_DEFINITIONS, future)
     all_selection = normalize_selection(SelectionMode.ALL, definitions=definitions)
@@ -205,8 +205,8 @@ def test_custom_future_selection_does_not_acquire_newly_non_empty_draft_group() 
         title="Future Draft tool",
         group=ToolGroup.DRAFT,
         section=TOOL_DEFINITIONS[0].section,
-        logical_order=60,
-        legacy_wire_order=60,
+        logical_order=61,
+        legacy_wire_order=61,
     )
     definitions = (*TOOL_DEFINITIONS, future_draft)
     custom = normalize_selection(

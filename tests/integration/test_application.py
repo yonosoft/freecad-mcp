@@ -70,7 +70,10 @@ from freecad_mcp.commands.sketch_constraint_state import (
     SetSketchConstraintDrivingHandler,
     SetSketchConstraintVirtualSpaceHandler,
 )
-from freecad_mcp.commands.sketch_diagnostics import AnalyzeSketchConstraintsHandler
+from freecad_mcp.commands.sketch_diagnostics import (
+    AnalyzeSketchConstraintsHandler,
+    DiagnoseSketchDoFHandler,
+)
 from freecad_mcp.commands.sketch_polyline import CreateSketchPolylineHandler
 from freecad_mcp.exceptions import SketchConstraintStateUnsafeError
 from freecad_mcp.freecad import sketch_topology
@@ -99,6 +102,8 @@ from freecad_mcp.models import (
     SketchConstraintInput,
     SketchCreationResult,
     SketchDiagnosticClassification,
+    SketchDoFDiagnosticsResult,
+    SketchDoFGeometry,
     SketchGeometryAdditionResult,
     SketchGeometryInput,
     SketchGeometryUpdateInput,
@@ -368,6 +373,19 @@ class AdapterStub:
                 active=True,
                 object_count=0,
             ),
+        )
+
+    def diagnose_sketch_dof(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchDoFDiagnosticsResult:
+        return SketchDoFDiagnosticsResult(
+            document_name=document_name,
+            sketch_name=sketch_name,
+            fully_constrained=False,
+            degrees_of_freedom=1,
+            unconstrained_geometry=(SketchDoFGeometry(geometry_index=0, type="line_segment"),),
         )
 
     def validate_sketch_profile(
@@ -1084,6 +1102,7 @@ def make_application() -> Application:
             fillet_sketch_geometry=FilletSketchGeometryHandler(adapter, dispatcher),
             chamfer_sketch_geometry=ChamferSketchGeometryHandler(adapter, dispatcher),
             analyze_sketch_constraints=AnalyzeSketchConstraintsHandler(adapter, dispatcher),
+            diagnose_sketch_dof=DiagnoseSketchDoFHandler(adapter, dispatcher),
         ),
     )
     return create_application(lifecycle, handlers)
@@ -1411,3 +1430,12 @@ class TestAnalyzeSketchConstraintsApplication:
         app = make_application()
         result = app.analyze_sketch_constraints("TestDoc", "TestSketch")
         assert result.ok is True
+
+
+def test_application_dispatches_compact_sketch_dof_diagnosis() -> None:
+    result = make_application().diagnose_sketch_dof("TestDoc", "TestSketch")
+
+    assert result.ok is True
+    assert result.code == "sketch_dof_diagnosed"
+    assert result.data["degrees_of_freedom"] == 1
+    assert result.data["unconstrained_geometry"] == [{"geometry_index": 0, "type": "line_segment"}]

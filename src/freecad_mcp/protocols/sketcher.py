@@ -20,6 +20,7 @@ from freecad_mcp.models import (
     SketchConstraintStateResult,
     SketchConstraintValueUpdateResult,
     SketchDependencyInspectionResult,
+    SketchDoFDiagnosticsResult,
     SketchGeometryConstructionResult,
     SketchGeometryRemovalResult,
     SketchGeometryTransformResult,
@@ -95,6 +96,13 @@ class SketchDiagnosticsAdapter(Protocol):
         sketch_name: str,
     ) -> SketchConstraintDiagnosticsResult:
         """Return structured constraint diagnostics without mutation."""
+
+    def diagnose_sketch_dof(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchDoFDiagnosticsResult:
+        """Return native remaining-DoF geometry without mutation."""
 
 
 class SketchExternalGeometryAdapter(Protocol):

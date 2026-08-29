@@ -33,6 +33,8 @@ SERVER_INSTRUCTIONS = (
     " Use analyze_sketch_constraints for structured constraint diagnostics:"
     " conflicts, redundancies, state counts, and candidate repair actions;"
     " it is strictly read-only and never repairs."
+    " Use diagnose_sketch_dof for the compact remaining DoF count and the exact current "
+    "geometry indices FreeCAD's solver still regards as unconstrained."
     " Use add_external_geometry for one proven same-document edge, vertex, or supported "
     "source-sketch geometry reference. Use list_external_geometry for controlled mapping "
     "readback and get_sketch_dependencies for dependency impact. Remove only through "

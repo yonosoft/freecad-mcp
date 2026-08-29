@@ -15,11 +15,15 @@ from freecad_mcp.exceptions import (
     SketchInspectionError,
     SketchTypeMismatchError,
 )
-from freecad_mcp.models import SketchConstraintDiagnosticsResult, SketchDiagnosticsRequestInput
+from freecad_mcp.models import (
+    SketchConstraintDiagnosticsResult,
+    SketchDiagnosticsRequestInput,
+    SketchDoFDiagnosticsResult,
+)
 from freecad_mcp.protocols import Dispatcher
 from freecad_mcp.validation import validate_analyze_sketch_constraints_request
 
-_SerializableResult: TypeAlias = SketchConstraintDiagnosticsResult
+_SerializableResult: TypeAlias = SketchConstraintDiagnosticsResult | SketchDoFDiagnosticsResult
 
 
 class SketchDiagnosticsAnalyzer(Protocol):
@@ -31,6 +35,17 @@ class SketchDiagnosticsAnalyzer(Protocol):
         sketch_name: str,
     ) -> SketchConstraintDiagnosticsResult:
         """Return structured constraint diagnostics without mutation."""
+
+
+class SketchDoFDiagnoser(Protocol):
+    """The single compact native DoF adapter method this handler needs."""
+
+    def diagnose_sketch_dof(
+        self,
+        document_name: str,
+        sketch_name: str,
+    ) -> SketchDoFDiagnosticsResult:
+        """Return native remaining-DoF geometry without mutation."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +77,35 @@ class AnalyzeSketchConstraintsHandler:
             success_message="Analyzed sketch constraint diagnostics.",
             failure_code="sketch_diagnostics_failed",
             failure_message="FreeCAD could not analyze sketch constraint diagnostics.",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DiagnoseSketchDoFHandler:
+    """Return FreeCAD's compact native remaining-DoF diagnosis."""
+
+    adapter: SketchDoFDiagnoser
+    dispatcher: Dispatcher
+
+    def execute(
+        self,
+        document_name: object,
+        sketch_name: object,
+    ) -> CommandResult:
+        request = validate_analyze_sketch_constraints_request(document_name, sketch_name)
+        if isinstance(request, CommandResult):
+            return request
+        return _execute(
+            self.dispatcher,
+            lambda: self.adapter.diagnose_sketch_dof(
+                request.document_name,
+                request.sketch_name,
+            ),
+            request,
+            success_code="sketch_dof_diagnosed",
+            success_message="Diagnosed remaining sketch degrees of freedom.",
+            failure_code="sketch_dof_diagnosis_failed",
+            failure_message="FreeCAD could not diagnose remaining sketch degrees of freedom.",
         )
 
 
@@ -130,4 +174,9 @@ def _execute(
     )
 
 
-__all__ = ["AnalyzeSketchConstraintsHandler", "SketchDiagnosticsAnalyzer"]
+__all__ = [
+    "AnalyzeSketchConstraintsHandler",
+    "DiagnoseSketchDoFHandler",
+    "SketchDiagnosticsAnalyzer",
+    "SketchDoFDiagnoser",
+]

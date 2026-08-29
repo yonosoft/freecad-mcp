@@ -1,4 +1,4 @@
-"""Public MCP registration and schema tests for analyze_sketch_constraints (tool 59)."""
+"""Public MCP registration and schema tests for compact sketch diagnostics."""
 
 from __future__ import annotations
 
@@ -8,10 +8,16 @@ from typing import Any, cast
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 
-from freecad_mcp.commands.sketch_diagnostics import AnalyzeSketchConstraintsHandler
+from freecad_mcp.commands.sketch_diagnostics import (
+    AnalyzeSketchConstraintsHandler,
+    DiagnoseSketchDoFHandler,
+)
 from freecad_mcp.mcp.server import build_mcp_server
 from freecad_mcp.server.config import ServerConfig
-from freecad_mcp.tool_registry import ANALYZE_SKETCH_CONSTRAINTS_TOOL
+from freecad_mcp.tool_registry import (
+    ANALYZE_SKETCH_CONSTRAINTS_TOOL,
+    DIAGNOSE_SKETCH_DOF_TOOL,
+)
 from tests.support.mcp_stubs import make_handlers
 
 
@@ -31,8 +37,9 @@ def test_tool_59_is_analyze_sketch_constraints() -> None:
     tools = asyncio.run(_server().list_tools())
     names = [item.name for item in tools]
 
-    assert len(names) == 59
+    assert len(names) == 60
     assert names[58] == ANALYZE_SKETCH_CONSTRAINTS_TOOL
+    assert names[59] == DIAGNOSE_SKETCH_DOF_TOOL
 
 
 def test_tool_registered_exactly_once() -> None:
@@ -209,3 +216,49 @@ def test_runtime_uses_real_handler() -> None:
     assert hasattr(handlers.sketcher, "analyze_sketch_constraints")
     handler = handlers.sketcher.analyze_sketch_constraints
     assert isinstance(handler, AnalyzeSketchConstraintsHandler)
+
+
+def test_dof_tool_schema_is_exactly_two_required_strings() -> None:
+    tool = _server()._tool_manager.get_tool(DIAGNOSE_SKETCH_DOF_TOOL)
+    assert tool is not None
+    schema = cast(dict[str, Any], tool.parameters)
+
+    assert schema["required"] == ["document_name", "sketch_name"]
+    assert set(schema["properties"]) == {"document_name", "sketch_name"}
+    assert schema["properties"]["document_name"]["type"] == "string"
+    assert schema["properties"]["sketch_name"]["type"] == "string"
+
+
+def test_dof_tool_description_is_compact_and_explicitly_read_only() -> None:
+    tool = _server()._tool_manager.get_tool(DIAGNOSE_SKETCH_DOF_TOOL)
+    assert tool is not None
+    description = tool.description.lower()
+
+    assert len(tool.description) < 300
+    assert "read-only" in description
+    assert "does not recompute" in description
+    assert "edit mode" in description
+    assert "selection" in description
+
+
+def test_dof_tool_invocation_returns_affected_geometry() -> None:
+    import asyncio
+
+    handlers, adapter = make_handlers()
+    server = build_mcp_server(handlers, ServerConfig())
+    arguments = {"document_name": "TestDoc", "sketch_name": "TestSketch"}
+
+    call_result = cast(Any, asyncio.run(server.call_tool(DIAGNOSE_SKETCH_DOF_TOOL, arguments)))
+    result = cast(dict[str, object], call_result[1])
+
+    assert result["ok"] is True
+    assert result["code"] == "sketch_dof_diagnosed"
+    assert result["degrees_of_freedom"] == 1
+    assert result["unconstrained_geometry"] == [{"geometry_index": 2, "type": "circle"}]
+    assert adapter.diagnose_sketch_dof_calls == [("TestDoc", "TestSketch")]
+
+
+def test_runtime_uses_real_dof_handler() -> None:
+    handlers, _ = make_handlers()
+
+    assert isinstance(handlers.sketcher.diagnose_sketch_dof, DiagnoseSketchDoFHandler)

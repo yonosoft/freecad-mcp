@@ -1,11 +1,11 @@
 # Public MCP Tool Inventory
 
 The structured catalogue under `src/freecad_mcp/catalog/` contains
-exactly 59 public tools, each with one complete definition. The numbered list
+exactly 60 public tools, each with one complete definition. The numbered list
 below is the
 unchanged legacy MCP wire order derived as `REGISTERED_TOOL_NAMES`; it is
 intentionally distinct from the catalogue's human-readable logical order.
-Catalogue groups and sections are metadata only: all 59 tools remain visible,
+Catalogue groups and sections are metadata only: all 60 tools remain visible,
 with no runtime filtering. Repository consistency tests prevent the catalogue,
 runtime registration, and this inventory from drifting apart.
 
@@ -68,6 +68,18 @@ runtime registration, and this inventory from drifting apart.
 57. `scale_sketch`
 58. `mirror_sketch`
 59. `analyze_sketch_constraints`
+60. `diagnose_sketch_dof`
+
+### `diagnose_sketch_dof`
+
+Compact, read-only native solver diagnostics. Accepts required `document_name`
+and `sketch_name` strings. Returns the cached remaining DoF count, fully
+constrained state, and deduplicated zero-based indices and types of internal
+geometry for which FreeCAD reports dependent solver parameters. It does not
+recompute, enter Sketch edit mode, invoke GUI selection, open a transaction,
+or save. Point/parameter labels, dependency groups, and motion descriptions are
+deliberately omitted because the supported Python API does not expose them
+reliably. See [Sketch DoF diagnostics](sketch-dof-diagnostics.md).
 
 ## Deferred
 

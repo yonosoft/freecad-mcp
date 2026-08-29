@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://freecad-mcp.local/schemas/freecad-sketch-constraints-v1.json",
-  "$comment": "Policy source: ../../.aider-desk/rules/freecad-sketch-constraints.yaml",
+  "$comment": "Historical schema retained after agent policy removal.",
   "title": "FreeCAD sketch constraint-engineering policy",
   "type": "object",
   "additionalProperties": false,
