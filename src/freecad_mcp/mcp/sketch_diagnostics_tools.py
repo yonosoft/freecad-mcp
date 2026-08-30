@@ -23,9 +23,11 @@ ANALYZE_SKETCH_CONSTRAINTS_DESCRIPTION = (
 )
 
 DIAGNOSE_SKETCH_DOF_DESCRIPTION = (
-    "Return the remaining Sketcher DoF count and affected zero-based geometry indices "
-    "reported by FreeCAD's solver. Read-only; does not recompute, enter edit mode, or "
-    "change GUI selection."
+    "Return the remaining Sketcher DoF count, affected zero-based geometry indices, coarse "
+    "native dependent elements, and conservative endpoint, centre, point, radius, or curve "
+    "motion hints where supported. The result explicitly identifies unavailable coordinate "
+    "directions, independent modes, and coupled groups. Read-only; does not recompute, enter "
+    "edit mode, or change GUI selection."
 )
 
 

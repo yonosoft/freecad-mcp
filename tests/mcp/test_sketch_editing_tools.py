@@ -77,7 +77,7 @@ def test_geometry_update_schema_has_four_strict_same_state_variants() -> None:
     )
 
 
-def test_replacement_schema_reuses_exact_eighteen_variant_union() -> None:
+def test_replacement_schema_reuses_exact_concrete_constraint_union() -> None:
     server = _server()
     replacement_tool = server._tool_manager.get_tool(REPLACE_SKETCH_CONSTRAINT_TOOL)
     add_tool = server._tool_manager.get_tool(ADD_SKETCH_CONSTRAINTS_TOOL)
@@ -90,10 +90,9 @@ def test_replacement_schema_reuses_exact_eighteen_variant_union() -> None:
 
     assert replacement_tool.description == REPLACE_SKETCH_CONSTRAINT_DESCRIPTION
     assert replacement_schema["additionalProperties"] is False
-    assert len(replacement["oneOf"]) == 18
-    assert len(replacement["discriminator"]["mapping"]) == 18
+    assert len(replacement["oneOf"]) == 23
+    assert all(set(variant) == {"$ref"} for variant in replacement["oneOf"])
     assert replacement["oneOf"] == existing["oneOf"]
-    assert replacement["discriminator"] == existing["discriminator"]
 
 
 def test_constraint_value_schema_is_required_finite_numeric_contract() -> None:

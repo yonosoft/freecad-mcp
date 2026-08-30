@@ -38,7 +38,14 @@ def _result() -> SketchDoFDiagnosticsResult:
         sketch_name="Sketch",
         fully_constrained=False,
         degrees_of_freedom=1,
-        unconstrained_geometry=(SketchDoFGeometry(geometry_index=17, type="line_segment"),),
+        unconstrained_geometry=(
+            SketchDoFGeometry(
+                geometry_index=17,
+                type="line_segment",
+                dependent_elements=("point_parameters",),
+                motion_hints=("endpoint_movement",),
+            ),
+        ),
     )
 
 
@@ -56,7 +63,27 @@ def test_handler_returns_compact_serializable_result() -> None:
         "sketch_name": "Sketch",
         "fully_constrained": False,
         "degrees_of_freedom": 1,
-        "unconstrained_geometry": [{"geometry_index": 17, "type": "line_segment"}],
+        "unconstrained_geometry": [
+            {
+                "geometry_index": 17,
+                "type": "line_segment",
+                "dependent_elements": ["point_parameters"],
+                "motion_hints": ["endpoint_movement"],
+            }
+        ],
+        "motion_analysis": {
+            "detail_level": "coarse_native_elements",
+            "coordinate_directions_available": False,
+            "independent_motion_modes_available": False,
+            "coupled_motion_groups_available": False,
+            "point_position_detail": "collapsed",
+            "limitations": [
+                "coordinate_directions_unavailable",
+                "independent_motion_modes_unavailable",
+                "coupled_motion_groups_unavailable",
+                "point_position_labels_collapsed_for_cross_version_safety",
+            ],
+        },
     }
     assert adapter.calls == [("Doc", "Sketch")]
 

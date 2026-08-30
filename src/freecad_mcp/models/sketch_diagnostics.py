@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Annotated
 
@@ -50,13 +50,47 @@ class SketchDiagnosticsRequestInput(_SketchGeometryInputModel):
 
 @dataclass(frozen=True, slots=True)
 class SketchDoFGeometry:
-    """One current-state geometry index reported by FreeCAD's solver."""
+    """One current-state geometry index with conservative native motion detail."""
 
     geometry_index: int
     type: str
+    dependent_elements: tuple[str, ...] = ()
+    motion_hints: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
-        return {"geometry_index": self.geometry_index, "type": self.type}
+        return {
+            "geometry_index": self.geometry_index,
+            "type": self.type,
+            "dependent_elements": list(self.dependent_elements),
+            "motion_hints": list(self.motion_hints),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SketchDoFMotionAnalysis:
+    """Stable capability boundary for native remaining-motion interpretation."""
+
+    detail_level: str = "coarse_native_elements"
+    coordinate_directions_available: bool = False
+    independent_motion_modes_available: bool = False
+    coupled_motion_groups_available: bool = False
+    point_position_detail: str = "collapsed"
+    limitations: tuple[str, ...] = (
+        "coordinate_directions_unavailable",
+        "independent_motion_modes_unavailable",
+        "coupled_motion_groups_unavailable",
+        "point_position_labels_collapsed_for_cross_version_safety",
+    )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "detail_level": self.detail_level,
+            "coordinate_directions_available": self.coordinate_directions_available,
+            "independent_motion_modes_available": self.independent_motion_modes_available,
+            "coupled_motion_groups_available": self.coupled_motion_groups_available,
+            "point_position_detail": self.point_position_detail,
+            "limitations": list(self.limitations),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +102,7 @@ class SketchDoFDiagnosticsResult:
     fully_constrained: bool
     degrees_of_freedom: int
     unconstrained_geometry: tuple[SketchDoFGeometry, ...]
+    motion_analysis: SketchDoFMotionAnalysis = field(default_factory=SketchDoFMotionAnalysis)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -76,6 +111,7 @@ class SketchDoFDiagnosticsResult:
             "fully_constrained": self.fully_constrained,
             "degrees_of_freedom": self.degrees_of_freedom,
             "unconstrained_geometry": [item.to_dict() for item in self.unconstrained_geometry],
+            "motion_analysis": self.motion_analysis.to_dict(),
         }
 
 

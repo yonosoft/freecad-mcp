@@ -498,18 +498,17 @@ def test_expected_dof_reduction_is_capped_at_three_in_model_and_schema() -> None
     assert dof_schema["properties"]["maximum"]["maximum"] == 3
 
 
-def test_plan_schema_is_closed_and_reuses_discriminated_constraint_union() -> None:
+def test_plan_schema_is_closed_and_reuses_concrete_constraint_union() -> None:
     schema = ConstraintPlan.model_json_schema()
     constraint_schema = schema["$defs"]["ConstraintPlanStep"]["properties"]["constraint"]
 
     assert schema["additionalProperties"] is False
-    assert constraint_schema["discriminator"]["propertyName"] == "type"
-    assert constraint_schema["discriminator"]["mapping"]["coincident"] == (
-        "#/$defs/CoincidentConstraintInput"
-    )
-    assert constraint_schema["discriminator"]["mapping"]["equal"] == (
-        "#/$defs/EqualConstraintInput"
-    )
+    variants = constraint_schema["oneOf"]
+    assert len(variants) == 23
+    assert all(set(variant) == {"$ref"} for variant in variants)
+    references = {variant["$ref"] for variant in variants}
+    assert "#/$defs/CoincidentConstraintInput" in references
+    assert "#/$defs/EqualConstraintInput" in references
 
 
 def test_issue_order_is_deterministic() -> None:

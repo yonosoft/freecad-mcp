@@ -456,7 +456,14 @@ class AdapterStub:
             sketch_name=sketch_name,
             fully_constrained=False,
             degrees_of_freedom=1,
-            unconstrained_geometry=(SketchDoFGeometry(geometry_index=2, type="circle"),),
+            unconstrained_geometry=(
+                SketchDoFGeometry(
+                    geometry_index=2,
+                    type="circle",
+                    dependent_elements=("edge_parameters",),
+                    motion_hints=("radius_change",),
+                ),
+            ),
         )
 
     def validate_sketch_profile(

@@ -83,26 +83,76 @@ def _install_modules(monkeypatch: pytest.MonkeyPatch, sketch: _Sketch) -> None:
             1,
             False,
             (_LineSegment(),) * 4,
-            ((0, 1), (0, 1), (1, 1), (2, 1), (3, 1)),
+            ((0, 1), (0, 2), (0, 3), (1, 1), (2, 2), (3, 3)),
             [
-                {"geometry_index": 0, "type": "line_segment"},
-                {"geometry_index": 1, "type": "line_segment"},
-                {"geometry_index": 2, "type": "line_segment"},
-                {"geometry_index": 3, "type": "line_segment"},
+                {
+                    "geometry_index": index,
+                    "type": "line_segment",
+                    "dependent_elements": ["point_parameters"],
+                    "motion_hints": ["endpoint_movement"],
+                }
+                for index in range(4)
             ],
         ),
-        (1, False, (_Circle(),), ((0, 0),), [{"geometry_index": 0, "type": "circle"}]),
-        (1, False, (_Point(),), ((0, 1),), [{"geometry_index": 0, "type": "point"}]),
+        (
+            1,
+            False,
+            (_Circle(),),
+            ((0, 0),),
+            [
+                {
+                    "geometry_index": 0,
+                    "type": "circle",
+                    "dependent_elements": ["edge_parameters"],
+                    "motion_hints": ["radius_change"],
+                }
+            ],
+        ),
+        (
+            3,
+            False,
+            (_Circle(),),
+            ((0, 0), (0, 1), (0, 1), (0, 1)),
+            [
+                {
+                    "geometry_index": 0,
+                    "type": "circle",
+                    "dependent_elements": ["edge_parameters", "point_parameters"],
+                    "motion_hints": ["center_movement", "radius_change"],
+                }
+            ],
+        ),
+        (
+            1,
+            False,
+            (_Point(),),
+            ((0, 1),),
+            [
+                {
+                    "geometry_index": 0,
+                    "type": "point",
+                    "dependent_elements": ["point_parameters"],
+                    "motion_hints": ["point_movement"],
+                }
+            ],
+        ),
         (
             1,
             False,
             (_ArcOfCircle(),),
             ((0, 0),),
-            [{"geometry_index": 0, "type": "arc_of_circle"}],
+            [
+                {
+                    "geometry_index": 0,
+                    "type": "arc_of_circle",
+                    "dependent_elements": ["edge_parameters"],
+                    "motion_hints": ["curve_parameter_change"],
+                }
+            ],
         ),
     ],
 )
-def test_adapter_returns_compact_native_dof_geometry_without_mutation(
+def test_adapter_returns_native_element_motion_hints_without_mutation(
     monkeypatch: pytest.MonkeyPatch,
     dof: int,
     fully: bool,
@@ -127,6 +177,19 @@ def test_adapter_returns_compact_native_dof_geometry_without_mutation(
         "fully_constrained": fully,
         "degrees_of_freedom": dof,
         "unconstrained_geometry": expected,
+        "motion_analysis": {
+            "detail_level": "coarse_native_elements",
+            "coordinate_directions_available": False,
+            "independent_motion_modes_available": False,
+            "coupled_motion_groups_available": False,
+            "point_position_detail": "collapsed",
+            "limitations": [
+                "coordinate_directions_unavailable",
+                "independent_motion_modes_unavailable",
+                "coupled_motion_groups_unavailable",
+                "point_position_labels_collapsed_for_cross_version_safety",
+            ],
+        },
     }
     assert sketch.native_calls == 1
     assert (sketch.DoF, sketch.FullyConstrained, sketch.Geometry, sketch._dependent) == before

@@ -234,11 +234,14 @@ def test_dof_tool_description_is_compact_and_explicitly_read_only() -> None:
     assert tool is not None
     description = tool.description.lower()
 
-    assert len(tool.description) < 300
+    assert len(tool.description) < 450
     assert "read-only" in description
     assert "does not recompute" in description
     assert "edit mode" in description
     assert "selection" in description
+    assert "motion hints" in description
+    assert "unavailable" in description
+    assert "coupled groups" in description
 
 
 def test_dof_tool_invocation_returns_affected_geometry() -> None:
@@ -254,7 +257,18 @@ def test_dof_tool_invocation_returns_affected_geometry() -> None:
     assert result["ok"] is True
     assert result["code"] == "sketch_dof_diagnosed"
     assert result["degrees_of_freedom"] == 1
-    assert result["unconstrained_geometry"] == [{"geometry_index": 2, "type": "circle"}]
+    assert result["unconstrained_geometry"] == [
+        {
+            "geometry_index": 2,
+            "type": "circle",
+            "dependent_elements": ["edge_parameters"],
+            "motion_hints": ["radius_change"],
+        }
+    ]
+    motion_analysis = cast(dict[str, object], result["motion_analysis"])
+    assert motion_analysis["coordinate_directions_available"] is False
+    assert motion_analysis["independent_motion_modes_available"] is False
+    assert motion_analysis["coupled_motion_groups_available"] is False
     assert adapter.diagnose_sketch_dof_calls == [("TestDoc", "TestSketch")]
 
 

@@ -21,6 +21,10 @@ _GEOMETRY_TYPES = (
     ("BSplineCurve", "b_spline"),
 )
 
+_EDGE_PARAMETERS = "edge_parameters"
+_POINT_PARAMETERS = "point_parameters"
+_DEPENDENT_ELEMENT_ORDER = (_EDGE_PARAMETERS, _POINT_PARAMETERS)
+
 
 def diagnose_sketch_dof(
     document_name: str,
@@ -59,29 +63,38 @@ def diagnose_sketch_dof(
     except Exception as exc:
         raise SketchInspectionError("dof_geometry_api_failure") from exc
 
-    indices = _geometry_indices(raw, len(geometry))
-    if dof == 0 and indices:
+    dependent = _dependent_geometry_elements(raw, len(geometry))
+    if dof == 0 and dependent:
         raise SketchInspectionError("fully_constrained_geometry_reported")
-    if dof > 0 and not indices:
+    if dof > 0 and not dependent:
         raise SketchInspectionError("unconstrained_geometry_unavailable")
+
+    diagnosed_geometry: list[SketchDoFGeometry] = []
+    for index, elements in dependent:
+        geometry_type = _geometry_type(geometry[index], Part)
+        diagnosed_geometry.append(
+            SketchDoFGeometry(
+                geometry_index=index,
+                type=geometry_type,
+                dependent_elements=elements,
+                motion_hints=_motion_hints(geometry_type, elements),
+            )
+        )
 
     return SketchDoFDiagnosticsResult(
         document_name=document_name,
         sketch_name=str(sketch.Name),
         fully_constrained=fully_constrained,
         degrees_of_freedom=dof,
-        unconstrained_geometry=tuple(
-            SketchDoFGeometry(
-                geometry_index=index,
-                type=_geometry_type(geometry[index], Part),
-            )
-            for index in indices
-        ),
+        unconstrained_geometry=tuple(diagnosed_geometry),
     )
 
 
-def _geometry_indices(raw: tuple[Any, ...], geometry_count: int) -> tuple[int, ...]:
-    indices: set[int] = set()
+def _dependent_geometry_elements(
+    raw: tuple[Any, ...],
+    geometry_count: int,
+) -> tuple[tuple[int, tuple[str, ...]], ...]:
+    by_index: dict[int, set[str]] = {}
     for item in raw:
         if not isinstance(item, (tuple, list)) or len(item) != 2:
             raise SketchInspectionError("dof_geometry_entry_malformed")
@@ -91,8 +104,31 @@ def _geometry_indices(raw: tuple[Any, ...], geometry_count: int) -> tuple[int, .
             raise SketchInspectionError("dof_geometry_index_out_of_range")
         if position not in (0, 1, 2, 3):
             raise SketchInspectionError("dof_geometry_position_unsupported")
-        indices.add(index)
-    return tuple(sorted(indices))
+        element = _EDGE_PARAMETERS if position == 0 else _POINT_PARAMETERS
+        by_index.setdefault(index, set()).add(element)
+    return tuple(
+        (
+            index,
+            tuple(element for element in _DEPENDENT_ELEMENT_ORDER if element in by_index[index]),
+        )
+        for index in sorted(by_index)
+    )
+
+
+def _motion_hints(geometry_type: str, elements: tuple[str, ...]) -> tuple[str, ...]:
+    hints: list[str] = []
+    if _POINT_PARAMETERS in elements:
+        point_hint = {
+            "line_segment": "endpoint_movement",
+            "circle": "center_movement",
+            "point": "point_movement",
+            "arc_of_circle": "endpoint_or_center_movement",
+        }.get(geometry_type, "control_point_movement")
+        hints.append(point_hint)
+    if _EDGE_PARAMETERS in elements:
+        edge_hint = "radius_change" if geometry_type == "circle" else "curve_parameter_change"
+        hints.append(edge_hint)
+    return tuple(hints)
 
 
 def _strict_integer(value: Any, reason: str) -> int:

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Annotated, Literal, TypeAlias
+from typing import Annotated, Any, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag
 
 from freecad_mcp.models.common import (
     MAX_SKETCH_CONSTRAINT_BATCH_SIZE,
@@ -316,26 +316,46 @@ AngleConstraintInput = Annotated[
 ]
 
 
+def _sketch_constraint_variant(value: Any) -> str:
+    """Select one concrete transport variant without nesting discriminators."""
+    if isinstance(value, dict):
+        constraint_type = value.get("type")
+        mode = value.get("mode")
+    else:
+        constraint_type = getattr(value, "type", None)
+        mode = getattr(value, "mode", None)
+    if not isinstance(constraint_type, str):
+        return ""
+    if constraint_type in {"distance", "distance_x", "distance_y", "angle"}:
+        return f"{constraint_type}:{mode}" if isinstance(mode, str) else constraint_type
+    return constraint_type
+
+
 SketchConstraintInput = Annotated[
-    HorizontalConstraintInput
-    | VerticalConstraintInput
-    | HorizontalPointsConstraintInput
-    | VerticalPointsConstraintInput
-    | ParallelConstraintInput
-    | PerpendicularConstraintInput
-    | EqualConstraintInput
-    | CoincidentConstraintInput
-    | PointOnObjectConstraintInput
-    | SymmetricConstraintInput
-    | TangentConstraintInput
-    | TangentPointsConstraintInput
-    | DistanceConstraintInput
-    | DistanceXConstraintInput
-    | DistanceYConstraintInput
-    | RadiusConstraintInput
-    | DiameterConstraintInput
-    | AngleConstraintInput,
-    Field(discriminator="type"),
+    Annotated[HorizontalConstraintInput, Tag("horizontal")]
+    | Annotated[VerticalConstraintInput, Tag("vertical")]
+    | Annotated[HorizontalPointsConstraintInput, Tag("horizontal_points")]
+    | Annotated[VerticalPointsConstraintInput, Tag("vertical_points")]
+    | Annotated[ParallelConstraintInput, Tag("parallel")]
+    | Annotated[PerpendicularConstraintInput, Tag("perpendicular")]
+    | Annotated[EqualConstraintInput, Tag("equal")]
+    | Annotated[CoincidentConstraintInput, Tag("coincident")]
+    | Annotated[PointOnObjectConstraintInput, Tag("point_on_object")]
+    | Annotated[SymmetricConstraintInput, Tag("symmetric")]
+    | Annotated[TangentConstraintInput, Tag("tangent")]
+    | Annotated[TangentPointsConstraintInput, Tag("tangent_points")]
+    | Annotated[DistanceLineLengthConstraintInput, Tag("distance:line_length")]
+    | Annotated[DistancePointToOriginConstraintInput, Tag("distance:point_to_origin")]
+    | Annotated[DistanceBetweenPointsConstraintInput, Tag("distance:between_points")]
+    | Annotated[DistanceXPointToOriginConstraintInput, Tag("distance_x:point_to_origin")]
+    | Annotated[DistanceXBetweenPointsConstraintInput, Tag("distance_x:between_points")]
+    | Annotated[DistanceYPointToOriginConstraintInput, Tag("distance_y:point_to_origin")]
+    | Annotated[DistanceYBetweenPointsConstraintInput, Tag("distance_y:between_points")]
+    | Annotated[RadiusConstraintInput, Tag("radius")]
+    | Annotated[DiameterConstraintInput, Tag("diameter")]
+    | Annotated[AngleLineConstraintInput, Tag("angle:line_angle")]
+    | Annotated[AngleBetweenLinesConstraintInput, Tag("angle:between_lines")],
+    Discriminator(_sketch_constraint_variant),
 ]
 
 

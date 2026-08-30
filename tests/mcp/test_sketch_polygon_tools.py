@@ -233,4 +233,6 @@ def test_rectangle_schemas_and_constraint_union_remain_unchanged() -> None:
     assert rectangle is not None and "center" not in rectangle.parameters["properties"]
     assert centered is not None and "placement" not in centered.parameters["properties"]
     assert constraints is not None
-    assert len(constraints.parameters["properties"]["constraints"]["items"]["oneOf"]) == 18
+    variants = constraints.parameters["properties"]["constraints"]["items"]["oneOf"]
+    assert len(variants) == 23
+    assert all(set(variant) == {"$ref"} for variant in variants)

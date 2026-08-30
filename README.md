@@ -135,8 +135,8 @@ The tools cover these controlled areas:
   inspection;
 - geometry creation for supported lines, circles, circular arcs, points,
   conics, and B-splines;
-- an 18-variant internal sketch-constraint contract, including controlled
-  point-to-point tangency;
+- an 18-type internal sketch-constraint contract exposed as 23 concrete
+  transport variants, including controlled point-to-point tangency;
 - external-geometry references and a separately bounded mixed-reference
   constraint contract;
 - semantic rectangles, centred rectangles, equilateral triangles, regular
@@ -153,7 +153,10 @@ The tools cover these controlled areas:
   state;
 - read-only constraint diagnostics with structured candidate repair actions.
 - compact native remaining-DoF diagnostics that identify affected sketch
-  geometry without entering edit mode or changing GUI selection.
+  geometry, dependent edge/point elements, and conservative motion hints
+  without entering edit mode or changing GUI selection;
+- compact verified deltas for small constraint name, expression, value, and
+  state mutations, with detailed state available through inspection tools.
 
 All public operations use strict schemas, deterministic validation, structured
 results, and controlled errors. The complete current wire-order list is the
@@ -186,7 +189,7 @@ evidence for these development stages:
 | Sketch creation | Strict supported geometry and constraints with structured readback and solver facts |
 | Semantic profiles | Rectangles, centred rectangles, polygons, slots, rounded rectangles, and polylines within frozen contracts |
 | Inspection and dependencies | Profile analysis, open vertices, external geometry, dependency reporting, and controlled diagnostics |
-| Safe mutation | Removal, construction state, geometry edits, constraint replacement and datum edits, names, and expressions |
+| Safe mutation | Removal, construction state, geometry edits, constraint replacement and datum edits, names, and expressions; small constraint mutations return compact verified deltas |
 | Topology and transforms | Bounded trim/split/extend, chamfer/fillet, selected-geometry transforms and arrays, and whole-sketch copy-only transforms |
 | Constraint diagnostics | Read-only classifications, issues, solver evidence, and non-binding repair candidates |
 | Constraint engineering | The six-geometry, 15-constraint asymmetric benchmark reaches zero degrees of freedom and remains stable under its verified parameter edits |
@@ -218,6 +221,9 @@ The most important limitations are:
 - sketch geometry and constraint indices identify current state, not permanent
   entities, so clients must inspect again after mutation;
 - solver facts can be unavailable when FreeCAD's cached sketch state is stale;
+- the public FreeCAD Sketcher binding does not expose coordinate-specific free
+  directions, independent motion modes, or coupled dependency groups, so DoF
+  diagnostics report that boundary instead of inferring it;
 - some native FreeCAD states are reported as unsupported rather than guessed;
 - development and native acceptance are currently documented primarily for
   FreeCAD 1.1 on Windows;
@@ -291,7 +297,9 @@ transport remain the same.
 
 After connecting, begin with inspection. Tool indices refer to current FreeCAD
 state, and a client should inspect again after a mutation before issuing
-follow-up operations.
+follow-up operations. Small constraint mutations return compact semantic deltas;
+use `get_sketch` or the focused inspection tools when complete geometry and
+constraint state is required.
 
 ## Architecture and safety principles
 

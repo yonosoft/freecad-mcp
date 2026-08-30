@@ -190,4 +190,5 @@ def test_centered_rectangle_preserves_tool_sixteen_and_constraint_schemas() -> N
     assert "center" not in rectangle_tool.parameters["properties"]
     assert constraint_tool is not None
     items = constraint_tool.parameters["properties"]["constraints"]["items"]
-    assert len(items["oneOf"]) == 18
+    assert len(items["oneOf"]) == 23
+    assert all(set(variant) == {"$ref"} for variant in items["oneOf"])

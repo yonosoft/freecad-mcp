@@ -23,6 +23,19 @@ from freecad_mcp.models.sketch_inspection import (
 )
 
 
+def _compact_mutation_readback(
+    sketch: SketchInspectionResult,
+    document: DocumentSummary,
+) -> dict[str, object]:
+    """Project a verified full readback into compact public mutation context."""
+    return {
+        "document_name": document.name,
+        "sketch_name": sketch.name,
+        "document_modified": document.modified,
+        "solver": sketch.solver.to_dict(),
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class SketchReferenceConstraintSummary:
     """One added constraint with normalized public operands and no native GeoIds."""
@@ -139,6 +152,7 @@ class SketchConstraintValueUpdateResult:
 
     def to_dict(self) -> dict[str, object]:
         return {
+            **_compact_mutation_readback(self.sketch, self.document),
             "constraint_index": self.constraint_index,
             "constraint_type": self.constraint_type,
             "before_constraint": self.before_constraint.to_dict(),
@@ -158,16 +172,13 @@ class SketchConstraintValueUpdateResult:
             "constraint_count": self.sketch.constraint_count,
             "external_geometry_count": self.sketch.external_geometry_count,
             "affected_geometry_indices": list(self.affected_geometry_indices),
-            "solver": self.sketch.solver.to_dict(),
             "profile_impact": dict(self.profile_impact),
-            "sketch": self.sketch.to_dict(),
-            "document": self.document.to_dict(),
         }
 
 
 @dataclass(frozen=True, slots=True)
 class SketchConstraintStateResult:
-    """Verified constraint state transition with complete controlled readback."""
+    """Verified constraint state transition with compact public readback."""
 
     constraint_index: int
     constraint_type: str
@@ -192,10 +203,8 @@ class SketchConstraintStateResult:
             "transaction_committed": not self.no_change,
             "affected_geometry_indices": list(self.affected_geometry_indices),
         }
-        if self.sketch is not None:
-            result["sketch"] = self.sketch.to_dict()
-        if self.document is not None:
-            result["document"] = self.document.to_dict()
+        if self.sketch is not None and self.document is not None:
+            result.update(_compact_mutation_readback(self.sketch, self.document))
         return result
 
 
@@ -233,14 +242,13 @@ class SketchConstraintNameResult:
 
     def to_dict(self) -> dict[str, object]:
         return {
+            **_compact_mutation_readback(self.sketch, self.document),
             "constraint_index": self.constraint_index,
             "previous_name": self.previous_name,
             "current_name": self.current_name,
             "changed": not self.no_change,
             "no_change": self.no_change,
             "dependents": [item.to_dict() for item in self.dependents],
-            "sketch": self.sketch.to_dict(),
-            "document": self.document.to_dict(),
         }
 
 
@@ -308,6 +316,7 @@ class SketchConstraintExpressionMutationResult:
 
     def to_dict(self) -> dict[str, object]:
         return {
+            **_compact_mutation_readback(self.sketch, self.document),
             "constraint_index": self.constraint_index,
             "constraint_type": self.constraint_type,
             "constraint_name": self.constraint_name,
@@ -317,6 +326,4 @@ class SketchConstraintExpressionMutationResult:
             "no_change": self.no_change,
             "dependencies": [item.to_dict() for item in self.dependencies],
             "value": self.value.to_dict(),
-            "sketch": self.sketch.to_dict(),
-            "document": self.document.to_dict(),
         }

@@ -64,6 +64,26 @@ def _diagnose_read_only(document: Any, sketch: Any) -> dict[str, object]:
 def main() -> None:
     document = App.newDocument(f"MCPDoFDiagnosticSmoke_{uuid.uuid4().hex[:8]}")
     try:
+        line = document.addObject("Sketcher::SketchObject", "UnconstrainedLine")
+        line.addGeometry(
+            Part.LineSegment(App.Vector(1, 2), App.Vector(8, 6)),
+            False,
+        )
+
+        horizontal = document.addObject("Sketcher::SketchObject", "TranslatedHorizontalLine")
+        horizontal.addGeometry(
+            Part.LineSegment(App.Vector(1, 2), App.Vector(11, 2)),
+            False,
+        )
+        horizontal.addConstraint(Sketcher.Constraint("Horizontal", 0))
+        horizontal.addConstraint(Sketcher.Constraint("Distance", 0, 10.0))
+
+        free_circle = document.addObject("Sketcher::SketchObject", "FreeCircle")
+        free_circle.addGeometry(
+            Part.Circle(App.Vector(4, 6), App.Vector(0, 0, 1), 3),
+            False,
+        )
+
         window = document.addObject("Sketcher::SketchObject", "Window")
         _add_rectangle(window)
 
@@ -83,23 +103,72 @@ def main() -> None:
         document.recompute()
         results = {
             sketch.Name: _diagnose_read_only(document, sketch)
-            for sketch in (window, fully, circle, point)
+            for sketch in (line, horizontal, free_circle, window, fully, circle, point)
         }
 
+        assert results["UnconstrainedLine"]["degrees_of_freedom"] == 4
+        assert results["UnconstrainedLine"]["unconstrained_geometry"] == [
+            {
+                "geometry_index": 0,
+                "type": "line_segment",
+                "dependent_elements": ["point_parameters"],
+                "motion_hints": ["endpoint_movement"],
+            }
+        ]
+        assert results["TranslatedHorizontalLine"]["degrees_of_freedom"] == 2
+        assert results["TranslatedHorizontalLine"]["unconstrained_geometry"] == [
+            {
+                "geometry_index": 0,
+                "type": "line_segment",
+                "dependent_elements": ["point_parameters"],
+                "motion_hints": ["endpoint_movement"],
+            }
+        ]
+        assert results["FreeCircle"]["degrees_of_freedom"] == 3
+        assert results["FreeCircle"]["unconstrained_geometry"] == [
+            {
+                "geometry_index": 0,
+                "type": "circle",
+                "dependent_elements": ["edge_parameters", "point_parameters"],
+                "motion_hints": ["center_movement", "radius_change"],
+            }
+        ]
         assert results["Window"]["degrees_of_freedom"] == 1
         assert results["Window"]["unconstrained_geometry"] == [
-            {"geometry_index": index, "type": "line_segment"} for index in range(4)
+            {
+                "geometry_index": index,
+                "type": "line_segment",
+                "dependent_elements": ["point_parameters"],
+                "motion_hints": ["endpoint_movement"],
+            }
+            for index in range(4)
         ]
+        window_analysis = results["Window"]["motion_analysis"]
+        assert isinstance(window_analysis, dict)
+        assert window_analysis["coupled_motion_groups_available"] is False
+        limitations = window_analysis["limitations"]
+        assert isinstance(limitations, list)
+        assert "coupled_motion_groups_unavailable" in limitations
         assert results["FullyConstrainedWindow"]["degrees_of_freedom"] == 0
         assert results["FullyConstrainedWindow"]["fully_constrained"] is True
         assert results["FullyConstrainedWindow"]["unconstrained_geometry"] == []
         assert results["FreeRadiusCircle"]["degrees_of_freedom"] == 1
         assert results["FreeRadiusCircle"]["unconstrained_geometry"] == [
-            {"geometry_index": 0, "type": "circle"}
+            {
+                "geometry_index": 0,
+                "type": "circle",
+                "dependent_elements": ["edge_parameters"],
+                "motion_hints": ["radius_change"],
+            }
         ]
         assert results["FreeYPoint"]["degrees_of_freedom"] == 1
         assert results["FreeYPoint"]["unconstrained_geometry"] == [
-            {"geometry_index": 0, "type": "point"}
+            {
+                "geometry_index": 0,
+                "type": "point",
+                "dependent_elements": ["point_parameters"],
+                "motion_hints": ["point_movement"],
+            }
         ]
 
         print(json.dumps({"status": "PASS", "results": results}, indent=2))

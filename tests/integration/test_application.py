@@ -385,7 +385,14 @@ class AdapterStub:
             sketch_name=sketch_name,
             fully_constrained=False,
             degrees_of_freedom=1,
-            unconstrained_geometry=(SketchDoFGeometry(geometry_index=0, type="line_segment"),),
+            unconstrained_geometry=(
+                SketchDoFGeometry(
+                    geometry_index=0,
+                    type="line_segment",
+                    dependent_elements=("point_parameters",),
+                    motion_hints=("endpoint_movement",),
+                ),
+            ),
         )
 
     def validate_sketch_profile(
@@ -1438,4 +1445,24 @@ def test_application_dispatches_compact_sketch_dof_diagnosis() -> None:
     assert result.ok is True
     assert result.code == "sketch_dof_diagnosed"
     assert result.data["degrees_of_freedom"] == 1
-    assert result.data["unconstrained_geometry"] == [{"geometry_index": 0, "type": "line_segment"}]
+    assert result.data["unconstrained_geometry"] == [
+        {
+            "geometry_index": 0,
+            "type": "line_segment",
+            "dependent_elements": ["point_parameters"],
+            "motion_hints": ["endpoint_movement"],
+        }
+    ]
+    assert result.data["motion_analysis"] == {
+        "detail_level": "coarse_native_elements",
+        "coordinate_directions_available": False,
+        "independent_motion_modes_available": False,
+        "coupled_motion_groups_available": False,
+        "point_position_detail": "collapsed",
+        "limitations": [
+            "coordinate_directions_unavailable",
+            "independent_motion_modes_unavailable",
+            "coupled_motion_groups_unavailable",
+            "point_position_labels_collapsed_for_cross_version_safety",
+        ],
+    }

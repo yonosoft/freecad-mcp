@@ -105,51 +105,58 @@ def test_add_sketch_constraints_schema_locks_all_types_modes_and_strict_models()
     properties = cast(dict[str, Any], schema["properties"])
     constraints = cast(dict[str, Any], properties["constraints"])
     items = cast(dict[str, Any], constraints["items"])
-    discriminator = cast(dict[str, Any], items["discriminator"])
-    mapping = cast(dict[str, Any], discriminator["mapping"])
 
     assert constraints["minItems"] == 1
     assert constraints["maxItems"] == 100
     assert constraints["type"] == "array"
-    assert discriminator["propertyName"] == "type"
-    assert list(mapping) == [
-        "angle",
-        "coincident",
-        "diameter",
-        "distance",
-        "distance_x",
-        "distance_y",
-        "equal",
-        "horizontal",
-        "horizontal_points",
-        "parallel",
-        "perpendicular",
-        "point_on_object",
-        "radius",
-        "symmetric",
-        "tangent",
-        "tangent_points",
-        "vertical",
-        "vertical_points",
+    assert set(items) == {"oneOf"}
+    variants = cast(list[dict[str, str]], items["oneOf"])
+    assert all(set(variant) == {"$ref"} for variant in variants)
+    assert [variant["$ref"].rsplit("/", 1)[-1] for variant in variants] == [
+        "HorizontalConstraintInput",
+        "VerticalConstraintInput",
+        "HorizontalPointsConstraintInput",
+        "VerticalPointsConstraintInput",
+        "ParallelConstraintInput",
+        "PerpendicularConstraintInput",
+        "EqualConstraintInput",
+        "CoincidentConstraintInput",
+        "PointOnObjectConstraintInput",
+        "SymmetricConstraintInput",
+        "TangentConstraintInput",
+        "TangentPointsConstraintInput",
+        "DistanceLineLengthConstraintInput",
+        "DistancePointToOriginConstraintInput",
+        "DistanceBetweenPointsConstraintInput",
+        "DistanceXPointToOriginConstraintInput",
+        "DistanceXBetweenPointsConstraintInput",
+        "DistanceYPointToOriginConstraintInput",
+        "DistanceYBetweenPointsConstraintInput",
+        "RadiusConstraintInput",
+        "DiameterConstraintInput",
+        "AngleLineConstraintInput",
+        "AngleBetweenLinesConstraintInput",
     ]
-    assert len(items["oneOf"]) == 18
     object_definitions = [
         definition for definition in definitions.values() if definition.get("type") == "object"
     ]
     assert all(definition["additionalProperties"] is False for definition in object_definitions)
 
-    distance = cast(dict[str, Any], mapping["distance"])
-    distance_mapping = distance["discriminator"]["mapping"]
-    assert list(distance_mapping) == ["between_points", "line_length", "point_to_origin"]
-    assert len(distance["oneOf"]) == 3
-
-    distance_x = cast(dict[str, Any], mapping["distance_x"])
-    distance_y = cast(dict[str, Any], mapping["distance_y"])
-    assert list(distance_x["discriminator"]["mapping"]) == ["between_points", "point_to_origin"]
-    assert list(distance_y["discriminator"]["mapping"]) == ["between_points", "point_to_origin"]
-
-    angle = cast(dict[str, Any], mapping["angle"])
-    assert list(angle["discriminator"]["mapping"]) == ["between_lines", "line_angle"]
+    for name, constraint_type, mode in (
+        ("DistanceLineLengthConstraintInput", "distance", "line_length"),
+        ("DistancePointToOriginConstraintInput", "distance", "point_to_origin"),
+        ("DistanceBetweenPointsConstraintInput", "distance", "between_points"),
+        ("DistanceXPointToOriginConstraintInput", "distance_x", "point_to_origin"),
+        ("DistanceXBetweenPointsConstraintInput", "distance_x", "between_points"),
+        ("DistanceYPointToOriginConstraintInput", "distance_y", "point_to_origin"),
+        ("DistanceYBetweenPointsConstraintInput", "distance_y", "between_points"),
+        ("AngleLineConstraintInput", "angle", "line_angle"),
+        ("AngleBetweenLinesConstraintInput", "angle", "between_lines"),
+    ):
+        definition = definitions[name]
+        assert definition["properties"]["type"]["const"] == constraint_type
+        assert definition["properties"]["mode"]["const"] == mode
+        assert {"type", "mode"} <= set(definition["required"])
     assert definitions["SketchConstraintPointReferenceInput"]["properties"]["position"] == {
         "$ref": "#/$defs/SketchPointPosition"
     }

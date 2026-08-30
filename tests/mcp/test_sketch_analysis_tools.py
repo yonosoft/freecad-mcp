@@ -230,4 +230,6 @@ def test_constraint_union_remains_stable() -> None:
     server = _server()
     constraints = server._tool_manager.get_tool("add_sketch_constraints")
     assert constraints is not None
-    assert len(constraints.parameters["properties"]["constraints"]["items"]["oneOf"]) == 18
+    variants = constraints.parameters["properties"]["constraints"]["items"]["oneOf"]
+    assert len(variants) == 23
+    assert all(set(variant) == {"$ref"} for variant in variants)

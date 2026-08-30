@@ -150,4 +150,5 @@ def test_rectangle_schema_sees_additive_constraint_variant() -> None:
     assert constraint_tool is not None
     schema = constraint_tool.parameters
     items = schema["properties"]["constraints"]["items"]
-    assert len(items["oneOf"]) == 18
+    assert len(items["oneOf"]) == 23
+    assert all(set(variant) == {"$ref"} for variant in items["oneOf"])

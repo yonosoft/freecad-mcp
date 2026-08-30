@@ -45,9 +45,12 @@ read-only sketch state belongs to `freecad.sketch_inspection`. Both remain
 separate from sketch creation and behind the same public adapter facade.
 Compact remaining-DoF inspection belongs to
 `freecad.sketch_dof_diagnostics`; it translates FreeCAD's native dependent-
-parameter geometry IDs without recompute, edit mode, GUI selection, or solver
-reimplementation. Its evidence and deliberately narrow output boundary are
-recorded in [Sketch DoF diagnostics](sketch-dof-diagnostics.md).
+parameter geometry IDs into edge/point element categories and conservative
+geometry-specific motion hints without recompute, edit mode, GUI selection,
+perturbation, or solver reimplementation. Coordinate directions, independent
+modes, and coupled groups remain explicitly unavailable. Its evidence and
+deliberately narrow output boundary are recorded in
+[Sketch DoF diagnostics](sketch-dof-diagnostics.md).
 Controlled external-reference enumeration and mutation belong to
 `freecad.sketch_external_geometry`; read-only attachment, expression,
 constraint, consumer, broken, and cross-document dependency extraction belongs
@@ -1400,8 +1403,13 @@ registration loop, arbitrary property mutation, or raw constructor passthrough.
 
 The top-level schema requires exactly `document_name`, `sketch_name`, and a
 `constraints` array with 1 to 100 items. Both names use exact internal-name
-lookup. The strict nested discriminated union has 18 top-level variants and
-supports:
+lookup. The input retains 18 logical `type` values, but its callable Pydantic
+discriminator selects 23 concrete `type`/`mode` models. FastMCP therefore emits
+one direct `$ref` alternative per concrete request instead of embedding four
+second-level discriminator objects inside the top-level mapping. Clients can
+inspect every required, optional, point, geometry, index, and dimensional field
+without treating a nested alternative as `unknown`. The request payloads and
+validation allowlist are unchanged. The contract supports:
 
 ```text
 horizontal / vertical
@@ -2291,6 +2299,24 @@ Transport schemas for all four tools are registered explicitly and then made
 composition, and server registration preserve the existing dependency
 direction. The full capability contract is maintained in
 `docs/sketch-constraint-expression-capabilities.md`.
+
+### Compact small-mutation results
+
+Constraint name, expression set/clear, dimensional-value, and
+driving/active/virtual-state operations retain their complete controlled sketch
+and document readbacks inside the typed adapter result. Those snapshots remain
+available to semantic verification, dependency checks, rollback, and history
+proof. Their public `to_dict()` projection is intentionally smaller: exact
+document/sketch identifiers, the target constraint and before/after semantic
+delta, affected geometry and profile impact where applicable, document-modified
+state, and the verified solver summary.
+
+The compact projection does not duplicate the complete geometry and constraint
+collections or the full document summary. `get_sketch`, expression listing, and
+other inspection tools continue to return detailed state on demand. Creation,
+topology, removal, and replacement results retain their existing semantic
+mappings and readbacks; the projection is not applied indiscriminately to
+mutation results whose mappings are part of their contract.
 
 ## Sketch Topology-Editing Boundary
 
